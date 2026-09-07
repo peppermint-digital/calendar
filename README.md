@@ -87,6 +87,21 @@ silent behaviour, because both choices surprise somebody.
 Labels come from the package's language files (English and German included), so
 `describe()` follows the application's locale instead of hard-coding one.
 
+## iCalendar
+
+```php
+return app(IcsExporter::class)->download($events, 'team.ics', 'Team calendar');
+```
+
+Series are exported as `RRULE`, so a subscriber sees a series rather than one
+appointment. Attendees carry their response state, trashed events are exported
+as `STATUS:CANCELLED` so subscribers remove them, and confidential events are
+marked `CLASS:PRIVATE`.
+
+Lines are folded at 75 octets and never inside a multi-byte character — the two
+things hand-rolled serialisers usually miss, because nothing breaks until
+someone writes a long description or a name with an umlaut in it.
+
 ## Deliberate design decisions
 
 **`kind` has no default.** A guessed event kind decides fields, visibility and
@@ -138,8 +153,8 @@ vendor/bin/pest
 
 ## Status
 
-Early. Kinds, profiles, attendees, scopes, deletion and recurrence are in place
-and covered by tests. iCalendar export, CalDAV and time blocking are next.
+Early. Kinds, profiles, attendees, scopes, deletion, recurrence and iCalendar
+export are in place and covered by tests. Time blocking and CalDAV are next.
 
 ## License
 

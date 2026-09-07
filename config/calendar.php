@@ -18,4 +18,18 @@ return [
     | retention period of its own. null = forever.
     */
     'trash_retention_days' => 30,
+
+    'ics' => [
+        /*
+        | Identifies the software that produced the file. Clients show it when
+        | something looks wrong, so name your application, not this package.
+        */
+        'prodid' => env('CALENDAR_ICS_PRODID', '-//Peppermint//Calendar//EN'),
+
+        /*
+        | Suffix for event UIDs. It must stay stable: change it and every
+        | subscribed calendar treats the same events as new ones.
+        */
+        'uid_domain' => env('CALENDAR_ICS_UID_DOMAIN', 'calendar.local'),
+    ],
 ];
