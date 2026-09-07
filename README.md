@@ -162,6 +162,11 @@ someone writes a long description or a name with an umlaut in it.
 deletion behaviour. Creating an event without a registered kind throws — and the
 exception names the kinds that *are* registered, plus where to add new ones.
 
+**Forbidden fields are checked on change, not on existence.** Applications adopt
+kinds for data that predates them. A guard that rejects an untouched legacy value
+would turn "you may not add this" into "you may never save this row again", so
+only attributes being set or changed are examined.
+
 **Visibility is not the kind.** A business event can be confidential; a private
 one can be shared. They are two columns (`kind`, `visibility`), because a single
 flag cannot answer both questions and eventually answers neither.

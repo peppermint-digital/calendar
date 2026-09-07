@@ -64,6 +64,15 @@ class CalendarEvent extends Model
             $kind = $event->kindDefinition();
 
             foreach ($kind->forbiddenAttributes() as $attribute) {
+                // Only what is being set or changed right now. A value that an
+                // existing row already carries is not this check's business:
+                // applications adopt kinds for data that predates them, and a
+                // guard that rejects an untouched legacy value turns "you may
+                // not add this" into "you may never save this row again".
+                if ($event->exists && ! $event->isDirty($attribute)) {
+                    continue;
+                }
+
                 if (filled($event->getAttribute($attribute))) {
                     throw ForbiddenAttributeForKind::make($kind->key(), $attribute);
                 }

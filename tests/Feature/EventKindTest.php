@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\DB;
 use Peppermint\Calendar\Exceptions\ForbiddenAttributeForKind;
 use Peppermint\Calendar\Exceptions\UnknownEventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
@@ -65,4 +66,29 @@ it('can be told not to load its own migrations', function () {
     $provider->boot();
 
     expect(config('calendar.run_migrations'))->toBeFalse();
+});
+
+it('lets an existing row keep a forbidden value it already carried', function () {
+    // Data older than the kind: the row was created before the application
+    // adopted event kinds, and carries a field the kind now forbids. Editing
+    // its title must not be blocked by that.
+    $event = makeEvent(['meeting_url' => 'https://meet.example/legacy']);
+
+    DB::table('calendar_events')->where('id', $event->id)->update(['kind' => 'private']);
+
+    $legacy = CalendarEvent::find($event->id);
+    $legacy->title = 'Renamed';
+
+    expect(fn () => $legacy->save())->not->toThrow(ForbiddenAttributeForKind::class)
+        ->and($legacy->fresh()->title)->toBe('Renamed');
+});
+
+it('still refuses to set a forbidden value on an existing row', function () {
+    $event = makeEvent();
+    DB::table('calendar_events')->where('id', $event->id)->update(['kind' => 'private']);
+
+    $legacy = CalendarEvent::find($event->id);
+    $legacy->meeting_url = 'https://meet.example/new';
+
+    expect(fn () => $legacy->save())->toThrow(ForbiddenAttributeForKind::class);
 });
