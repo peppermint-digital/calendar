@@ -35,14 +35,14 @@ class IcsExporter
     {
         $writer ??= new IcsWriter;
 
-        $start = CarbonImmutable::parse($event->starts_at);
-        $end = CarbonImmutable::parse($event->ends_at);
+        $start = CarbonImmutable::parse($event->field('starts_at'));
+        $end = CarbonImmutable::parse($event->field('ends_at'));
 
         $writer->begin('VEVENT')
             ->property('UID', $this->uid($event), raw: true)
             ->property('DTSTAMP', $this->utc(CarbonImmutable::now()), raw: true);
 
-        if ($event->all_day) {
+        if ($event->field('all_day')) {
             // DTEND is exclusive for all-day events: a one-day event ends on
             // the following day. Emitting the same date makes it disappear in
             // some clients and last zero minutes in others.
@@ -64,7 +64,7 @@ class IcsExporter
 
         // A confidential event still travels — its details do not. Clients that
         // honour CLASS hide title and description from other viewers.
-        if ($event->visibility === 'confidential') {
+        if ($event->field('visibility') === 'confidential') {
             $writer->property('CLASS', 'PRIVATE', raw: true);
         }
 
@@ -129,7 +129,7 @@ class IcsExporter
 
     protected function uid(CalendarEvent $event): string
     {
-        return $event->uid.'@'.config('calendar.ics.uid_domain');
+        return $event->field('uid').'@'.config('calendar.ics.uid_domain');
     }
 
     protected function utc(CarbonImmutable $moment): string

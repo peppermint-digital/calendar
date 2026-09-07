@@ -67,13 +67,13 @@ class Board
             'scheduled' => $scheduled,
             'events' => $events->map(fn (CalendarEvent $event) => [
                 'id' => $event->id,
-                'kind' => $event->kind,
+                'kind' => $event->field('kind'),
                 'title' => $event->title,
-                'starts_at' => $event->starts_at?->toIso8601String(),
-                'ends_at' => $event->ends_at?->toIso8601String(),
-                'all_day' => (bool) $event->all_day,
-                'subject_type' => $event->subject_type,
-                'subject_id' => $event->subject_id,
+                'starts_at' => $event->field('starts_at')?->toIso8601String(),
+                'ends_at' => $event->field('ends_at')?->toIso8601String(),
+                'all_day' => (bool) $event->field('all_day'),
+                'subject_type' => $event->field('subject_type'),
+                'subject_id' => $event->field('subject_id'),
             ])->values()->all(),
             'collisions' => $this->collisions($events),
             'preferences' => $preferences->toArray(),
@@ -83,10 +83,10 @@ class Board
     /** @return Collection<int, CalendarEvent> */
     protected function events(int $userId, CarbonImmutable $from, CarbonImmutable $to, BoardPreferences $preferences): Collection
     {
-        $query = CalendarEvent::query()->inRange($from, $to)->orderBy('starts_at');
+        $query = CalendarEvent::query()->inRange($from, $to)->orderBy(CalendarEvent::column('starts_at'));
 
         $preferences->onlyOwnBlocks
-            ? $query->where('owner_id', $userId)
+            ? $query->where(CalendarEvent::column('owner_id'), $userId)
             : $query->visibleTo($userId);
 
         if ($preferences->kinds !== []) {
@@ -94,7 +94,7 @@ class Board
         }
 
         if (! $preferences->showAllDayEvents) {
-            $query->where('all_day', false);
+            $query->where(CalendarEvent::column('all_day'), false);
         }
 
         $events = $query->get();
@@ -103,7 +103,7 @@ class Board
             // Filtered in PHP, not in SQL: every database spells weekday
             // extraction differently, and a driver-specific expression here
             // would pass the test suite on SQLite and fail on MySQL.
-            $events = $events->reject(fn (CalendarEvent $event) => $event->starts_at->isWeekend())->values();
+            $events = $events->reject(fn (CalendarEvent $event) => $event->field('starts_at')->isWeekend())->values();
         }
 
         return $events;
@@ -124,7 +124,8 @@ class Board
 
         foreach ($list as $i => $event) {
             foreach ($list->slice($i + 1) as $other) {
-                if ($event->starts_at < $other->ends_at && $event->ends_at > $other->starts_at) {
+                if ($event->field('starts_at') < $other->field('ends_at')
+                    && $event->field('ends_at') > $other->field('starts_at')) {
                     $pairs[] = [$event->id, $other->id];
                 }
             }

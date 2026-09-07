@@ -18,16 +18,30 @@ class CalendarEvent extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'calendar_events';
+    public function getTable(): string
+    {
+        return config('calendar.tables.events', 'calendar_events');
+    }
 
-    protected $guarded = ['id'];
+    /**
+     * Empty rather than ['id']: a non-empty guard makes Eloquent ask the table
+     * for its column list and cache that answer statically, per model class.
+     * This model can be pointed at a different table at runtime, so a cached
+     * column list from an earlier table would silently drop every attribute the
+     * new one does not share. Mass assignment is the application's business —
+     * it validates its own requests.
+     */
+    protected $guarded = [];
 
     protected function casts(): array
     {
+        // Keyed by the real column names: an adopted table calls them something
+        // else, and a cast registered under a column that does not exist is a
+        // cast that never runs.
         return [
-            'starts_at' => 'datetime',
-            'ends_at' => 'datetime',
-            'all_day' => 'boolean',
+            static::column('starts_at') => 'datetime',
+            static::column('ends_at') => 'datetime',
+            static::column('all_day') => 'boolean',
             'is_recurrence_master' => 'boolean',
             'recurrence_rules' => 'array',
             'recurrence_until' => 'date:Y-m-d',
@@ -37,7 +51,9 @@ class CalendarEvent extends Model
     protected static function booted(): void
     {
         static::creating(function (self $event): void {
-            $event->uid ??= (string) Str::uuid();
+            $uid = static::column('uid');
+
+            $event->{$uid} ??= (string) Str::uuid();
         });
 
         static::saving(function (self $event): void {
@@ -56,14 +72,32 @@ class CalendarEvent extends Model
         });
     }
 
+    /**
+     * The real column name for one of the package's fields, which may differ in
+     * an application that adopted an existing table.
+     */
+    public static function column(string $field): string
+    {
+        return config("calendar.columns.{$field}", $field);
+    }
+
+    /**
+     * Reads a package field through whatever the column is actually called, so
+     * package code can say `$event->field('starts_at')` without knowing.
+     */
+    public function field(string $name): mixed
+    {
+        return $this->getAttribute(static::column($name));
+    }
+
     public function kindDefinition(): EventKind
     {
-        return app(EventKindRegistry::class)->get((string) $this->kind);
+        return app(EventKindRegistry::class)->get((string) $this->field('kind'));
     }
 
     public function owner(): BelongsTo
     {
-        return $this->belongsTo(config('calendar.user_model'), 'owner_id');
+        return $this->belongsTo(config('calendar.user_model'), static::column('owner_id'));
     }
 
     /**
@@ -72,13 +106,13 @@ class CalendarEvent extends Model
      */
     public function subject(): MorphTo
     {
-        return $this->morphTo();
+        return $this->morphTo(__FUNCTION__, static::column('subject_type'), static::column('subject_id'));
     }
 
     public function scopeAbout(Builder $query, string $subjectType, int|array $subjectIds): Builder
     {
-        return $query->where('subject_type', $subjectType)
-            ->whereIn('subject_id', (array) $subjectIds);
+        return $query->where(static::column('subject_type'), $subjectType)
+            ->whereIn(static::column('subject_id'), (array) $subjectIds);
     }
 
     public function attendees(): HasMany
@@ -99,7 +133,7 @@ class CalendarEvent extends Model
 
     public function scopeOfKind(Builder $query, string ...$kinds): Builder
     {
-        return $query->whereIn('kind', $kinds);
+        return $query->whereIn(static::column('kind'), $kinds);
     }
 
     /**
@@ -108,7 +142,8 @@ class CalendarEvent extends Model
      */
     public function scopeInRange(Builder $query, mixed $from, mixed $to): Builder
     {
-        return $query->where('starts_at', '<', $to)->where('ends_at', '>', $from);
+        return $query->where(static::column('starts_at'), '<', $to)
+            ->where(static::column('ends_at'), '>', $from);
     }
 
     /**
@@ -124,7 +159,7 @@ class CalendarEvent extends Model
         }
 
         return $query->where(function (Builder $q) use ($userId): void {
-            $q->where('owner_id', $userId)
+            $q->where(static::column('owner_id'), $userId)
                 ->orWhereHas('attendees', fn (Builder $a) => $a->where('user_id', $userId));
         });
     }

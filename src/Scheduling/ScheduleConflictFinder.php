@@ -26,13 +26,12 @@ class ScheduleConflictFinder
         ?int $ignoreEventId = null,
     ): Collection {
         $query = CalendarEvent::query()
-            ->where('owner_id', $userId)
-            ->where('starts_at', '<', $end)
-            ->where('ends_at', '>', $start)
-            ->orderBy('starts_at');
+            ->where(CalendarEvent::column('owner_id'), $userId)
+            ->inRange($start, $end)
+            ->orderBy(CalendarEvent::column('starts_at'));
 
         if ($kinds !== []) {
-            $query->whereIn('kind', $kinds);
+            $query->ofKind(...$kinds);
         }
 
         // Moving an event must not collide with the version of itself that is

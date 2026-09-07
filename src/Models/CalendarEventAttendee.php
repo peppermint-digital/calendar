@@ -7,9 +7,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CalendarEventAttendee extends Model
 {
-    protected $table = 'calendar_event_attendees';
+    public function getTable(): string
+    {
+        return config('calendar.tables.attendees', 'calendar_event_attendees');
+    }
 
-    protected $guarded = ['id'];
+    /**
+     * Empty rather than ['id']: a non-empty guard makes Eloquent ask the table
+     * for its column list and cache that answer statically, per model class.
+     * This model can be pointed at a different table at runtime, so a cached
+     * column list from an earlier table would silently drop every attribute the
+     * new one does not share. Mass assignment is the application's business —
+     * it validates its own requests.
+     */
+    protected $guarded = [];
 
     protected function casts(): array
     {

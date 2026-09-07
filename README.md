@@ -175,6 +175,29 @@ key cascade fires depends on the driver — SQLite needs the pragma enabled, MyS
 does not. Behaviour that differs between your test suite and production is not
 behaviour you can rely on.
 
+## Adopting an existing calendar
+
+An application that has kept a calendar for years has its own table and column
+names, and several hundred references to them. Renaming those is a migration of
+the codebase, not of the schema — so the package bends instead:
+
+```php
+'tables' => ['events' => 'calendar_events'],
+
+'columns' => [
+    'owner_id'   => 'user_id',
+    'starts_at'  => 'start_datetime',
+    'ends_at'    => 'end_datetime',
+    'uid'        => 'caldav_uid',
+],
+
+'run_migrations' => false,   // your table already exists; bring the new columns
+                             // across in a migration of your own
+```
+
+Everything else keeps working: scopes, deletion per kind, conflicts, the board
+and the iCalendar export all resolve column names through this map.
+
 ## Requirements
 
 PHP 8.2+, Laravel 11, 12 or 13.

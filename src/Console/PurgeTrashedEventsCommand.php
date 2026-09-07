@@ -41,7 +41,7 @@ class PurgeTrashedEventsCommand extends Command
             $cutoff = Carbon::now()->subDays($days);
 
             $query = CalendarEvent::onlyTrashed()
-                ->where('kind', $key)
+                ->where(CalendarEvent::column('kind'), $key)
                 ->where('deleted_at', '<', $cutoff);
 
             $count = (clone $query)->count();

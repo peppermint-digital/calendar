@@ -28,7 +28,7 @@ class PlannedSubjects
      */
     public function ever(int $userId, string $subjectType, array $kinds = []): array
     {
-        return $this->query($userId, $subjectType, $kinds)->pluck('subject_id')->all();
+        return $this->query($userId, $subjectType, $kinds)->pluck(CalendarEvent::column('subject_id'))->all();
     }
 
     /**
@@ -43,9 +43,8 @@ class PlannedSubjects
         array $kinds = [],
     ): array {
         return $this->query($userId, $subjectType, $kinds)
-            ->where('starts_at', '<', $to)
-            ->where('ends_at', '>', $from)
-            ->pluck('subject_id')
+            ->inRange($from, $to)
+            ->pluck(CalendarEvent::column('subject_id'))
             ->all();
     }
 
@@ -55,13 +54,13 @@ class PlannedSubjects
     protected function query(int $userId, string $subjectType, array $kinds)
     {
         $query = CalendarEvent::query()
-            ->where('owner_id', $userId)
-            ->where('subject_type', $subjectType)
-            ->whereNotNull('subject_id')
+            ->where(CalendarEvent::column('owner_id'), $userId)
+            ->where(CalendarEvent::column('subject_type'), $subjectType)
+            ->whereNotNull(CalendarEvent::column('subject_id'))
             ->distinct();
 
         if ($kinds !== []) {
-            $query->whereIn('kind', $kinds);
+            $query->ofKind(...$kinds);
         }
 
         return $query;
