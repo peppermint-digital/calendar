@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Recurrence\Occurrence;
 use Peppermint\Calendar\Recurrence\OccurrenceExpander;
@@ -120,4 +121,95 @@ it('gives each appearance an identity of its own', function () {
 
     expect($keys)->toHaveCount(2)
         ->and($keys[0])->not->toBe($keys[1]);
+});
+
+it('leaves out an occurrence that was cancelled', function () {
+    $event = CalendarEvent::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Jour fixe',
+        'starts_at' => '2026-09-07 10:00:00',
+        'ends_at' => '2026-09-07 11:00:00',
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+        // Der 14. fällt aus. Die Regel bleibt, wie sie ist.
+        'recurrence_exceptions' => ['2026-09-14'],
+    ]);
+
+    $dates = app(OccurrenceExpander::class)
+        ->expand([$event], CarbonImmutable::parse('2026-09-07'), CarbonImmutable::parse('2026-09-28')->endOfDay())
+        ->map(fn ($o) => $o->startsAt->toDateString())
+        ->all();
+
+    expect($dates)->toBe(['2026-09-07', '2026-09-21', '2026-09-28']);
+});
+
+it('reads exceptions written as full timestamps', function () {
+    // Die Ausnahme kommt aus der Oberfläche mal als Tag, mal als Zeitpunkt.
+    // Beides meint denselben ausgefallenen Termin.
+    $event = CalendarEvent::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Jour fixe',
+        'starts_at' => '2026-09-07 10:00:00',
+        'ends_at' => '2026-09-07 11:00:00',
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+        'recurrence_exceptions' => ['2026-09-14 10:00:00'],
+    ]);
+
+    $dates = app(OccurrenceExpander::class)
+        ->expand([$event], CarbonImmutable::parse('2026-09-07'), CarbonImmutable::parse('2026-09-21')->endOfDay())
+        ->map(fn ($o) => $o->startsAt->toDateString())
+        ->all();
+
+    expect($dates)->toBe(['2026-09-07', '2026-09-21']);
+});
+
+it('detaches a single occurrence and leaves the rest of the series alone', function () {
+    $series = CalendarEvent::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Jour fixe',
+        'starts_at' => '2026-09-07 10:00:00',
+        'ends_at' => '2026-09-07 11:00:00',
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+    ]);
+
+    $detached = app(\Peppermint\Calendar\Recurrence\SeriesEditor::class)->detachOccurrence(
+        $series,
+        CarbonImmutable::parse('2026-09-14 10:00:00'),
+        ['starts_at' => '2026-09-14 14:00:00', 'ends_at' => '2026-09-14 15:00:00'],
+    );
+
+    // Der herausgelöste Termin trägt keine Regel — sonst stünde er ab jetzt
+    // jede Woche ein zweites Mal im Kalender.
+    expect($detached->recurrence_rules)->toBeNull()
+        ->and($detached->recurrence_group_id)->toBe($series->fresh()->recurrence_group_id);
+
+    $dates = app(OccurrenceExpander::class)
+        ->expand(
+            [$series->fresh(), $detached],
+            CarbonImmutable::parse('2026-09-07'),
+            CarbonImmutable::parse('2026-09-21')->endOfDay(),
+        )
+        ->map(fn ($o) => $o->startsAt->format('Y-m-d H:i'))
+        ->all();
+
+    expect($dates)->toBe(['2026-09-07 10:00', '2026-09-14 14:00', '2026-09-21 10:00']);
+});
+
+it('does not pile up the same cancellation twice', function () {
+    $series = CalendarEvent::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Jour fixe',
+        'starts_at' => '2026-09-07 10:00:00',
+        'ends_at' => '2026-09-07 11:00:00',
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+    ]);
+
+    $editor = app(\Peppermint\Calendar\Recurrence\SeriesEditor::class);
+    $editor->cancelOccurrence($series, CarbonImmutable::parse('2026-09-14 10:00:00'));
+    $editor->cancelOccurrence($series, CarbonImmutable::parse('2026-09-14 00:00:00'));
+
+    expect($series->fresh()->recurrence_exceptions)->toBe(['2026-09-14']);
 });

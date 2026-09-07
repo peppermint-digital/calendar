@@ -45,6 +45,7 @@ class CalendarEvent extends Model
             static::column('all_day') => 'boolean',
             'is_recurrence_master' => 'boolean',
             'recurrence_rules' => 'array',
+            'recurrence_exceptions' => 'array',
             'recurrence_until' => 'date:Y-m-d',
         ];
     }

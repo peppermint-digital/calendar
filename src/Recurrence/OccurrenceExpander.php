@@ -64,10 +64,22 @@ class OccurrenceExpander
                 ? CarbonImmutable::parse($event->recurrence_until)->endOfDay()->min($windowEnd)
                 : $windowEnd;
 
+            // Abgesagte oder verschobene Vorkommen. Sie stehen als Datum am
+            // Termin — die Regel bleibt unangetastet, denn wer einen Dienstag
+            // absagt, meint nicht „ab jetzt keine Dienstage mehr".
+            $exceptions = array_map(
+                fn ($date) => CarbonImmutable::parse($date)->toDateString(),
+                is_array($event->recurrence_exceptions) ? $event->recurrence_exceptions : [],
+            );
+
             foreach ($this->calculator->occurrences($starts, $rule, $until) as $date) {
                 $occurrenceEnd = $date->addSeconds($length);
 
                 if ($date->greaterThan($windowEnd) || $occurrenceEnd->lessThan($windowStart)) {
+                    continue;
+                }
+
+                if (in_array($date->toDateString(), $exceptions, true)) {
                     continue;
                 }
 
