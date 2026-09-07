@@ -143,3 +143,42 @@ it('survives preferences round-tripping through storage', function () {
         'kinds' => ['private'],
     ]);
 });
+
+it('tells apart a task and a habit that carry the same number', function () {
+    // Task 5 is planned, habit 5 is not. Without the type in the lookup the
+    // habit would vanish from the list because of a number it has nothing to
+    // do with.
+    boardBlock('2026-09-08 10:00:00', '2026-09-08 11:00:00', ['subject_type' => 'task', 'subject_id' => 5]);
+
+    $result = board([
+        ['id' => 5, 'title' => 'Write the offer', 'subject_type' => 'task'],
+        ['id' => 5, 'title' => 'Go running', 'subject_type' => 'habit', 'recurring' => true],
+    ]);
+
+    expect(array_column($result['scheduled'], 'title'))->toBe(['Write the offer'])
+        ->and(array_column($result['open'], 'title'))->toBe(['Go running']);
+});
+
+it('brings a recurring habit back in a window it is not yet planned in', function () {
+    boardBlock('2026-09-08 07:00:00', '2026-09-08 08:00:00', ['subject_type' => 'habit', 'subject_id' => 9]);
+
+    $thisWeek = board([['id' => 9, 'title' => 'Go running', 'subject_type' => 'habit', 'recurring' => true]]);
+    $nextWeek = board(
+        [['id' => 9, 'title' => 'Go running', 'subject_type' => 'habit', 'recurring' => true]],
+        from: '2026-09-14',
+        to: '2026-09-20',
+    );
+
+    expect(array_column($thisWeek['scheduled'], 'id'))->toBe([9])
+        ->and(array_column($nextWeek['open'], 'id'))->toBe([9]);
+});
+
+it('falls back to the board-wide type when an item does not name one', function () {
+    boardBlock('2026-09-08 10:00:00', '2026-09-08 11:00:00', ['subject_type' => 'task', 'subject_id' => 42]);
+
+    // The manager calls build() with a single type and items without one —
+    // that must keep working exactly as before.
+    $result = board([['id' => 42, 'title' => 'Write the offer']]);
+
+    expect(array_column($result['scheduled'], 'id'))->toBe([42]);
+});

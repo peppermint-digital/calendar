@@ -39,20 +39,39 @@ class Board
         $from = CarbonImmutable::parse($from);
         $to = CarbonImmutable::parse($to);
 
-        $everPlanned = $this->planned->ever($userId, $subjectType, $preferences->kinds);
-        $plannedInWindow = $this->planned->within($userId, $subjectType, $from, $to, $preferences->kinds);
+        // A board may offer several sorts at once — tasks, habits, training.
+        // The lookup runs per type, because subject ids are unique only within
+        // their own: asking "is 5 planned?" without the type would hide a habit
+        // because a task with the same number is already in the day.
+        $items = is_array($items) ? $items : iterator_to_array($items);
+
+        $types = [];
+
+        foreach ($items as $item) {
+            $types[$item->subjectType ?? $subjectType] = true;
+        }
+
+        $everPlanned = [];
+        $plannedInWindow = [];
+
+        foreach (array_keys($types) as $type) {
+            $everPlanned[$type] = $this->planned->ever($userId, $type, $preferences->kinds);
+            $plannedInWindow[$type] = $this->planned->within($userId, $type, $from, $to, $preferences->kinds);
+        }
 
         $open = [];
         $scheduled = [];
 
         foreach ($items as $item) {
+            $type = $item->subjectType ?? $subjectType;
+
             // A one-off item is done with the list as soon as it has any block
             // at all. A recurring one comes back for every window it is not yet
             // planned in — otherwise it would leave the list after being
             // scheduled once and never return.
             $isPlanned = $item->recurring
-                ? in_array($item->id, $plannedInWindow, true)
-                : in_array($item->id, $everPlanned, true);
+                ? in_array($item->id, $plannedInWindow[$type], true)
+                : in_array($item->id, $everPlanned[$type], true);
 
             $isPlanned
                 ? $scheduled[] = $item->toArray()
