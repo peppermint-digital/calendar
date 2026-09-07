@@ -1,0 +1,45 @@
+{
+    "name": "peppermint/calendar",
+    "description": "Calendar core for Laravel — events, attendees, recurrences, ICS/CalDAV and a registry for application-defined event kinds and event sources.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Peppermint Digital",
+            "email": "hello@peppermint-digital.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "illuminate/database": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Peppermint\\Calendar\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Peppermint\\Calendar\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Peppermint\\Calendar\\CalendarServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

@@ -1,0 +1,123 @@
+# Calendar
+
+A calendar core for Laravel that does not know a single event type — your application does.
+
+Most calendar packages ship with a fixed event table: a column for every feature
+anyone might need, and a `type` column to tell them apart. That table only grows.
+Add invoicing, add equipment bookings, add private appointments, and every
+application carries every other application's columns.
+
+This package inverts that. The core owns what every event has — a title, a time
+range, attendees, recurrence, visibility, an iCalendar identity. Everything else
+lives in a **profile table owned by the event kind**, and a kind is a class your
+application registers.
+
+```
+calendar_events                  title, time range, all-day, location,
+                                 recurrence, owner, visibility, kind, uid
+  ├── calendar_event_attendees   internal and external, one foreign key
+  └── <your profile table>  1:1  your columns, your constraints
+```
+
+## Defining an event kind
+
+```php
+use Peppermint\Calendar\Kinds\EventKind;
+
+class PrivateKind extends EventKind
+{
+    public function key(): string            { return 'private'; }
+    public function label(): string          { return 'Private'; }
+    public function profileModel(): ?string   { return PrivateProfile::class; }
+
+    // A private appointment someone deletes is gone. No trash.
+    public function usesTrash(): bool         { return false; }
+
+    // Guards the kind against becoming a meaningless flag.
+    public function forbiddenAttributes(): array { return ['meeting_url']; }
+}
+```
+
+Register it in `config/calendar.php`:
+
+```php
+'kinds' => [
+    App\Calendar\BusinessKind::class,
+    App\Calendar\PrivateKind::class,
+],
+```
+
+Add a migration for the profile table with `event_id` constrained to
+`calendar_events`, and you are done. The core needs no changes — not for your
+kind, and not for the next one.
+
+## What the kind decides
+
+| Method | Question it answers |
+| --- | --- |
+| `key()` / `label()` | how the kind is stored and shown |
+| `profileModel()` | which table holds the extra fields |
+| `usesTrash()` | soft delete with a trash bin, or delete for good |
+| `trashRetentionDays()` | how long deleted events stay recoverable |
+| `forbiddenAttributes()` | which core fields this kind must never set |
+| `rules()` | validation rules the application pulls into its requests |
+| `saving()` | a hook before every save |
+
+## Deliberate design decisions
+
+**`kind` has no default.** A guessed event kind decides fields, visibility and
+deletion behaviour. Creating an event without a registered kind throws — and the
+exception names the kinds that *are* registered, plus where to add new ones.
+
+**Visibility is not the kind.** A business event can be confidential; a private
+one can be shared. They are two columns (`kind`, `visibility`), because a single
+flag cannot answer both questions and eventually answers neither.
+
+**`visibleTo(null)` returns nothing.** A missing identity means "unknown", not
+"anyone". A scope that drops its restriction when it cannot resolve the caller
+hands out everything precisely when it knows least.
+
+**Dependent rows are deleted in code, not only by cascade.** Whether a foreign
+key cascade fires depends on the driver — SQLite needs the pragma enabled, MySQL
+does not. Behaviour that differs between your test suite and production is not
+behaviour you can rely on.
+
+## Requirements
+
+PHP 8.2+, Laravel 11, 12 or 13.
+
+## Installation
+
+```bash
+composer require peppermint/calendar
+```
+
+Publish the configuration with the `calendar-config` tag, then run your
+migrations — the package ships its own and loads them automatically.
+
+## Housekeeping
+
+```bash
+php artisan calendar:purge-trash --dry-run   # count first
+php artisan calendar:purge-trash             # then delete
+```
+
+Each kind is purged according to its own retention period; kinds without a trash
+bin are skipped, because their events never reach it.
+
+## Tests
+
+```bash
+composer install
+vendor/bin/pest
+```
+
+## Status
+
+Early. The core — kinds, profiles, attendees, scopes, deletion — is in place and
+covered by tests. Recurrence expansion, iCalendar export, CalDAV and time
+blocking are being added next.
+
+## License
+
+MIT.
