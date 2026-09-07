@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Peppermint\Calendar\Console\PurgeTrashedEventsCommand;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
+use Peppermint\Calendar\Sources\EventSource;
+use Peppermint\Calendar\Sources\EventSourceRegistry;
 
 class CalendarServiceProvider extends ServiceProvider
 {
@@ -26,6 +28,24 @@ class CalendarServiceProvider extends ServiceProvider
                 }
 
                 $registry->register($kind);
+            }
+
+            return $registry;
+        });
+
+        $this->app->singleton(EventSourceRegistry::class, function ($app): EventSourceRegistry {
+            $registry = new EventSourceRegistry;
+
+            foreach ((array) $app['config']->get('calendar.sources', []) as $class) {
+                $source = $app->make($class);
+
+                if (! $source instanceof EventSource) {
+                    throw new \InvalidArgumentException(
+                        "Registered event source [{$class}] does not extend ".EventSource::class.'.'
+                    );
+                }
+
+                $registry->register($source);
             }
 
             return $registry;

@@ -185,6 +185,35 @@ key cascade fires depends on the driver — SQLite needs the pragma enabled, MyS
 does not. Behaviour that differs between your test suite and production is not
 behaviour you can rely on.
 
+## Calendars of other systems
+
+An event kind describes events this application owns. A **source** describes
+events that belong to another system and are only displayed — no rows here, no
+editing, no copy that drifts out of sync.
+
+```php
+class ManagerSource extends EventSource
+{
+    public function key(): string   { return 'manager'; }
+    public function label(): string { return 'Manager'; }
+
+    public function events(int $userId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        return $this->client->appointments($userId, $from, $to)
+            ->map(fn ($row) => new ExternalEvent(...))
+            ->all();
+    }
+
+    // Skipped silently where the connection is not configured.
+    public function isAvailable(): bool { return $this->client->isConfigured(); }
+}
+```
+
+Neither side is the centre: each application registers the sources it wants to
+see, and the same package serves both directions. A source that fails is logged
+and left out — the rest of the calendar still appears, because a blank page
+explains nothing while a gap is at least visible.
+
 ## Adopting an existing calendar
 
 An application that has kept a calendar for years has its own table and column

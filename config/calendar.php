@@ -20,6 +20,16 @@ return [
     'trash_retention_days' => 30,
 
     /*
+    | Calendars of other systems, shown alongside the local one.
+    |
+    | A source is read-only: its events live elsewhere and are only displayed.
+    | Each entry is the class name of a Peppermint\Calendar\Sources\EventSource
+    | subclass. Neither system is the centre — the application registers the
+    | sources it wants to see.
+    */
+    'sources' => [],
+
+    /*
     | Table names, for adopting tables that already exist under other names.
     */
     'tables' => [
