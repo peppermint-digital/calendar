@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Peppermint\Calendar\Exceptions\ForbiddenAttributeForKind;
@@ -63,6 +64,21 @@ class CalendarEvent extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(config('calendar.user_model'), 'owner_id');
+    }
+
+    /**
+     * What the event is about, when it refers to something outside the calendar
+     * — the task behind a time block, for instance. Null for a plain appointment.
+     */
+    public function subject(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function scopeAbout(Builder $query, string $subjectType, int|array $subjectIds): Builder
+    {
+        return $query->where('subject_type', $subjectType)
+            ->whereIn('subject_id', (array) $subjectIds);
     }
 
     public function attendees(): HasMany

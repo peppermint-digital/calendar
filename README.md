@@ -87,6 +87,30 @@ silent behaviour, because both choices surprise somebody.
 Labels come from the package's language files (English and German included), so
 `describe()` follows the application's locale instead of hard-coding one.
 
+## Time blocking
+
+An event can point at something the core knows nothing about — the task behind a
+time block, a habit, a training session — through a narrow `subject_type` /
+`subject_id` pair. That is enough for the core to answer the two questions every
+planner needs:
+
+```php
+$finder = app(ScheduleConflictFinder::class);
+$finder->conflicts($userId, $start, $end, ignoreEventId: $movedEvent?->id);
+
+$planned = app(PlannedSubjects::class);
+$planned->ever($userId, 'task');                        // one-off: planned at all?
+$planned->within($userId, 'task', $windowFrom, $windowTo);  // recurring: planned in view?
+```
+
+Back-to-back slots do not collide — 10:00–11:00 and 11:00–12:00 are consecutive,
+not overlapping. Everything counts per person: someone else planning the same
+task never removes it from your list, and moving an event does not collide with
+the version of itself still in the database.
+
+The distinction between `ever` and `within` is what keeps a recurring task from
+disappearing forever after being scheduled once.
+
 ## iCalendar
 
 ```php
@@ -153,8 +177,9 @@ vendor/bin/pest
 
 ## Status
 
-Early. Kinds, profiles, attendees, scopes, deletion, recurrence and iCalendar
-export are in place and covered by tests. Time blocking and CalDAV are next.
+Early. Kinds, profiles, attendees, scopes, deletion, recurrence, iCalendar
+export and the time-blocking primitives are in place and covered by tests.
+CalDAV and invitation mails are next.
 
 ## License
 
