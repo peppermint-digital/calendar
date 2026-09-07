@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Peppermint\Calendar\Eloquent\CalendarEventBuilder;
 use Peppermint\Calendar\Exceptions\ForbiddenAttributeForKind;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
@@ -76,6 +77,14 @@ class CalendarEvent extends Model
      * The real column name for one of the package's fields, which may differ in
      * an application that adopted an existing table.
      */
+    /**
+     * @param  \Illuminate\Database\Query\Builder  $query
+     */
+    public function newEloquentBuilder($query): CalendarEventBuilder
+    {
+        return new CalendarEventBuilder($query);
+    }
+
     public static function column(string $field): string
     {
         return config("calendar.columns.{$field}", $field);

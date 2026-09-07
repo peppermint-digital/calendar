@@ -87,3 +87,17 @@ it('deletes nothing during a dry run', function () {
 
     expect(CalendarEvent::withTrashed()->find($old->id))->not->toBeNull();
 });
+
+it('follows the event kind even when several events are deleted at once', function () {
+    // Bulk deletes go through the query builder, where model deletion logic
+    // normally never runs. A rule that only applies when the caller uses the
+    // right form is not a rule — existing code says `where(...)->delete()`.
+    $business = eventWithProfile('business');
+    $private = eventWithProfile('private');
+
+    $deleted = CalendarEvent::query()->whereIn('id', [$business->id, $private->id])->delete();
+
+    expect($deleted)->toBe(2)
+        ->and(CalendarEvent::withTrashed()->find($business->id))->not->toBeNull()
+        ->and(CalendarEvent::withTrashed()->find($private->id))->toBeNull();
+});

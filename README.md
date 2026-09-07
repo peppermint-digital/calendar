@@ -170,6 +170,11 @@ flag cannot answer both questions and eventually answers neither.
 "anyone". A scope that drops its restriction when it cannot resolve the caller
 hands out everything precisely when it knows least.
 
+**Bulk deletes follow the kind too.** `where(...)->delete()` normally bypasses
+model deletion entirely; here it loads and deletes row by row, so a kind that
+deletes for good is not silently soft-deleted by existing code that never heard
+of event kinds.
+
 **Dependent rows are deleted in code, not only by cascade.** Whether a foreign
 key cascade fires depends on the driver — SQLite needs the pragma enabled, MySQL
 does not. Behaviour that differs between your test suite and production is not
