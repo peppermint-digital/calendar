@@ -13,7 +13,7 @@ class PrivateKind extends EventKind
 
     public function label(): string
     {
-        return 'Privat';
+        return 'Private';
     }
 
     public function profileModel(): ?string
@@ -21,7 +21,7 @@ class PrivateKind extends EventKind
         return PrivateProfile::class;
     }
 
-    /** Ein privater Termin, den jemand löscht, ist weg — kein Papierkorb. */
+    /** A private appointment someone deletes is gone. No trash bin. */
     public function usesTrash(): bool
     {
         return false;

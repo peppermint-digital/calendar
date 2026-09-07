@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('calendar_event_attendees', function (Blueprint $table) {
             $table->id();
 
-            // Cascade ist hier richtig: eine Teilnahme ohne Termin ist keine Angabe,
-            // die jemand später noch braucht. Sie greift nur beim harten Löschen —
-            // ein Termin im Papierkorb wird nicht aus der Datenbank entfernt.
+            // A cascade is right here: attendance without its event is not information
+            // anyone needs later. It only fires on a hard delete — an event in the trash
+            // bin is never removed from the database.
             $table->foreignId('event_id')->constrained('calendar_events')->cascadeOnDelete();
 
             $table->unsignedBigInteger('user_id')->nullable();

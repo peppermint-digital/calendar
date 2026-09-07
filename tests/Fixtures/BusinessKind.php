@@ -13,7 +13,7 @@ class BusinessKind extends EventKind
 
     public function label(): string
     {
-        return 'Geschäftlich';
+        return 'Business';
     }
 
     public function profileModel(): ?string

@@ -21,7 +21,7 @@ class CalendarServiceProvider extends ServiceProvider
 
                 if (! $kind instanceof EventKind) {
                     throw new \InvalidArgumentException(
-                        "Eingetragene Terminart [{$class}] erweitert nicht ".EventKind::class.'.'
+                        "Registered event kind [{$class}] does not extend ".EventKind::class.'.'
                     );
                 }
 
@@ -35,11 +35,16 @@ class CalendarServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'calendar');
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/calendar.php' => config_path('calendar.php'),
             ], 'calendar-config');
+
+            $this->publishes([
+                __DIR__.'/../lang' => lang_path('vendor/calendar'),
+            ], 'calendar-lang');
 
             $this->commands([
                 PurgeTrashedEventsCommand::class,

@@ -2,21 +2,20 @@
 
 return [
     /*
-    | Nutzer-Modell der einbindenden Anwendung. Das Paket kennt keine eigene
-    | Nutzerverwaltung — es hält nur eine Referenz.
+    | User model of the consuming application. The package has no user management
+    | of its own — it only holds a reference.
     */
     'user_model' => env('CALENDAR_USER_MODEL', 'App\\Models\\User'),
 
     /*
-    | Terminarten. Jede Anwendung registriert ihre eigenen; das Paket bringt
-    | keine mit. Eintrag: FQCN einer Klasse, die Peppermint\Calendar\Kinds\EventKind
-    | erweitert.
+    | Event kinds. Every application registers its own; the package ships none.
+    | Each entry is the class name of a Peppermint\Calendar\Kinds\EventKind subclass.
     */
     'kinds' => [],
 
     /*
-    | Wie lange ein gelöschter Termin im Papierkorb liegt, wenn die Terminart
-    | keine eigene Frist nennt. null = unbegrenzt.
+    | How long a deleted event stays in the trash bin when its kind names no
+    | retention period of its own. null = forever.
     */
     'trash_retention_days' => 30,
 ];

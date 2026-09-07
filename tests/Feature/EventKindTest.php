@@ -16,16 +16,16 @@ function makeEvent(array $attributes = []): CalendarEvent
     ], $attributes));
 }
 
-it('vergibt beim Anlegen eine eindeutige Kennung', function () {
+it('assigns a unique identity on creation', function () {
     expect(makeEvent()->uid)->not->toBeNull();
 });
 
-it('lehnt eine nicht registrierte Terminart ab, statt eine anzunehmen', function () {
+it('refuses an unregistered event kind instead of assuming one', function () {
     expect(fn () => makeEvent(['kind' => 'inventory']))
         ->toThrow(UnknownEventKind::class);
 });
 
-it('nennt in der Fehlermeldung die bekannten Arten und wo man sie einträgt', function () {
+it('names the known kinds and where to register new ones', function () {
     try {
         makeEvent(['kind' => 'inventory']);
     } catch (UnknownEventKind $e) {
@@ -36,22 +36,22 @@ it('nennt in der Fehlermeldung die bekannten Arten und wo man sie einträgt', fu
     }
 });
 
-it('verweigert ein Feld, das die Terminart ausschliesst', function () {
+it('rejects a field the event kind forbids', function () {
     expect(fn () => makeEvent(['kind' => 'private', 'meeting_url' => 'https://meet.example/x']))
         ->toThrow(ForbiddenAttributeForKind::class);
 });
 
-it('laesst dasselbe Feld bei einer Art zu, die es nicht ausschliesst', function () {
+it('allows that same field for a kind that does not forbid it', function () {
     $event = makeEvent(['meeting_url' => 'https://meet.example/x']);
 
     expect($event->fresh()->meeting_url)->toBe('https://meet.example/x');
 });
 
-it('kennt zu jedem Termin seine Art-Definition', function () {
-    expect(makeEvent(['kind' => 'private'])->kindDefinition()->label())->toBe('Privat');
+it('resolves the kind definition for an event', function () {
+    expect(makeEvent(['kind' => 'private'])->kindDefinition()->label())->toBe('Private');
 });
 
-it('meldet unbekannte Arten auch beim direkten Nachschlagen', function () {
+it('reports unknown kinds on direct lookup too', function () {
     expect(fn () => app(EventKindRegistry::class)->get('inventory'))
         ->toThrow(UnknownEventKind::class);
 });

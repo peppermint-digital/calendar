@@ -112,11 +112,34 @@ composer install
 vendor/bin/pest
 ```
 
+## Recurrence
+
+Rules are stored as an array on the event and validated by building a
+`RecurrenceRule` — there is no way to hold one that describes an impossible
+series.
+
+```php
+$rule = RecurrenceRule::fromArray([
+    'frequency' => 'monthly',
+    'byMonthDay' => 31,
+    'monthDayOverflow' => 'clamp',   // or 'skip'
+]);
+
+$dates = app(RecurrenceCalculator::class)->occurrences($event->starts_at, $rule, $until);
+```
+
+`monthDayOverflow` exists because February has no 31st and there is no answer
+that is right for everyone: `skip` leaves that month without an occurrence,
+`clamp` falls back to the last day of the month. It is a setting rather than a
+silent behaviour, because both choices surprise somebody.
+
+Labels come from the package's language files (English and German included), so
+`describe()` follows the application's locale instead of hard-coding one.
+
 ## Status
 
-Early. The core — kinds, profiles, attendees, scopes, deletion — is in place and
-covered by tests. Recurrence expansion, iCalendar export, CalDAV and time
-blocking are being added next.
+Early. Kinds, profiles, attendees, scopes, deletion and recurrence are in place
+and covered by tests. iCalendar export, CalDAV and time blocking are next.
 
 ## License
 

@@ -13,7 +13,7 @@ function eventBetween(string $von, string $bis, int $owner = 1): CalendarEvent
     ]);
 }
 
-it('findet Termine, die in den Zeitraum hineinragen — nicht nur die, die darin beginnen', function () {
+it('finds events reaching into the window, not only those starting in it', function () {
     $ueberNacht = eventBetween('2026-09-07 23:00:00', '2026-09-08 01:00:00');
     eventBetween('2026-09-09 09:00:00', '2026-09-09 10:00:00');
 
@@ -22,13 +22,13 @@ it('findet Termine, die in den Zeitraum hineinragen — nicht nur die, die darin
     expect($treffer->pluck('id')->all())->toBe([$ueberNacht->id]);
 });
 
-it('gibt ohne erkennbaren Nutzer nichts frei', function () {
+it('releases nothing when the caller cannot be resolved', function () {
     eventBetween('2026-09-08 09:00:00', '2026-09-08 10:00:00');
 
     expect(CalendarEvent::visibleTo(null)->count())->toBe(0);
 });
 
-it('zeigt eigene Termine und solche, an denen man teilnimmt', function () {
+it('shows own events and those one attends', function () {
     $eigener = eventBetween('2026-09-08 09:00:00', '2026-09-08 10:00:00', owner: 1);
     $fremder = eventBetween('2026-09-08 11:00:00', '2026-09-08 12:00:00', owner: 2);
     $eingeladen = eventBetween('2026-09-08 13:00:00', '2026-09-08 14:00:00', owner: 2);
@@ -41,7 +41,7 @@ it('zeigt eigene Termine und solche, an denen man teilnimmt', function () {
         ->not->toContain($fremder->id);
 });
 
-it('filtert nach Terminart', function () {
+it('filters by event kind', function () {
     eventBetween('2026-09-08 09:00:00', '2026-09-08 10:00:00');
     $privat = CalendarEvent::create([
         'kind' => 'private',

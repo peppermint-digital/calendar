@@ -18,7 +18,7 @@ abstract class TestCase extends Orchestra
 
     protected function defineEnvironment($app): void
     {
-        // Fremdschlüssel scharf, damit die Tests dieselben Regeln sehen wie MySQL.
+        // Foreign keys enforced so tests see the same rules MySQL applies.
         $app['config']->set('database.connections.testing.foreign_key_constraints', true);
 
         $app['config']->set('calendar.kinds', [
@@ -31,8 +31,8 @@ abstract class TestCase extends Orchestra
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
-        // Profiltabellen liegen in der Anwendung, nicht im Paket — hier stehen
-        // zwei Beispiele für Anwendungen mit unterschiedlichen Zusatzfeldern.
+        // Profile tables live in the application, not the package — these two
+        // stand in for applications with different extra fields.
         Schema::create('calendar_event_profile_business', function (Blueprint $table) {
             $table->id();
             $table->foreignId('event_id')->constrained('calendar_events')->cascadeOnDelete();

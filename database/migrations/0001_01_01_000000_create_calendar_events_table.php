@@ -11,12 +11,12 @@ return new class extends Migration
         Schema::create('calendar_events', function (Blueprint $table) {
             $table->id();
 
-            // Kalender-übergreifend eindeutig — trägt ICS/CalDAV und übersteht einen Umzug.
+            // Globally unique — carries iCalendar/CalDAV identity and survives a move.
             $table->uuid('uid')->unique();
 
-            // Terminart. Bewusst ohne Default: wer die Art nicht nennt, bekommt einen
-            // Fehler statt stillschweigend die erste. Welche Werte gelten, entscheidet
-            // die Anwendung über die Registrierung — das Paket kennt sie nicht.
+            // Event kind. Deliberately without a default: omitting it raises an error
+            // instead of silently picking the first one. Which values are valid is up
+            // to the application's registration — the package knows none.
             $table->string('kind', 64);
 
             $table->unsignedBigInteger('owner_id')->nullable();
@@ -31,9 +31,9 @@ return new class extends Migration
             $table->boolean('all_day')->default(false);
             $table->string('timezone', 64)->nullable();
 
-            // Sichtbarkeit ist NICHT die Art: ein geschäftlicher Termin kann vertraulich
-            // sein, ein privater offen geteilt. Wer beides in eine Spalte legt, kann
-            // später nur noch raten, was gemeint war — deshalb zwei Spalten.
+            // Visibility is NOT the kind: a business event may be confidential, a
+            // private one openly shared. Putting both in one column leaves you guessing
+            // which was meant — hence two columns.
             $table->string('visibility', 16)->default('shared');
 
             $table->uuid('recurrence_group_id')->nullable();
@@ -41,8 +41,8 @@ return new class extends Migration
             $table->json('recurrence_rules')->nullable();
             $table->date('recurrence_until')->nullable();
 
-            // Wird nur gesetzt, wenn die Terminart einen Papierkorb führt. Arten ohne
-            // Papierkorb löschen hart — siehe EventKind::usesTrash().
+            // Only ever set for kinds that keep a trash bin. Kinds without one delete
+            // for good — see EventKind::usesTrash().
             $table->softDeletes();
             $table->timestamps();
 

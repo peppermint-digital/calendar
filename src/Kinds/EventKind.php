@@ -5,24 +5,23 @@ namespace Peppermint\Calendar\Kinds;
 use Peppermint\Calendar\Models\CalendarEvent;
 
 /**
- * Eine Terminart. Die einbindende Anwendung leitet je Art eine Klasse ab und
- * registriert sie — das Paket bringt keine Arten mit.
+ * An event kind. The consuming application subclasses this once per kind and
+ * registers it — the package ships none of its own.
  *
- * Die Art beantwortet drei Fragen, die der Kern nicht beantworten kann:
- * wie heisst sie, welche Zusatzfelder hat sie (Profil), und was passiert
- * beim Löschen.
+ * A kind answers three questions the core cannot: what it is called, which
+ * extra fields it carries (its profile), and what happens when it is deleted.
  */
 abstract class EventKind
 {
-    /** Schlüssel, wie er in `calendar_events.kind` steht. Stabil halten — er steht in den Daten. */
+    /** Key as stored in `calendar_events.kind`. Keep it stable — it lives in the data. */
     abstract public function key(): string;
 
-    /** Bezeichnung für die Oberfläche. */
+    /** Label for the user interface. */
     abstract public function label(): string;
 
     /**
-     * Profil-Modell mit den Feldern dieser Art (1:1 zum Termin), oder null,
-     * wenn die Art ohne Zusatzfelder auskommt.
+     * Profile model holding this kind's fields (1:1 with the event), or null
+     * when the kind needs no extra fields.
      *
      * @return class-string|null
      */
@@ -32,12 +31,12 @@ abstract class EventKind
     }
 
     /**
-     * Führt diese Art einen Papierkorb?
+     * Does this kind keep a trash bin?
      *
-     * false bedeutet: Löschen entfernt den Termin sofort aus der Datenbank,
-     * samt Profil und Teilnehmern. Für private Termine ist das die richtige
-     * Antwort — wer seinen eigenen Termin löscht, erwartet nicht, dass er
-     * irgendwo weiterlebt.
+     * false means deleting removes the event from the database immediately,
+     * profile and attendees included. For private appointments that is the
+     * right answer — someone deleting their own appointment does not expect it
+     * to live on somewhere.
      */
     public function usesTrash(): bool
     {
@@ -45,8 +44,8 @@ abstract class EventKind
     }
 
     /**
-     * Tage, die ein gelöschter Termin im Papierkorb bleibt, bevor er
-     * endgültig entfernt wird. null = unbegrenzt. Ohne Papierkorb bedeutungslos.
+     * Days a deleted event stays recoverable before it is purged.
+     * null = forever. Meaningless for kinds without a trash bin.
      */
     public function trashRetentionDays(): ?int
     {
@@ -54,8 +53,8 @@ abstract class EventKind
     }
 
     /**
-     * Validierungsregeln für die Zusatzfelder dieser Art. Der Kern prüft sie
-     * nicht selbst — die Anwendung zieht sie in ihre Requests.
+     * Validation rules for this kind's extra fields. The core does not apply
+     * them itself — the application pulls them into its own requests.
      *
      * @return array<string, mixed>
      */
@@ -65,9 +64,9 @@ abstract class EventKind
     }
 
     /**
-     * Felder, die bei dieser Art NICHT gesetzt sein dürfen. Der Riegel gegen
-     * die Flagge, die zur Attrappe wird: ein privater Termin mit Projekt und
-     * Abrechnung ist kein privater Termin mehr.
+     * Core fields this kind must never set. The guard against a kind decaying
+     * into a meaningless flag: a private appointment carrying a project and a
+     * billing target is not a private appointment any more.
      *
      * @return array<int, string>
      */
@@ -76,6 +75,6 @@ abstract class EventKind
         return [];
     }
 
-    /** Haken für die Anwendung, bevor ein Termin dieser Art gespeichert wird. */
+    /** Hook for the application before an event of this kind is saved. */
     public function saving(CalendarEvent $event): void {}
 }

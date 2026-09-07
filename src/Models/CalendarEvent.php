@@ -40,9 +40,9 @@ class CalendarEvent extends Model
         });
 
         static::saving(function (self $event): void {
-            // Wirft, wenn die Art unbekannt ist. Absichtlich kein Rückfall auf
-            // eine Vorgabe: eine geratene Terminart entscheidet über Felder,
-            // Sichtbarkeit und Löschverhalten.
+            // Throws when the kind is unknown. Deliberately no fallback to a
+            // default: a guessed event kind decides fields, visibility and
+            // deletion behaviour.
             $kind = $event->kindDefinition();
 
             foreach ($kind->forbiddenAttributes() as $attribute) {
@@ -71,8 +71,8 @@ class CalendarEvent extends Model
     }
 
     /**
-     * Die Zusatzfelder dieser Terminart. Welche Tabelle das ist, weiss nur die
-     * Art — der Kern hat keine Spalte dafür und bekommt auch keine.
+     * The extra fields of this event kind. Only the kind knows which table that
+     * is — the core has no column for it, and will not grow one.
      */
     public function profile(): ?HasOne
     {
@@ -87,9 +87,8 @@ class CalendarEvent extends Model
     }
 
     /**
-     * Termine, die sich mit dem Zeitraum überschneiden — nicht nur die, die
-     * darin beginnen. Ein Termin von gestern 23:00 bis heute 01:00 gehört in
-     * die Ansicht von heute.
+     * Events overlapping the window — not merely those starting inside it. An
+     * event running from 23:00 yesterday to 01:00 today belongs in today's view.
      */
     public function scopeInRange(Builder $query, mixed $from, mixed $to): Builder
     {
@@ -97,10 +96,10 @@ class CalendarEvent extends Model
     }
 
     /**
-     * Besitz ODER Teilnahme. Ohne Nutzer wird nichts freigegeben: fehlende
-     * Identität heisst "unbekannt", nicht "egal". Ein Scope, der bei fehlender
-     * Identität die Einschränkung fallen lässt, gibt genau dann alles heraus,
-     * wenn am wenigsten über den Aufrufer bekannt ist.
+     * Ownership OR attendance. Without a user nothing is released: a missing
+     * identity means "unknown", not "anyone". A scope that drops its restriction
+     * when it cannot resolve the caller hands out everything precisely when it
+     * knows least.
      */
     public function scopeVisibleTo(Builder $query, ?int $userId): Builder
     {
@@ -115,19 +114,18 @@ class CalendarEvent extends Model
     }
 
     /**
-     * Löschen richtet sich nach der Terminart: Arten mit Papierkorb wandern in
-     * den Papierkorb, Arten ohne verschwinden sofort — samt Profil und
-     * Teilnehmern über die Fremdschlüssel.
+     * Deletion follows the event kind: kinds with a trash bin are soft deleted,
+     * kinds without one are removed immediately, profile and attendees included.
      */
     protected function performDeleteOnModel(): void
     {
         if ($this->forceDeleting || ! $this->kindDefinition()->usesTrash()) {
-            // Angaben zum Termin gehen mit: Teilnahme und Profil sind ohne ihn
-            // keine Auskunft, die jemand später noch braucht. Bewusst im Code
-            // und nicht nur als Fremdschlüssel-Regel — ob ein Cascade greift,
-            // hängt am Treiber (SQLite braucht ein aktives Pragma, MySQL nicht),
-            // und ein Verhalten, das in Tests und Produktion auseinanderläuft,
-            // ist an dieser Stelle keins.
+            // Details of the event go with it: attendance and profile are not
+            // information anyone needs once the event is gone. Done in code and
+            // not only as a foreign key rule — whether a cascade fires depends on
+            // the driver (SQLite needs the pragma enabled, MySQL does not), and
+            // behaviour that differs between tests and production is not
+            // behaviour at all.
             $this->attendees()->delete();
             $this->deleteProfile();
 

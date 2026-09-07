@@ -26,7 +26,7 @@ function eventWithProfile(string $kind): CalendarEvent
     return $event;
 }
 
-it('legt einen geschaeftlichen Termin in den Papierkorb statt ihn zu entfernen', function () {
+it('moves a business event to the trash bin instead of removing it', function () {
     $event = eventWithProfile('business');
 
     $event->delete();
@@ -36,7 +36,7 @@ it('legt einen geschaeftlichen Termin in den Papierkorb statt ihn zu entfernen',
         ->and($event->fresh()->deleted_at)->not->toBeNull();
 });
 
-it('behaelt Teilnehmer und Profil, solange der Termin im Papierkorb liegt', function () {
+it('keeps attendees and profile while the event sits in the trash bin', function () {
     $event = eventWithProfile('business');
 
     $event->delete();
@@ -45,7 +45,7 @@ it('behaelt Teilnehmer und Profil, solange der Termin im Papierkorb liegt', func
         ->and(BusinessProfile::where('event_id', $event->id)->count())->toBe(1);
 });
 
-it('holt einen Termin aus dem Papierkorb zurueck', function () {
+it('restores an event from the trash bin', function () {
     $event = eventWithProfile('business');
     $event->delete();
 
@@ -54,7 +54,7 @@ it('holt einen Termin aus dem Papierkorb zurueck', function () {
     expect(CalendarEvent::find($event->id))->not->toBeNull();
 });
 
-it('entfernt einen privaten Termin sofort — samt Teilnehmern und Profil', function () {
+it('removes a private event at once, attendees and profile included', function () {
     $event = eventWithProfile('private');
 
     $event->delete();
@@ -64,26 +64,26 @@ it('entfernt einen privaten Termin sofort — samt Teilnehmern und Profil', func
         ->and(PrivateProfile::where('event_id', $event->id)->count())->toBe(0);
 });
 
-it('raeumt den Papierkorb erst nach der Frist der jeweiligen Art', function () {
-    $frisch = eventWithProfile('business');
-    $alt = eventWithProfile('business');
+it('purges the trash bin only after the retention period of each kind', function () {
+    $fresh = eventWithProfile('business');
+    $old = eventWithProfile('business');
 
-    $frisch->delete();
-    $alt->delete();
-    CalendarEvent::withTrashed()->whereKey($alt->id)->update(['deleted_at' => Carbon::now()->subDays(31)]);
+    $fresh->delete();
+    $old->delete();
+    CalendarEvent::withTrashed()->whereKey($old->id)->update(['deleted_at' => Carbon::now()->subDays(31)]);
 
     $this->artisan('calendar:purge-trash')->assertSuccessful();
 
-    expect(CalendarEvent::withTrashed()->find($alt->id))->toBeNull()
-        ->and(CalendarEvent::withTrashed()->find($frisch->id))->not->toBeNull();
+    expect(CalendarEvent::withTrashed()->find($old->id))->toBeNull()
+        ->and(CalendarEvent::withTrashed()->find($fresh->id))->not->toBeNull();
 });
 
-it('loescht im Probelauf nichts', function () {
-    $alt = eventWithProfile('business');
-    $alt->delete();
-    CalendarEvent::withTrashed()->whereKey($alt->id)->update(['deleted_at' => Carbon::now()->subDays(31)]);
+it('deletes nothing during a dry run', function () {
+    $old = eventWithProfile('business');
+    $old->delete();
+    CalendarEvent::withTrashed()->whereKey($old->id)->update(['deleted_at' => Carbon::now()->subDays(31)]);
 
     $this->artisan('calendar:purge-trash', ['--dry-run' => true])->assertSuccessful();
 
-    expect(CalendarEvent::withTrashed()->find($alt->id))->not->toBeNull();
+    expect(CalendarEvent::withTrashed()->find($old->id))->not->toBeNull();
 });

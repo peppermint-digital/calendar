@@ -10,10 +10,10 @@ use Peppermint\Calendar\Models\CalendarEvent;
 class PurgeTrashedEventsCommand extends Command
 {
     protected $signature = 'calendar:purge-trash
-                            {--kind= : Nur diese Terminart aufräumen}
-                            {--dry-run : Nur zählen, nichts löschen}';
+                            {--kind= : Only purge this event kind}
+                            {--dry-run : Count only, delete nothing}';
 
-    protected $description = 'Entfernt Termine endgültig, die länger als die Aufbewahrungsfrist ihrer Art im Papierkorb liegen.';
+    protected $description = 'Permanently removes events that have been in the trash bin longer than their kind allows.';
 
     public function handle(EventKindRegistry $registry): int
     {
@@ -33,7 +33,7 @@ class PurgeTrashedEventsCommand extends Command
             $days = $kind->trashRetentionDays();
 
             if ($days === null) {
-                $this->line("· {$key}: unbegrenzte Aufbewahrung, übersprungen");
+                $this->line("· {$key}: kept forever, skipped");
 
                 continue;
             }
@@ -48,25 +48,25 @@ class PurgeTrashedEventsCommand extends Command
             $total += $count;
 
             if ($count === 0) {
-                $this->line("· {$key}: nichts fällig (Frist {$days} Tage)");
+                $this->line("· {$key}: nothing due (retention {$days} days)");
 
                 continue;
             }
 
             if ($dry) {
-                $this->line("· {$key}: {$count} fällig (Frist {$days} Tage) — Probelauf, nichts gelöscht");
+                $this->line("· {$key}: {$count} due (retention {$days} days) — dry run, nothing deleted");
 
                 continue;
             }
 
             $query->get()->each(fn (CalendarEvent $event) => $event->forceDelete());
 
-            $this->line("· {$key}: {$count} endgültig entfernt (Frist {$days} Tage)");
+            $this->line("· {$key}: {$count} permanently removed (retention {$days} days)");
         }
 
         $this->info($dry
-            ? "Probelauf: {$total} Termine wären entfernt worden."
-            : "{$total} Termine endgültig entfernt.");
+            ? "Dry run: {$total} events would have been removed."
+            : "{$total} events permanently removed.");
 
         return self::SUCCESS;
     }
