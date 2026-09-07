@@ -3,7 +3,7 @@
 namespace Peppermint\Calendar\Tests\Fixtures;
 
 use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
+use DateTimeInterface;
 use Peppermint\Calendar\Sources\EventSource;
 use Peppermint\Calendar\Sources\ExternalEvent;
 
@@ -29,7 +29,7 @@ class DemoSource extends EventSource
         return self::$available;
     }
 
-    public function events(int $userId, CarbonInterface $from, CarbonInterface $to): array
+    public function events(int $userId, DateTimeInterface $from, DateTimeInterface $to): array
     {
         if (self::$throws) {
             throw new \RuntimeException('remote system unreachable');

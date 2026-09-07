@@ -2,7 +2,7 @@
 
 namespace Peppermint\Calendar\Sources;
 
-use Carbon\CarbonInterface;
+use DateTimeInterface;
 
 /**
  * A calendar of another system, shown alongside the local one.
@@ -24,9 +24,13 @@ abstract class EventSource
     /**
      * Events of this source for one person and one window.
      *
+     * Takes DateTimeInterface rather than Carbon: a package that demands Carbon
+     * forces every caller to convert first, and the conversion is the package's
+     * business, not theirs.
+     *
      * @return array<int, ExternalEvent>
      */
-    abstract public function events(int $userId, CarbonInterface $from, CarbonInterface $to): array;
+    abstract public function events(int $userId, DateTimeInterface $from, DateTimeInterface $to): array;
 
     /**
      * Is the source usable at all? A source that is not configured is skipped

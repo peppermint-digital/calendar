@@ -14,10 +14,13 @@ beforeEach(function () {
 
 function collectSources(array $only = []): array
 {
+    // Bewusst mit einfachem DateTimeImmutable: Das Paket darf seine Nutzer
+    // nicht zu Carbon zwingen — genau daran ist der erste Live-Aufruf
+    // gescheitert.
     return app(EventSourceRegistry::class)->collect(
         1,
-        CarbonImmutable::parse('2026-09-07'),
-        CarbonImmutable::parse('2026-09-13'),
+        new DateTimeImmutable('2026-09-07'),
+        new DateTimeImmutable('2026-09-13'),
         $only,
     );
 }

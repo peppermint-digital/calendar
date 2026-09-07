@@ -2,7 +2,7 @@
 
 namespace Peppermint\Calendar\Sources;
 
-use Carbon\CarbonInterface;
+use DateTimeInterface;
 use Illuminate\Support\Facades\Log;
 
 class EventSourceRegistry
@@ -38,7 +38,7 @@ class EventSourceRegistry
      * @param  array<int, string>  $only  restrict to these source keys, empty = all
      * @return array<int, ExternalEvent>
      */
-    public function collect(int $userId, CarbonInterface $from, CarbonInterface $to, array $only = []): array
+    public function collect(int $userId, DateTimeInterface $from, DateTimeInterface $to, array $only = []): array
     {
         $events = [];
 
