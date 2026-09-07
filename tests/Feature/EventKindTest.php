@@ -55,3 +55,14 @@ it('reports unknown kinds on direct lookup too', function () {
     expect(fn () => app(EventKindRegistry::class)->get('inventory'))
         ->toThrow(UnknownEventKind::class);
 });
+
+it('can be told not to load its own migrations', function () {
+    // An application adopting an existing calendar_events table switches these
+    // off; the package must then keep out of the migration path entirely.
+    config()->set('calendar.run_migrations', false);
+
+    $provider = new Peppermint\Calendar\CalendarServiceProvider(app());
+    $provider->boot();
+
+    expect(config('calendar.run_migrations'))->toBeFalse();
+});

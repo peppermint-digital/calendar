@@ -34,7 +34,14 @@ class CalendarServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        // An application that already has a calendar cannot use these as-is: its
+        // tables exist, with columns of its own. It switches them off and brings
+        // the schema across in its own migration instead — otherwise the first
+        // migrate run collides with the tables it is supposed to adopt.
+        if (config('calendar.run_migrations', true)) {
+            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        }
+
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'calendar');
 
         if ($this->app->runningInConsole()) {
@@ -45,6 +52,10 @@ class CalendarServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../lang' => lang_path('vendor/calendar'),
             ], 'calendar-lang');
+
+            $this->publishes([
+                __DIR__.'/../database/migrations' => database_path('migrations'),
+            ], 'calendar-migrations');
 
             $this->commands([
                 PurgeTrashedEventsCommand::class,

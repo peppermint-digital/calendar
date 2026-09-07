@@ -19,6 +19,13 @@ return [
     */
     'trash_retention_days' => 30,
 
+    /*
+    | Load the package's own migrations. Set to false in an application that
+    | already owns a calendar_events table and brings the schema across itself;
+    | publish them with the `calendar-migrations` tag to start from a copy.
+    */
+    'run_migrations' => true,
+
     'ics' => [
         /*
         | Identifies the software that produced the file. Clients show it when
