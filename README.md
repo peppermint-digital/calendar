@@ -89,6 +89,36 @@ Labels come from the package's language files (English and German included), so
 
 ## Time blocking
 
+Time blocking is a way of working, not a data structure: a list of things to do
+next to a calendar, and you push the day into shape. The list rules belong in
+the package — written once, they cannot drift apart between two frontends.
+
+```php
+$board = app(Board::class)->build(
+    userId: $user->id,
+    subjectType: 'task',
+    items: $tasks->map(fn ($task) => new PlannableItem(
+        id: $task->id,
+        title: $task->title,
+        recurring: $task->is_routine,
+        meta: ['project' => $task->project?->name, 'effort' => $task->estimated_hours],
+    )),
+    from: $windowStart,
+    to: $windowEnd,
+);
+```
+
+You get back what still needs planning, what is already in the day, the events
+of the window, and where the day collides with itself. Your frontend only draws
+it — Vue and React can render the same board without agreeing on anything but
+the shape.
+
+The rule that matters: a one-off item leaves the list as soon as it has any
+block at all; a recurring one comes back in every window it is not yet planned
+in. Without that distinction a routine task disappears after being scheduled
+once and never returns — and nobody notices, because a missing entry looks
+exactly like an empty list.
+
 An event can point at something the core knows nothing about — the task behind a
 time block, a habit, a training session — through a narrow `subject_type` /
 `subject_id` pair. That is enough for the core to answer the two questions every
