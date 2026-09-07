@@ -79,6 +79,19 @@ $rule = RecurrenceRule::fromArray([
 $dates = app(RecurrenceCalculator::class)->occurrences($event->starts_at, $rule, $until);
 ```
 
+Stored rules are not appearances: a series is one row, and the dates it produces
+are computed when a window is read.
+
+```php
+$occurrences = app(OccurrenceExpander::class)->expand($events, $from, $to);
+```
+
+Expanding into rows would mean every rule change has to rewrite them — and a
+stored occurrence can disagree with its rule, at which point nobody knows which
+one is right. Events without a rule pass through unchanged; a rule that cannot
+be read leaves its event visible once, at its own date, rather than making it
+disappear.
+
 `monthDayOverflow` exists because February has no 31st and there is no answer
 that is right for everyone: `skip` leaves that month without an occurrence,
 `clamp` falls back to the last day of the month. It is a setting rather than a
