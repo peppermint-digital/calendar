@@ -92,3 +92,41 @@ it('still refuses to set a forbidden value on an existing row', function () {
 
     expect(fn () => $legacy->save())->toThrow(ForbiddenAttributeForKind::class);
 });
+
+it('treats a kind as creatable unless it says otherwise', function () {
+    $offen = new class extends \Peppermint\Calendar\Kinds\EventKind
+    {
+        public function key(): string
+        {
+            return 'offen';
+        }
+
+        public function label(): string
+        {
+            return 'Offen';
+        }
+    };
+
+    // A kind that only comes into being through another action — dragging a
+    // task into the day, approving a leave request — says so.
+    $abgeleitet = new class extends \Peppermint\Calendar\Kinds\EventKind
+    {
+        public function key(): string
+        {
+            return 'abgeleitet';
+        }
+
+        public function label(): string
+        {
+            return 'Abgeleitet';
+        }
+
+        public function isUserCreatable(): bool
+        {
+            return false;
+        }
+    };
+
+    expect($offen->isUserCreatable())->toBeTrue()
+        ->and($abgeleitet->isUserCreatable())->toBeFalse();
+});

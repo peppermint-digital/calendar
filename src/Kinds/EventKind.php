@@ -38,6 +38,24 @@ abstract class EventKind
      * right answer — someone deleting their own appointment does not expect it
      * to live on somewhere.
      */
+    /**
+     * May a person pick this kind when creating an event by hand?
+     *
+     * Not every kind is something you *choose*. A planned block appears by
+     * dragging a task into the day; a leave entry mirrors an approved request.
+     * Offering those in a "what would you like to create?" dialogue asks a
+     * question that has no useful answer — and an entry created that way would
+     * be missing whatever it exists to mirror.
+     *
+     * Kinds that only ever come into being through another action say so by
+     * returning false. The default is true: a kind is normally something you
+     * can create.
+     */
+    public function isUserCreatable(): bool
+    {
+        return true;
+    }
+
     public function usesTrash(): bool
     {
         return true;
