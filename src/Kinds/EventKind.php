@@ -31,14 +31,6 @@ abstract class EventKind
     }
 
     /**
-     * Does this kind keep a trash bin?
-     *
-     * false means deleting removes the event from the database immediately,
-     * profile and attendees included. For private appointments that is the
-     * right answer — someone deleting their own appointment does not expect it
-     * to live on somewhere.
-     */
-    /**
      * May a person pick this kind when creating an event by hand?
      *
      * Not every kind is something you *choose*. A planned block appears by
@@ -56,6 +48,14 @@ abstract class EventKind
         return true;
     }
 
+    /**
+     * Does this kind keep a trash bin?
+     *
+     * false means deleting removes the event from the database immediately,
+     * profile and attendees included. For private appointments that is the
+     * right answer — someone deleting their own appointment does not expect it
+     * to live on somewhere.
+     */
     public function usesTrash(): bool
     {
         return true;

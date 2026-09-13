@@ -14,6 +14,9 @@ class DemoSource extends EventSource
 
     public static bool $throws = false;
 
+    /** @var array<string, mixed> */
+    public static array $extra = [];
+
     public function key(): string
     {
         return 'demo';
@@ -43,6 +46,7 @@ class DemoSource extends EventSource
                 startsAt: CarbonImmutable::parse('2026-09-08 09:00'),
                 endsAt: CarbonImmutable::parse('2026-09-08 10:00'),
                 location: 'Remote',
+                extra: self::$extra,
             ),
         ];
     }

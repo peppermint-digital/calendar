@@ -227,6 +227,38 @@ see, and the same package serves both directions. A source that fails is logged
 and left out — the rest of the calendar still appears, because a blank page
 explains nothing while a gap is at least visible.
 
+### Fields only the other system knows
+
+A source usually has more to say than the eight fields every calendar shares: a
+project, a customer, a billing flag, who is attending. Those go into `extra`.
+
+```php
+new ExternalEvent(
+    sourceKey: 'manager',
+    id: (string) $row['id'],
+    title: $row['title'],
+    startsAt: CarbonImmutable::parse($row['starts_at']),
+    endsAt: CarbonImmutable::parse($row['ends_at']),
+    extra: [
+        'project'  => $row['project']['name'] ?? null,
+        'category' => $row['category'] ?? null,
+        'billable' => ! $row['is_not_billable'],
+    ],
+);
+```
+
+They are shown and nothing else — never stored, never written back, never mapped
+onto core columns. This is the answer to the pull every shared calendar table
+feels: a product needs one more field, and the cheapest place looks like a new
+column in the middle. A column would land in every other product too. This does
+not, because an external event is never persisted.
+
+Keys that collide with what the core writes (`id`, `starts_at`, `external`, …)
+are dropped. Without that, a remote system could overwrite the identity of its
+own event by naming a field cleverly — and the event could then be slipped into
+something that writes. When `extra` is empty the key is left out entirely: a key
+that is always present but usually empty teaches readers to ignore it.
+
 ## Adopting an existing calendar
 
 An application that has kept a calendar for years has its own table and column

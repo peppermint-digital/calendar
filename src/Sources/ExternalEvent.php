@@ -13,6 +13,35 @@ use Carbon\CarbonImmutable;
  */
 class ExternalEvent
 {
+    /**
+     * Keys the core itself writes. Anything a source puts under `extra` is
+     * removed if it collides — otherwise a remote system could overwrite the
+     * id or the times of its own event by naming a field cleverly.
+     *
+     * @var array<int, string>
+     */
+    protected const RESERVED_KEYS = [
+        'id', 'source', 'external', 'title',
+        'starts_at', 'ends_at', 'all_day', 'location', 'url', 'extra',
+    ];
+
+    /**
+     * Fields only the other system knows: a project, a customer, a billing
+     * flag, an attendee list. They are shown and nothing else — never stored,
+     * never written back, never mapped onto core columns.
+     *
+     * This is the answer to the pull every shared calendar table feels: a
+     * product needs one more field, and the cheapest place looks like a new
+     * column in the middle. A column would land in every other product too.
+     * This does not, because an external event is never persisted.
+     *
+     * @var array<string, mixed>
+     */
+    public readonly array $extra;
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
     public function __construct(
         public readonly string $sourceKey,
         public readonly string $id,
@@ -22,12 +51,15 @@ class ExternalEvent
         public readonly bool $allDay = false,
         public readonly ?string $location = null,
         public readonly ?string $url = null,
-    ) {}
+        array $extra = [],
+    ) {
+        $this->extra = array_diff_key($extra, array_flip(self::RESERVED_KEYS));
+    }
 
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return [
+        $payload = [
             // Prefixed so it can never collide with a local event id — and so a
             // caller cannot accidentally pass it to something that writes.
             'id' => $this->sourceKey.':'.$this->id,
@@ -40,5 +72,13 @@ class ExternalEvent
             'location' => $this->location,
             'url' => $this->url,
         ];
+
+        // Left out entirely when there is nothing to say: a key that is always
+        // present but usually empty teaches readers to ignore it.
+        if ($this->extra !== []) {
+            $payload['extra'] = $this->extra;
+        }
+
+        return $payload;
     }
 }
