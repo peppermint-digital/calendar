@@ -19,6 +19,12 @@ use Illuminate\Support\Facades\Schema;
  * Bedingt ausgefuehrt: Anwendungen mit eigener Tabelle (`run_migrations` aus)
  * erreicht diese Migration ohnehin nicht, und eine frische Installation legt
  * die Spalte gar nicht erst an.
+ *
+ * Der Dateiname traegt bewusst ein echtes Datum statt der `0001_01_01`-Reihe
+ * der Grundmigrationen: Eine Anwendung, die ihre Werte vorher woanders
+ * hinretten will, muss ihre eigene Migration davor einsortieren koennen. Mit
+ * `0001_01_01` liefe dieses Loeschen vor jeder App-Migration — und die
+ * Rettung waere strukturell unmoeglich.
  */
 return new class extends Migration
 {
