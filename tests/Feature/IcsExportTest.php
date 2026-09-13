@@ -93,7 +93,10 @@ it('exports a weekly series as a recurrence rule', function () {
         'recurrence_until' => '2026-12-31',
     ]));
 
-    expect($out)->toContain('RRULE:FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261231T235959Z');
+    // Reihenfolge und Schreibweise kommen jetzt von der Bibliothek. Das Z am
+    // Ende ist unseres: Sie laesst es weg, und eine schwebende Endzeit in einer
+    // UTC-Serie waere gegen RFC 5545 §3.3.10 (siehe UtcRRule).
+    expect($out)->toContain('RRULE:FREQ=WEEKLY;UNTIL=20261231T235959Z;BYDAY=MO,WE');
 });
 
 it('expresses every two weeks as an interval', function () {
@@ -117,10 +120,13 @@ it('lists attendees with their response state', function () {
 
     $out = ics($event->fresh('attendees'));
 
+    // Ohne Anfuehrungszeichen und mit grossgeschriebenem MAILTO — beides
+    // erlaubt: Ein Parameterwert muss nur dann in Anfuehrungszeichen, wenn er
+    // Komma, Semikolon oder Doppelpunkt enthaelt.
     expect($out)
-        ->toContain('CN="Alex Doe"')
-        ->toContain('PARTSTAT=ACCEPTED:mailto:a@example.test')
-        ->toContain('PARTSTAT=NEEDS-ACTION:mailto:b@example.test');
+        ->toContain('CN=Alex Doe')
+        ->toContain('PARTSTAT=ACCEPTED:MAILTO:a@example.test')
+        ->toContain('PARTSTAT=NEEDS-ACTION:MAILTO:b@example.test');
 });
 
 it('marks a trashed event as cancelled so subscribers remove it', function () {
@@ -141,15 +147,16 @@ it('wraps events in a calendar with the configured identity', function () {
         ->toStartWith("BEGIN:VCALENDAR\r\n")
         ->toContain('PRODID:-//Peppermint//Calendar//EN')
         ->toContain('X-WR-CALNAME:Team')
-        ->toEndWith("END:VCALENDAR\r\n");
+        ->toEndWith('END:VCALENDAR');
 });
 
 it('folds exactly at the octet boundary', function () {
-    $writer = new IcsWriter;
-    $writer->property('SUMMARY', str_repeat('a', 100));
-
-    $lines = explode("\r\n", trim($writer->toString()));
+    // Fuer die Stellen, die ihr ICS noch selbst zusammensetzen: Die Bibliothek
+    // faltet nur, was sie selbst baut.
+    $gefaltet = IcsWriter::foldDocument('SUMMARY:'.str_repeat('a', 100));
+    $lines = explode("\r\n", $gefaltet);
 
     expect(strlen($lines[0]))->toBe(75)
-        ->and($lines[1])->toStartWith(' ');
+        ->and($lines[1])->toStartWith(' ')
+        ->and(str_replace("\r\n ", '', $gefaltet))->toBe('SUMMARY:'.str_repeat('a', 100));
 });

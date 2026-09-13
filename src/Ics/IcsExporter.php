@@ -8,7 +8,26 @@ use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Enums\Frequency;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Recurrence\RecurrenceRule;
+use Spatie\IcalendarGenerator\Components\Calendar as IcsCalendar;
+use Spatie\IcalendarGenerator\Components\Event as IcsEvent;
+use Spatie\IcalendarGenerator\Enums\Classification;
+use Spatie\IcalendarGenerator\Enums\EventStatus;
+use Spatie\IcalendarGenerator\Enums\ParticipationStatus;
+use Spatie\IcalendarGenerator\Enums\RecurrenceDay;
+use Spatie\IcalendarGenerator\Enums\RecurrenceFrequency;
+use Spatie\IcalendarGenerator\Properties\TextProperty;
 
+/**
+ * Termine als iCalendar.
+ *
+ * Das Zusammensetzen erledigt spatie/icalendar-generator. RFC 5545 ist
+ * Kleinarbeit mit vielen Kanten — Faltung in Oktett, Maskierungsreihenfolge,
+ * das exklusive DTEND ganztaegiger Termine, Zeitzonenkomponenten, PARTSTAT.
+ * Das pflegt jemand anders besser als wir nebenbei.
+ *
+ * Was hier bleibt, ist die Uebersetzung: unser Terminmodell in seine Objekte.
+ * Die schreibt man in jedem Fall selbst.
+ */
 class IcsExporter
 {
     /**
@@ -16,121 +35,167 @@ class IcsExporter
      */
     public function calendar(iterable $events, ?string $name = null, string $method = 'PUBLISH'): string
     {
-        $writer = new IcsWriter;
-
-        $writer->begin('VCALENDAR')
-            ->property('VERSION', '2.0', raw: true)
-            ->property('PRODID', config('calendar.ics.prodid'), raw: true)
-            ->property('CALSCALE', 'GREGORIAN', raw: true)
-            ->property('METHOD', $method, raw: true)
-            ->property('X-WR-CALNAME', $name);
+        $calendar = IcsCalendar::create($name ?? '')
+            ->productIdentifier((string) config('calendar.ics.prodid'))
+            // Alle Zeiten gehen als UTC hinaus. Die Bibliothek legt dafuer
+            // sonst eine VTIMEZONE-Komponente fuer UTC an — korrekt, aber
+            // sinnlos: Ein Z am Zeitstempel sagt dasselbe in einer Zeile.
+            ->withoutAutoTimezoneComponents()
+            // METHOD kennt die Bibliothek nicht als eigene Angabe. Roh
+            // angehaengt, weil PUBLISH und REQUEST feste Woerter sind und
+            // nichts zu maskieren haben.
+            ->appendProperty(TextProperty::create('METHOD', $method)->withoutEscaping());
 
         foreach ($events as $event) {
-            $this->event($event, $writer);
+            $calendar->event($this->component($event));
         }
 
-        return $writer->end('VCALENDAR')->toString();
+        return $calendar->get();
     }
 
-    public function event(CalendarEvent $event, ?IcsWriter $writer = null): string
+    /** Ein einzelner Termin als vollstaendige Datei — fuer Mail-Anhaenge. */
+    public function event(CalendarEvent $event, string $method = 'PUBLISH'): string
     {
-        $writer ??= new IcsWriter;
-
-        $start = CarbonImmutable::parse($event->field('starts_at'));
-        $end = CarbonImmutable::parse($event->field('ends_at'));
-
-        $writer->begin('VEVENT')
-            ->property('UID', $this->uid($event), raw: true)
-            ->property('DTSTAMP', $this->utc(CarbonImmutable::now()), raw: true);
-
-        if ($event->field('all_day')) {
-            // DTEND is exclusive for all-day events: a one-day event ends on
-            // the following day. Emitting the same date makes it disappear in
-            // some clients and last zero minutes in others.
-            $writer->property('DTSTART', $start->format('Ymd'), ['VALUE' => 'DATE'], raw: true)
-                ->property('DTEND', $end->addDay()->format('Ymd'), ['VALUE' => 'DATE'], raw: true);
-        } else {
-            $writer->property('DTSTART', $this->utc($start), raw: true)
-                ->property('DTEND', $this->utc($end), raw: true);
-        }
-
-        $writer->property('SUMMARY', $event->title)
-            ->property('DESCRIPTION', $event->description === null ? null : strip_tags($event->description))
-            ->property('LOCATION', $event->location);
-
-        // Kategorien sind eine Zusatzfunktion: Wer keine fuehrt, exportiert
-        // keine Zeile. Die Art liefert Zeichenketten, das Schreiben bleibt hier.
-        if (app(CategoryRegistry::class)->enabled()) {
-            $writer->listProperty('CATEGORIES', $event->kindDefinition()->categories($event));
-        }
-
-        if ($rrule = $this->rrule($event)) {
-            $writer->property('RRULE', $rrule, raw: true);
-        }
-
-        // A confidential event still travels — its details do not. Clients that
-        // honour CLASS hide title and description from other viewers.
-        if ($event->field('visibility') === 'confidential') {
-            $writer->property('CLASS', 'PRIVATE', raw: true);
-        }
-
-        foreach ($event->attendees as $attendee) {
-            $address = $attendee->email;
-
-            if ($address === null || $address === '') {
-                continue;
-            }
-
-            $writer->property('ATTENDEE', 'mailto:'.$address, array_filter([
-                'CN' => $attendee->name === null ? null : $this->quote($attendee->name),
-                'PARTSTAT' => $this->partStat($attendee->status),
-            ]), raw: true);
-        }
-
-        if ($event->trashed()) {
-            $writer->property('STATUS', 'CANCELLED', raw: true);
-        }
-
-        $writer->property('LAST-MODIFIED', $this->utc(CarbonImmutable::parse($event->updated_at)), raw: true);
-
-        return $writer->end('VEVENT')->toString();
+        return $this->calendar([$event], null, $method);
     }
 
     /**
-     * Translates the package's recurrence rule into an RRULE. Without this an
-     * exported series arrives as a single appointment and the reader never
-     * learns that it repeats.
+     * Unser Termin als Baustein der Bibliothek.
+     *
+     * Oeffentlich, damit eine Anwendung ihn in einen eigenen Kalender haengen
+     * kann — etwa neben Eintraege, die keine Termine sind.
      */
-    public function rrule(CalendarEvent $event): ?string
+    public function component(CalendarEvent $event): IcsEvent
+    {
+        $start = CarbonImmutable::parse($event->field('starts_at'));
+        $end = CarbonImmutable::parse($event->field('ends_at'));
+        $allDay = (bool) $event->field('all_day');
+
+        $component = IcsEvent::create()
+            ->uniqueIdentifier($this->uid($event))
+            ->name((string) $event->title)
+            ->startsAt($allDay ? $start->startOfDay() : $start->utc())
+            // Das exklusive DTEND ganztaegiger Termine macht die Bibliothek
+            // NICHT — geprueft, sie schreibt denselben Tag zweimal. Ein
+            // eintaegiger Termin verschwindet damit in manchen Clients und
+            // dauert in anderen null Minuten.
+            ->endsAt($allDay ? $end->startOfDay()->addDay() : $end->utc());
+
+        if ($allDay) {
+            $component->fullDay();
+        }
+
+        if (filled($event->description)) {
+            $component->description(strip_tags((string) $event->description));
+        }
+
+        if (filled($event->location)) {
+            $component->address((string) $event->location);
+        }
+
+        if ($event->field('visibility') === 'confidential') {
+            $component->classification(Classification::Private);
+        }
+
+        if ($event->trashed()) {
+            $component->status(EventStatus::Cancelled);
+        }
+
+        $this->addCategories($component, $event);
+        $this->addRecurrence($component, $event);
+        $this->addAttendees($component, $event);
+
+        return $component;
+    }
+
+    /**
+     * Kategorien kennt die Bibliothek nicht — und der naive Weg ueber ihre
+     * Text-Angabe waere falsch: Sie maskiert das Komma zu `\,`, bei CATEGORIES
+     * ist das Komma aber das TRENNZEICHEN. Aus zwei Kategorien wuerde eine.
+     *
+     * Also unmaskiert anhaengen und jeden Wert selbst maskieren.
+     */
+    protected function addCategories(IcsEvent $component, CalendarEvent $event): void
+    {
+        if (! app(CategoryRegistry::class)->enabled()) {
+            return;
+        }
+
+        $labels = array_values(array_filter(
+            array_map(static fn (string $label): string => trim($label), $event->kindDefinition()->categories($event)),
+            static fn (string $label): bool => $label !== '',
+        ));
+
+        if ($labels === []) {
+            return;
+        }
+
+        $writer = new IcsWriter;
+
+        $component->appendProperty(
+            TextProperty::create(
+                'CATEGORIES',
+                implode(',', array_map(fn (string $label): string => $writer->escape($label), $labels)),
+            )->withoutEscaping(),
+        );
+    }
+
+    /**
+     * Ohne die Regel kaeme eine Serie als einzelner Termin an, und der Leser
+     * erfuehre nie, dass sie sich wiederholt.
+     */
+    protected function addRecurrence(IcsEvent $component, CalendarEvent $event): void
     {
         $rules = $event->recurrence_rules;
 
         if (! is_array($rules) || $rules === []) {
-            return null;
+            return;
         }
 
         $rule = RecurrenceRule::fromArray($rules);
 
-        $parts = match ($rule->frequency) {
-            Frequency::Daily => ['FREQ=DAILY'],
-            Frequency::Weekly => ['FREQ=WEEKLY'],
-            Frequency::Biweekly => ['FREQ=WEEKLY', 'INTERVAL=2'],
-            Frequency::Monthly => ['FREQ=MONTHLY'],
-        };
+        $rrule = UtcRRule::of(match ($rule->frequency) {
+            Frequency::Daily => RecurrenceFrequency::Daily,
+            Frequency::Weekly, Frequency::Biweekly => RecurrenceFrequency::Weekly,
+            Frequency::Monthly => RecurrenceFrequency::Monthly,
+        });
 
-        if ($rule->frequency->needsWeekdays() && $rule->byDay !== []) {
-            $parts[] = 'BYDAY='.implode(',', $rule->byDay);
+        if ($rule->frequency === Frequency::Biweekly) {
+            $rrule->interval(2);
+        }
+
+        if ($rule->frequency->needsWeekdays()) {
+            foreach ($rule->byDay as $day) {
+                if (($tag = RecurrenceDay::tryFrom($day)) !== null) {
+                    $rrule->onWeekDay($tag);
+                }
+            }
         }
 
         if ($rule->frequency === Frequency::Monthly && $rule->byMonthDay !== null) {
-            $parts[] = 'BYMONTHDAY='.$rule->byMonthDay;
+            $rrule->onMonthDay($rule->byMonthDay);
         }
 
         if ($event->recurrence_until !== null) {
-            $parts[] = 'UNTIL='.CarbonImmutable::parse($event->recurrence_until)->endOfDay()->utc()->format('Ymd\THis\Z');
+            $rrule->until(CarbonImmutable::parse($event->recurrence_until)->endOfDay()->utc());
         }
 
-        return implode(';', $parts);
+        $component->rrule($rrule);
+    }
+
+    protected function addAttendees(IcsEvent $component, CalendarEvent $event): void
+    {
+        foreach ($event->attendees as $attendee) {
+            if (! filled($attendee->email)) {
+                continue;
+            }
+
+            $component->attendee(
+                (string) $attendee->email,
+                $attendee->name,
+                $this->partStat($attendee->status),
+            );
+        }
     }
 
     protected function uid(CalendarEvent $event): string
@@ -138,23 +203,13 @@ class IcsExporter
         return $event->field('uid').'@'.config('calendar.ics.uid_domain');
     }
 
-    protected function utc(CarbonImmutable $moment): string
-    {
-        return $moment->utc()->format('Ymd\THis\Z');
-    }
-
-    protected function quote(string $value): string
-    {
-        return '"'.str_replace('"', '', $value).'"';
-    }
-
-    protected function partStat(?string $status): string
+    protected function partStat(?string $status): ParticipationStatus
     {
         return match ($status) {
-            'accepted' => 'ACCEPTED',
-            'declined' => 'DECLINED',
-            'tentative' => 'TENTATIVE',
-            default => 'NEEDS-ACTION',
+            'accepted' => ParticipationStatus::Accepted,
+            'declined' => ParticipationStatus::Declined,
+            'tentative' => ParticipationStatus::Tentative,
+            default => ParticipationStatus::NeedsAction,
         };
     }
 

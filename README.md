@@ -289,18 +289,32 @@ disappearing forever after being scheduled once.
 
 ## iCalendar
 
+Export runs through [spatie/icalendar-generator](https://github.com/spatie/icalendar-generator).
+RFC 5545 is detail work with sharp edges — folding counted in octets, the order escapes have to
+be applied in, the exclusive `DTEND` of all-day events, timezone components, `PARTSTAT`. Someone
+else maintains that better than we would on the side.
+
 ```php
-return app(IcsExporter::class)->download($events, 'team.ics', 'Team calendar');
+app(IcsExporter::class)->calendar($events, 'Team calendar');
+app(IcsExporter::class)->download($events, 'team.ics');
+app(IcsExporter::class)->component($event);   // for a calendar you assemble yourself
 ```
 
-Series are exported as `RRULE`, so a subscriber sees a series rather than one
-appointment. Attendees carry their response state, trashed events are exported
-as `STATUS:CANCELLED` so subscribers remove them, and confidential events are
-marked `CLASS:PRIVATE`.
+Three things the library does not do, and this package adds:
 
-Lines are folded at 75 octets and never inside a multi-byte character — the two
-things hand-rolled serialisers usually miss, because nothing breaks until
-someone writes a long description or a name with an umlaut in it.
+**`CATEGORIES`** does not exist there. Appending it through a text property escapes the comma —
+and in `CATEGORIES` the comma is the *separator*, so two categories would collapse into one
+called `Health\, Sport`. Each value is escaped on its own and joined with raw commas instead.
+
+**`UNTIL` inside an `RRULE` loses its `Z`.** RFC 5545 §3.3.10 requires UTC there when `DTSTART`
+is UTC; the library carries timezones in property parameters, which an `RRULE` value cannot have.
+`UtcRRule` puts it back. It disappears when upstream fixes it.
+
+**The exclusive `DTEND` of all-day events** is not applied — a one-day event would start and end
+on the same date, which makes it vanish in some clients and last zero minutes in others.
+
+`IcsWriter` keeps two methods, `escape()` and `foldDocument()`, for applications that assemble
+their `.ics` by hand and cannot switch in one go. It is a transition, not a destination.
 
 ## Deliberate design decisions
 
