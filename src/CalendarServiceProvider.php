@@ -84,7 +84,14 @@ class CalendarServiceProvider extends ServiceProvider
             // selbst geladen: Wer keine fuehrt, soll keine leere Tabelle
             // bekommen. Ein Schalter waere hier falsch — Laravel merkt sich
             // eine Migration als ausgefuehrt, auch wenn sie nichts getan hat.
-            $this->publishes([
+            //
+            // publishesMigrations() statt publishes(): Nur das stempelt beim
+            // Veroeffentlichen einen aktuellen Zeitstempel auf den Dateinamen.
+            // Mit publishes() landet die Datei unter ihrem Paketnamen in der
+            // Anwendung — und der beginnt mit 0001_01_01, liefe also vor jeder
+            // App-Migration. In einem Paket faellt das nicht auf, in der
+            // einbindenden Anwendung schon.
+            $this->publishesMigrations([
                 __DIR__.'/../database/migrations-optional' => database_path('migrations'),
             ], 'calendar-categories');
 
