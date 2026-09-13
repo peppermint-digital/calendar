@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 
-export type AgendaRow = {
+export type AgendaRow<T = unknown> = {
     key: string;
+    /** Was das Produkt an dieser Zeile haengen hat — fuer eigene Bedienelemente. */
+    data?: T;
     /** Kalendertag, `YYYY-MM-DD`. */
     date: string;
     /** `HH:MM`, oder null bei ganztaegig. */
@@ -16,11 +18,19 @@ export type AgendaRow = {
     recurring?: boolean;
 };
 
-export type AgendaListProps = {
-    rows: AgendaRow[];
+export type AgendaListProps<T = unknown> = {
+    rows: AgendaRow<T>[];
     /** Beschriftung eines Tages — das Produkt kennt seine Sprache und Zeitzone. */
     dayLabel: (date: string) => string;
-    onSelect?: (row: AgendaRow) => void;
+    onSelect?: (row: AgendaRow<T>) => void;
+    /**
+     * Bedienelemente am rechten Rand einer Zeile.
+     *
+     * Die kennt nur das Produkt: „zur Aufgabe springen" gibt es nur dort, wo es
+     * Aufgaben gibt. Ohne diesen Weg muesste die Liste jedes Produkt kennen —
+     * oder das Produkt verlaere beim Umstieg still eine Faehigkeit.
+     */
+    actions?: (row: AgendaRow<T>) => ReactNode;
     /** Was statt der Liste steht, wenn nichts ansteht. */
     empty?: ReactNode;
     allDayLabel?: string;
@@ -35,13 +45,14 @@ export type AgendaListProps = {
  * — Kopfzeile, Zeitraumwahl, ueberfaellige Aufgaben — bleibt beim Produkt, denn
  * die kennt jedes anders.
  */
-export function AgendaList({
+export function AgendaList<T = unknown>({
     rows,
     dayLabel,
     onSelect,
+    actions,
     empty = null,
     allDayLabel = 'ganztägig',
-}: AgendaListProps) {
+}: AgendaListProps<T>) {
     if (rows.length === 0) {
         return <>{empty}</>;
     }
@@ -52,7 +63,7 @@ export function AgendaList({
         `${a.date} ${a.start ?? '00:00'}`.localeCompare(`${b.date} ${b.start ?? '00:00'}`),
     );
 
-    const byDay = sorted.reduce<Record<string, AgendaRow[]>>((carry, row) => {
+    const byDay = sorted.reduce<Record<string, AgendaRow<T>[]>>((carry, row) => {
         (carry[row.date] ??= []).push(row);
 
         return carry;
@@ -95,6 +106,7 @@ export function AgendaList({
                                         {row.badge}
                                     </span>
                                 )}
+                                {actions && <div className="ml-auto flex gap-1">{actions(row)}</div>}
                             </div>
                         ))}
                     </div>
