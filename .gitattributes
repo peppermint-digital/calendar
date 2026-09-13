@@ -1,0 +1,8 @@
+# Das Frontend gehoert ins selbe Repository wie der PHP-Kern — ein Tag bedient
+# beide. Im Composer-Archiv hat es aber nichts verloren: Wer nur das PHP-Paket
+# einbindet, soll kein Frontend im vendor/ liegen haben.
+/resources/js       export-ignore
+/package.json       export-ignore
+/tsup.config.ts     export-ignore
+/tsconfig.json      export-ignore
+/.gitattributes     export-ignore

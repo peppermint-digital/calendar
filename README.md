@@ -19,6 +19,42 @@ calendar_events                  title, time range, all-day, location,
   └── <your profile table>  1:1  your columns, your constraints
 ```
 
+## The interface
+
+The package ships its front end in the same repository: `composer.json` for the PHP core,
+`package.json` for the React components. One tag serves both.
+
+```
+composer require peppermint/calendar
+npm install github:peppermint-digital/calendar#v0.11.0
+```
+
+```tsx
+import { AgendaList, EventForm, emptyDraft } from '@peppermint-digital/calendar';
+
+<EventForm
+    kinds={kinds}                 // key, label, requires, forbids, usesCategories
+    categories={categories}
+    value={draft}
+    onChange={setDraft}
+    onSubmit={save}
+    extraFields={<ProjectAndBilling />}   // whatever only this product has
+/>
+```
+
+**Which fields appear is decided by the kind, not by the form.** What `rules()` requires is
+marked and checked before submitting; what `forbiddenAttributes()` forbids is not rendered at
+all. The same dialogue therefore shows four fields in a personal calendar and twelve in a work
+calendar without existing twice — and it does not care whether the kind is its own or another
+system's, because `kinds()` on a writable source returns the same shape.
+
+The product passes its own fields in rather than rebuilding the arrangement. A component that
+only supplies the pieces leaves every application to wire them up, and the wiring is where they
+drift apart.
+
+No component library: plain elements with Tailwind class names, styled by the host. A UI
+dependency would force itself on every consumer, and two of them in one tree rarely agree.
+
 ## Vocabulary
 
 Six words that are easy to mix up, and the line between them. Getting this wrong is how a

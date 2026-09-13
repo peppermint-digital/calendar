@@ -1,0 +1,70 @@
+/**
+ * Was eine Terminart ueber sich sagt.
+ *
+ * Dieselbe Form fuer eigene Arten und fuer die eines anderen Systems: Der
+ * Dialog kennt den Unterschied nicht, und das ist der Sinn — wer aus seinem
+ * Kalender heraus einen Termin im Arbeitskalender anlegt, bekommt dessen
+ * Felder, ohne dass hier jemand das andere Produkt kennt.
+ */
+export type EventKind = {
+    key: string;
+    label: string;
+    /** Felder, ohne die diese Art nicht gespeichert werden kann (aus `rules()`). */
+    requires?: string[];
+    /** Felder, die diese Art nie tragen darf (aus `forbiddenAttributes()`). */
+    forbids?: string[];
+    /** Fuehrt diese Art Kategorien? */
+    usesCategories?: boolean;
+};
+
+export type EventCategory = {
+    label: string;
+    colour?: string | null;
+};
+
+/** Die Felder, die jeder Kalender teilt. Alles Weitere reicht das Produkt hinein. */
+export type EventDraft = {
+    kind: string;
+    title: string;
+    /** Kalendertag, `YYYY-MM-DD`. */
+    date: string;
+    /** `HH:MM`, leer bei ganztaegig. */
+    start: string;
+    end: string;
+    allDay: boolean;
+    location: string;
+    description: string;
+    meetingUrl: string;
+    category: string;
+};
+
+export const emptyDraft = (kind = ''): EventDraft => ({
+    kind,
+    title: '',
+    date: '',
+    start: '',
+    end: '',
+    allDay: false,
+    location: '',
+    description: '',
+    meetingUrl: '',
+    category: '',
+});
+
+/**
+ * Die Feldnamen, wie das PHP-Paket sie kennt — `requires` und `forbids` reden
+ * in dieser Sprache, nicht in der des Formulars.
+ */
+export const FIELD = {
+    title: 'title',
+    date: 'starts_at',
+    start: 'starts_at',
+    end: 'ends_at',
+    allDay: 'all_day',
+    location: 'location',
+    description: 'description',
+    meetingUrl: 'meeting_url',
+    category: 'category',
+} as const;
+
+export type FieldKey = keyof typeof FIELD;
