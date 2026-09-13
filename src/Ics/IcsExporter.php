@@ -16,6 +16,7 @@ use Spatie\IcalendarGenerator\Enums\ParticipationStatus;
 use Spatie\IcalendarGenerator\Enums\RecurrenceDay;
 use Spatie\IcalendarGenerator\Enums\RecurrenceFrequency;
 use Spatie\IcalendarGenerator\Properties\TextProperty;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Termine als iCalendar.
@@ -121,23 +122,11 @@ class IcsExporter
             return;
         }
 
-        $labels = array_values(array_filter(
-            array_map(static fn (string $label): string => trim($label), $event->kindDefinition()->categories($event)),
-            static fn (string $label): bool => $label !== '',
-        ));
+        $property = IcsCategories::property($event->kindDefinition()->categories($event));
 
-        if ($labels === []) {
-            return;
+        if ($property !== null) {
+            $component->appendProperty($property);
         }
-
-        $writer = new IcsWriter;
-
-        $component->appendProperty(
-            TextProperty::create(
-                'CATEGORIES',
-                implode(',', array_map(fn (string $label): string => $writer->escape($label), $labels)),
-            )->withoutEscaping(),
-        );
     }
 
     /**
@@ -216,7 +205,7 @@ class IcsExporter
     /**
      * @param  Collection<int, CalendarEvent>  $events
      */
-    public function download(Collection $events, string $filename, ?string $name = null): \Symfony\Component\HttpFoundation\Response
+    public function download(Collection $events, string $filename, ?string $name = null): Response
     {
         return response($this->calendar($events, $name), 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',

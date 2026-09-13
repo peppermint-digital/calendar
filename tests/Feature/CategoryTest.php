@@ -4,6 +4,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Gate;
 use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Exceptions\CategoryNotAllowed;
+use Peppermint\Calendar\Ics\IcsCategories;
 use Peppermint\Calendar\Ics\IcsExporter;
 use Peppermint\Calendar\Models\CalendarCategory;
 use Peppermint\Calendar\Models\CalendarEvent;
@@ -147,4 +148,26 @@ it('leaves the categories line out when there is nothing to say', function () {
     ]);
 
     expect(app(IcsExporter::class)->event($event))->not->toContain('CATEGORIES');
+});
+
+it('baut die CATEGORIES-Zeile auch fuer Anwendungen, die ihr ICS selbst zusammensetzen', function () {
+    // Der Manager baut CalDAV-Antworten und den Abo-Feed selbst. Ohne diesen
+    // einen Aufruf maskierte er das Trennzeichen dreimal von Hand — und beim
+    // dritten Mal anders.
+    $property = IcsCategories::property(['Gesundheit', ' Sport, Freizeit ', '', '  ']);
+
+    expect($property)->not->toBeNull()
+        ->and($property->getValue())->toBe('Gesundheit,Sport\\, Freizeit');
+});
+
+it('laesst die Zeile lieber weg, als sie leer zu schreiben', function () {
+    expect(IcsCategories::property([]))->toBeNull()
+        ->and(IcsCategories::property(['', '   ']))->toBeNull();
+});
+
+it('maskiert den Backslash zuerst, sonst frisst er die eigene Maskierung', function () {
+    // Zuerst der Backslash: Sonst maskiert der Durchgang die Zeichen mit, die
+    // er selbst gerade eingefuegt hat.
+    expect(IcsCategories::property(['a\\b;c'])->getValue())->toBe('a\\\\b\;c')
+        ->and(IcsCategories::property(["Zeile\nUmbruch"])->getValue())->toBe('Zeile\\nUmbruch');
 });

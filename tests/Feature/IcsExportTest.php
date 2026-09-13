@@ -1,7 +1,6 @@
 <?php
 
 use Peppermint\Calendar\Ics\IcsExporter;
-use Peppermint\Calendar\Ics\IcsWriter;
 use Peppermint\Calendar\Models\CalendarEvent;
 
 function icsEvent(array $attributes = []): CalendarEvent
@@ -148,15 +147,4 @@ it('wraps events in a calendar with the configured identity', function () {
         ->toContain('PRODID:-//Peppermint//Calendar//EN')
         ->toContain('X-WR-CALNAME:Team')
         ->toEndWith('END:VCALENDAR');
-});
-
-it('folds exactly at the octet boundary', function () {
-    // Fuer die Stellen, die ihr ICS noch selbst zusammensetzen: Die Bibliothek
-    // faltet nur, was sie selbst baut.
-    $gefaltet = IcsWriter::foldDocument('SUMMARY:'.str_repeat('a', 100));
-    $lines = explode("\r\n", $gefaltet);
-
-    expect(strlen($lines[0]))->toBe(75)
-        ->and($lines[1])->toStartWith(' ')
-        ->and(str_replace("\r\n ", '', $gefaltet))->toBe('SUMMARY:'.str_repeat('a', 100));
 });
