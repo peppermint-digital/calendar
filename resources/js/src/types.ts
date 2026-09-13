@@ -15,6 +15,16 @@ export type EventKind = {
     forbids?: string[];
     /** Fuehrt diese Art Kategorien? */
     usesCategories?: boolean;
+    /**
+     * Darf man diese Art von Hand waehlen?
+     *
+     * Nicht jede Art ist etwas, das man *aussucht*: Ein geplanter Block
+     * entsteht durchs Hereinziehen einer Aufgabe, ein Urlaubseintrag spiegelt
+     * einen genehmigten Antrag. Solche Arten gehoeren in die Anzeige, aber
+     * nicht in die Auswahl — das Produkt siebt sie aus, bevor es die Liste
+     * hereinreicht.
+     */
+    creatable?: boolean;
 };
 
 /** Die Wochentagskuerzel, wie RFC 5545 und das PHP-Paket sie schreiben. */

@@ -48,9 +48,32 @@ it('hands a user interface what it needs to build the dialogue', function () {
         'requires' => [],
         'forbids' => ['subject_type', 'subject_id'],
         'usesCategories' => false,
+        'creatable' => true,
     ]);
 
     expect((new BusinessKind)->toArray()['usesCategories'])->toBeTrue();
+});
+
+it('marks a kind that only ever comes into being through another action', function () {
+    $planned = new class extends EventKind
+    {
+        public function key(): string
+        {
+            return 'planned';
+        }
+
+        public function label(): string
+        {
+            return 'Geplant';
+        }
+
+        public function isUserCreatable(): bool
+        {
+            return false;
+        }
+    };
+
+    expect($planned->toArray()['creatable'])->toBeFalse();
 });
 
 it('speaks the same shape as a kind from another system', function () {

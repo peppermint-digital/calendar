@@ -171,6 +171,7 @@ abstract class EventKind
             'requires' => $this->requiredAttributes(),
             'forbids' => array_values($this->forbiddenAttributes()),
             'usesCategories' => $this->usesCategories(),
+            'creatable' => $this->isUserCreatable(),
         ];
     }
 
