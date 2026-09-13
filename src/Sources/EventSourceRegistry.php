@@ -28,6 +28,22 @@ class EventSourceRegistry
     }
 
     /**
+     * Die Quellen, in denen man anlegen darf.
+     *
+     * Eine Oberflaeche fragt danach, statt selbst zu pruefen — wer die Pruefung
+     * an jeder Bedienstelle wiederholt, vergisst sie irgendwo.
+     *
+     * @return array<string, WritableEventSource>
+     */
+    public function writable(): array
+    {
+        return array_filter(
+            $this->available(),
+            fn (EventSource $source) => $source instanceof WritableEventSource && $source->isWritable(),
+        );
+    }
+
+    /**
      * Collects events from every available source.
      *
      * A source that fails does not take the calendar with it: the other events

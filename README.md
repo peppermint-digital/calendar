@@ -367,6 +367,43 @@ own event by naming a field cleverly — and the event could then be slipped int
 something that writes. When `extra` is empty the key is left out entirely: a key
 that is always present but usually empty teaches readers to ignore it.
 
+### Creating in another system
+
+A source shows what lives elsewhere. A **writable** source also lets someone create there —
+a meeting in the work calendar, entered from the private one.
+
+```php
+class ManagerSource extends WritableEventSource
+{
+    public function kinds(): array
+    {
+        return [new ExternalKind('business', 'Business', requires: ['location'])];
+    }
+
+    public function create(int $userId, NewExternalEvent $event): ExternalEvent
+    {
+        return $this->toExternalEvent($this->client->create($userId, $event->toArray()));
+    }
+}
+```
+
+Deliberately a separate class rather than a flag on `EventSource`. A flag is a check someone
+forgets, and what it guards is a write path into a system that was only meant to be shown.
+A read-only source stays read-only because it does not have the method.
+
+Two details that decide whether this works in practice:
+
+**Kinds are per product.** What one application calls "business" the next has never heard of,
+so the target system names its own — with the fields it will reject without. A dialogue can
+then ask for them instead of showing the rejection after the fact.
+
+**What comes back is the target system's version, not the one that was sent.** It rounds
+times, fills in defaults, attaches its own id. Show its answer, or the calendar says something
+different from the system that owns the event.
+
+The event belongs to the other system from the first moment: no row here, exactly as when
+reading.
+
 ## Adopting an existing calendar
 
 An application that has kept a calendar for years has its own table and column
