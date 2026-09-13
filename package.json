@@ -1,6 +1,6 @@
 {
     "name": "@peppermint-digital/calendar",
-    "version": "0.15.0",
+    "version": "0.16.0",
     "description": "Kalender-Oberflaeche zum gleichnamigen PHP-Paket: ein Termin-Dialog, der sich aus den Terminarten baut, und die Agenda-Ansicht.",
     "license": "MIT",
     "type": "module",
@@ -28,8 +28,12 @@
         "react-dom": "^18 || ^19"
     },
     "devDependencies": {
+        "@testing-library/dom": "^10.4.2",
+        "@testing-library/react": "^16.3.3",
         "@types/react": "^19.0.0",
+        "jsdom": "^30.0.1",
         "react": "^19.0.0",
+        "react-dom": "^19.3.0",
         "tsup": "^8.0.0",
         "typescript": "^5.4.0",
         "vitest": "^5.0.0"

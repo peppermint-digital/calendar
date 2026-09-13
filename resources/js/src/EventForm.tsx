@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { weekdayOf } from './rules';
-import { emptyRecurrence, WEEKDAYS, type EventCategory, type EventDraft, type EventKind, type Frequency, type RecurrenceDraft } from './types';
+import { emptyRecurrence, WEEKDAYS, type EventCategory, type EventDraft, type EventKind, type FieldKey, type Frequency, type RecurrenceDraft } from './types';
 import { useEventForm } from './useEventForm';
 
 export type EventFormLabels = {
@@ -54,6 +54,24 @@ const DEFAULTS: EventFormLabels = {
     missing: 'Diese Terminart verlangt noch:',
 };
 
+/**
+ * Womit ein Feld beanstandet wird — die Schluessel des Formulars, nicht die des
+ * Servers. Die Teile der Serie einzeln, weil ein Server sie einzeln ablehnt:
+ * „Wiederholen bis fehlt" gehoert an das Datum und nicht ueber den ganzen Block.
+ *
+ * `kind` steht hier, aber nicht in FIELD: Die Terminart kann von keiner Art
+ * verlangt oder verboten werden — sie IST die Art. Beanstandet werden kann sie
+ * trotzdem.
+ */
+export type EventFormErrorKey = FieldKey | 'kind' | `recurrence.${keyof RecurrenceDraft}`;
+
+export type EventFormErrors = Partial<Record<EventFormErrorKey, string>>;
+
+/** Die Beanstandung unter dem Feld, das sie meint. */
+function FieldError({ message }: { message?: string }) {
+    return message ? <p className="text-destructive mt-1 text-xs">{message}</p> : null;
+}
+
 export type EventFormProps = {
     kinds: EventKind[];
     categories?: EventCategory[];
@@ -65,6 +83,15 @@ export type EventFormProps = {
     extraFields?: ReactNode;
     submitting?: boolean;
     error?: string | null;
+    /**
+     * Beanstandungen pro Feld, wie sie vom Server zurueckkommen.
+     *
+     * `error` allein reicht nicht: Wer eine Maske mit zwoelf Feldern absendet
+     * und eine einzelne Zeile darueber gesetzt bekommt, sucht das gemeinte Feld
+     * selbst. Das Produkt uebersetzt seine Server-Schluessel auf die des
+     * Formulars — genauso, wie es die Nutzlast uebersetzt.
+     */
+    fieldErrors?: EventFormErrors;
     labels?: Partial<EventFormLabels>;
 };
 
@@ -89,6 +116,7 @@ export function EventForm({
     extraFields,
     submitting = false,
     error = null,
+    fieldErrors,
     labels,
 }: EventFormProps) {
     const text = { ...DEFAULTS, ...labels };
@@ -121,6 +149,7 @@ export function EventForm({
                             <option key={kind.key} value={kind.key}>{kind.label}</option>
                         ))}
                     </select>
+                    <FieldError message={fieldErrors?.kind} />
                 </div>
             )}
 
@@ -133,6 +162,7 @@ export function EventForm({
                     onChange={(event) => set('title', event.target.value)}
                     required
                 />
+                <FieldError message={fieldErrors?.title} />
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -146,6 +176,7 @@ export function EventForm({
                         onChange={(event) => set('date', event.target.value)}
                         required
                     />
+                    <FieldError message={fieldErrors?.date} />
                 </div>
 
                 {!value.allDay && (
@@ -159,6 +190,7 @@ export function EventForm({
                                 value={value.start}
                                 onChange={(event) => set('start', event.target.value)}
                             />
+                            <FieldError message={fieldErrors?.start} />
                         </div>
                         <div className="w-28">
                             <label className={label} htmlFor="calendar-end">{text.to}</label>
@@ -169,6 +201,7 @@ export function EventForm({
                                 value={value.end}
                                 onChange={(event) => set('end', event.target.value)}
                             />
+                            <FieldError message={fieldErrors?.end} />
                         </div>
                     </>
                 )}
@@ -194,6 +227,7 @@ export function EventForm({
                         value={value.location}
                         onChange={(event) => set('location', event.target.value)}
                     />
+                    <FieldError message={fieldErrors?.location} />
                 </div>
             )}
 
@@ -210,6 +244,7 @@ export function EventForm({
                         value={value.meetingUrl}
                         onChange={(event) => set('meetingUrl', event.target.value)}
                     />
+                    <FieldError message={fieldErrors?.meetingUrl} />
                 </div>
             )}
 
@@ -230,6 +265,7 @@ export function EventForm({
                             <option key={category.label} value={category.label} />
                         ))}
                     </datalist>
+                    <FieldError message={fieldErrors?.category} />
                 </div>
             )}
 
@@ -243,6 +279,7 @@ export function EventForm({
                         value={value.description}
                         onChange={(event) => set('description', event.target.value)}
                     />
+                    <FieldError message={fieldErrors?.description} />
                 </div>
             )}
 
@@ -251,6 +288,7 @@ export function EventForm({
                     value={value.recurrence}
                     onChange={(next) => set('recurrence', next)}
                     startDate={value.date}
+                    errors={fieldErrors}
                     text={text}
                     field={field}
                     label={label}
@@ -301,6 +339,7 @@ function RecurrenceFields({
     value,
     onChange,
     startDate,
+    errors,
     text,
     field,
     label,
@@ -308,6 +347,7 @@ function RecurrenceFields({
     value: RecurrenceDraft | null;
     onChange: (next: RecurrenceDraft | null) => void;
     startDate: string;
+    errors?: EventFormErrors;
     text: EventFormLabels;
     field: string;
     label: string;
@@ -347,6 +387,7 @@ function RecurrenceFields({
                                 <option key={frequency} value={frequency}>{text.frequencies[frequency]}</option>
                             ))}
                         </select>
+                        <FieldError message={errors?.['recurrence.frequency']} />
                     </div>
 
                     <div className="w-40">
@@ -358,6 +399,7 @@ function RecurrenceFields({
                             value={value.until}
                             onChange={(event) => set('until', event.target.value)}
                         />
+                        <FieldError message={errors?.['recurrence.until']} />
                     </div>
 
                     {value.frequency === 'monthly' && (
@@ -373,6 +415,7 @@ function RecurrenceFields({
                                 value={value.byMonthDay}
                                 onChange={(event) => set('byMonthDay', event.target.value)}
                             />
+                            <FieldError message={errors?.['recurrence.byMonthDay']} />
                         </div>
                     )}
 
@@ -404,6 +447,7 @@ function RecurrenceFields({
                                     </button>
                                 ))}
                             </div>
+                            <FieldError message={errors?.['recurrence.byDay']} />
                         </div>
                     )}
                 </div>

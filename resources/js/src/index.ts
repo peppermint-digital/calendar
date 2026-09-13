@@ -1,7 +1,7 @@
 export { AgendaList, groupByDay } from './AgendaList';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
 export { EventForm } from './EventForm';
-export type { EventFormLabels, EventFormProps } from './EventForm';
+export type { EventFormErrorKey, EventFormErrors, EventFormLabels, EventFormProps } from './EventForm';
 export { useEventForm } from './useEventForm';
 export { eventFormRules, weekdayOf } from './rules';
 export type { EventFormRules } from './rules';
