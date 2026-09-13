@@ -1,6 +1,6 @@
 {
     "name": "@peppermint-digital/calendar",
-    "version": "0.11.2",
+    "version": "0.12.0",
     "description": "Kalender-Oberflaeche zum gleichnamigen PHP-Paket: ein Termin-Dialog, der sich aus den Terminarten baut, und die Agenda-Ansicht.",
     "license": "MIT",
     "type": "module",
@@ -20,6 +20,7 @@
         "build": "tsup",
         "dev": "tsup --watch",
         "typecheck": "tsc --noEmit",
+        "test": "vitest run",
         "prepare": "npm run build"
     },
     "peerDependencies": {
@@ -30,6 +31,7 @@
         "@types/react": "^19.0.0",
         "react": "^19.0.0",
         "tsup": "^8.0.0",
-        "typescript": "^5.4.0"
+        "typescript": "^5.4.0",
+        "vitest": "^5.0.0"
     }
 }

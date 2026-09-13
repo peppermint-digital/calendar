@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import type { EventCategory, EventDraft, EventKind } from './types';
+import { weekdayOf } from './rules';
+import { emptyRecurrence, WEEKDAYS, type EventCategory, type EventDraft, type EventKind, type Frequency, type RecurrenceDraft } from './types';
 import { useEventForm } from './useEventForm';
 
 export type EventFormLabels = {
@@ -13,6 +14,13 @@ export type EventFormLabels = {
     description: string;
     meetingUrl: string;
     category: string;
+    recurring: string;
+    frequency: string;
+    weekdays: string;
+    monthDay: string;
+    monthDayHint: string;
+    until: string;
+    frequencies: Record<Frequency, string>;
     submit: string;
     cancel: string;
     missing: string;
@@ -29,6 +37,18 @@ const DEFAULTS: EventFormLabels = {
     description: 'Beschreibung',
     meetingUrl: 'Meeting-Link',
     category: 'Kategorie',
+    recurring: 'Wiederholt sich',
+    frequency: 'Frequenz',
+    weekdays: 'An diesen Tagen',
+    monthDay: 'Tag im Monat',
+    monthDayHint: 'wie Start',
+    until: 'Wiederholen bis',
+    frequencies: {
+        daily: 'täglich',
+        weekly: 'wöchentlich',
+        biweekly: 'alle zwei Wochen',
+        monthly: 'monatlich',
+    },
     submit: 'Speichern',
     cancel: 'Abbrechen',
     missing: 'Diese Terminart verlangt noch:',
@@ -226,6 +246,17 @@ export function EventForm({
                 </div>
             )}
 
+            {rules.shows('recurrence') && (
+                <RecurrenceFields
+                    value={value.recurrence}
+                    onChange={(next) => set('recurrence', next)}
+                    startDate={value.date}
+                    text={text}
+                    field={field}
+                    label={label}
+                />
+            )}
+
             {extraFields}
 
             {/* Was die Art verlangt und noch fehlt, steht hier — nicht erst in der
@@ -254,5 +285,129 @@ export function EventForm({
                 )}
             </div>
         </form>
+    );
+}
+
+
+/**
+ * Die Serie: ein Schalter, und dahinter genau die Felder, die die gewaehlte
+ * Frequenz braucht.
+ *
+ * Beim Einschalten stehen Wochentag und Enddatum schon da, aus dem Starttag
+ * abgeleitet. Eine leere Maske mit zwei Pflichtfeldern waere die gleiche
+ * Auskunft, nur muesste der Mensch sie abtippen.
+ */
+function RecurrenceFields({
+    value,
+    onChange,
+    startDate,
+    text,
+    field,
+    label,
+}: {
+    value: RecurrenceDraft | null;
+    onChange: (next: RecurrenceDraft | null) => void;
+    startDate: string;
+    text: EventFormLabels;
+    field: string;
+    label: string;
+}) {
+    const set = <K extends keyof RecurrenceDraft>(key: K, next: RecurrenceDraft[K]) =>
+        value && onChange({ ...value, [key]: next });
+
+    const start = () => {
+        const day = weekdayOf(startDate);
+        const until = startDate === '' ? '' : `${Number(startDate.slice(0, 4)) + 1}${startDate.slice(4)}`;
+
+        onChange({ ...emptyRecurrence(), byDay: day ? [day] : [], until });
+    };
+
+    return (
+        <div className="flex flex-col gap-3 rounded-md border p-3">
+            <label className="flex items-center gap-2 text-sm">
+                <input
+                    type="checkbox"
+                    checked={value !== null}
+                    onChange={(event) => (event.target.checked ? start() : onChange(null))}
+                />
+                {text.recurring}
+            </label>
+
+            {value !== null && (
+                <div className="flex flex-wrap items-end gap-2">
+                    <div className="w-44">
+                        <label className={label} htmlFor="calendar-frequency">{text.frequency}</label>
+                        <select
+                            id="calendar-frequency"
+                            className={field}
+                            value={value.frequency}
+                            onChange={(event) => set('frequency', event.target.value as Frequency)}
+                        >
+                            {(Object.keys(text.frequencies) as Frequency[]).map((frequency) => (
+                                <option key={frequency} value={frequency}>{text.frequencies[frequency]}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="w-40">
+                        <label className={label} htmlFor="calendar-until">{text.until} *</label>
+                        <input
+                            id="calendar-until"
+                            type="date"
+                            className={field}
+                            value={value.until}
+                            onChange={(event) => set('until', event.target.value)}
+                        />
+                    </div>
+
+                    {value.frequency === 'monthly' && (
+                        <div className="w-32">
+                            <label className={label} htmlFor="calendar-month-day">{text.monthDay}</label>
+                            <input
+                                id="calendar-month-day"
+                                type="number"
+                                min={1}
+                                max={31}
+                                className={field}
+                                placeholder={text.monthDayHint}
+                                value={value.byMonthDay}
+                                onChange={(event) => set('byMonthDay', event.target.value)}
+                            />
+                        </div>
+                    )}
+
+                    {(value.frequency === 'weekly' || value.frequency === 'biweekly') && (
+                        <div className="w-full">
+                            <span className={label}>{text.weekdays} *</span>
+                            <div className="flex flex-wrap gap-1">
+                                {WEEKDAYS.map((day) => (
+                                    <button
+                                        key={day}
+                                        type="button"
+                                        aria-pressed={value.byDay.includes(day)}
+                                        className={
+                                            'rounded-md border px-2 py-1 text-xs ' +
+                                            (value.byDay.includes(day)
+                                                ? 'bg-primary text-primary-foreground border-primary'
+                                                : 'bg-background')
+                                        }
+                                        onClick={() =>
+                                            set(
+                                                'byDay',
+                                                value.byDay.includes(day)
+                                                    ? value.byDay.filter((entry) => entry !== day)
+                                                    : [...value.byDay, day],
+                                            )
+                                        }
+                                    >
+                                        {day}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }

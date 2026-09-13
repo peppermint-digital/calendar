@@ -17,6 +17,37 @@ export type EventKind = {
     usesCategories?: boolean;
 };
 
+/** Die Wochentagskuerzel, wie RFC 5545 und das PHP-Paket sie schreiben. */
+export const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
+
+export type Weekday = (typeof WEEKDAYS)[number];
+
+/** Die Frequenzen aus `Peppermint\Calendar\Enums\Frequency`. */
+export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
+/**
+ * Eine Serie in genau der Form, die `RecurrenceRule::fromArray()` entgegennimmt.
+ *
+ * Bewusst dieselben Namen wie drueben: Ein Formular, das `repeat_until` heisst
+ * und auf `until` gemappt werden muss, hat eine Uebersetzungsschicht, die
+ * irgendwann auseinanderlaeuft.
+ */
+export type RecurrenceDraft = {
+    frequency: Frequency;
+    byDay: Weekday[];
+    /** Leer heisst: wie der Starttag. Nur bei `monthly` von Belang. */
+    byMonthDay: string;
+    /** `YYYY-MM-DD` — das Ende der Serie, nicht Teil der Regel selbst. */
+    until: string;
+};
+
+export const emptyRecurrence = (): RecurrenceDraft => ({
+    frequency: 'weekly',
+    byDay: [],
+    byMonthDay: '',
+    until: '',
+});
+
 export type EventCategory = {
     label: string;
     colour?: string | null;
@@ -36,6 +67,8 @@ export type EventDraft = {
     description: string;
     meetingUrl: string;
     category: string;
+    /** null heisst: einmalig. Arten, die keine Serien fuehren, lassen es dabei. */
+    recurrence: RecurrenceDraft | null;
 };
 
 export const emptyDraft = (kind = ''): EventDraft => ({
@@ -49,6 +82,7 @@ export const emptyDraft = (kind = ''): EventDraft => ({
     description: '',
     meetingUrl: '',
     category: '',
+    recurrence: null,
 });
 
 /**
@@ -65,6 +99,7 @@ export const FIELD = {
     description: 'description',
     meetingUrl: 'meeting_url',
     category: 'category',
+    recurrence: 'recurrence_rules',
 } as const;
 
 export type FieldKey = keyof typeof FIELD;
