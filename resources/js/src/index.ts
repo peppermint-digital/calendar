@@ -1,4 +1,4 @@
-export { AgendaList } from './AgendaList';
+export { AgendaList, groupByDay } from './AgendaList';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
 export { EventForm } from './EventForm';
 export type { EventFormLabels, EventFormProps } from './EventForm';

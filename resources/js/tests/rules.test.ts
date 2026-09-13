@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { groupByDay } from '../src/AgendaList';
 import { eventFormRules, weekdayOf } from '../src/rules';
 import { emptyDraft, emptyRecurrence, type EventDraft, type EventKind } from '../src/types';
 
@@ -59,5 +60,33 @@ describe('eventFormRules', () => {
 
         expect(rules.kind?.key).toBe('habit');
         expect(rules.usesCategories).toBe(true);
+    });
+});
+
+describe('groupByDay', () => {
+    const row = (key: string, date: string, start: string | null) => ({ key, date, start, end: null, title: key });
+
+    it('sortiert nach Tag und Uhrzeit, egal wie die Abfrage sie liefert', () => {
+        const grouped = groupByDay([
+            row('spaet', '2026-09-14', '17:00'),
+            row('morgen', '2026-09-15', '08:00'),
+            row('frueh', '2026-09-14', '09:00'),
+        ]);
+
+        expect(Object.keys(grouped)).toEqual(['2026-09-14', '2026-09-15']);
+        expect(grouped['2026-09-14']?.map((entry) => entry.key)).toEqual(['frueh', 'spaet']);
+    });
+
+    it('stellt ganztaegige Termine vor die mit Uhrzeit', () => {
+        const grouped = groupByDay([row('acht', '2026-09-14', '08:00'), row('ganztags', '2026-09-14', null)]);
+
+        expect(grouped['2026-09-14']?.map((entry) => entry.key)).toEqual(['ganztags', 'acht']);
+    });
+
+    it('laesst die uebergebene Liste unangetastet', () => {
+        const rows = [row('b', '2026-09-15', '08:00'), row('a', '2026-09-14', '08:00')];
+        groupByDay(rows);
+
+        expect(rows.map((entry) => entry.key)).toEqual(['b', 'a']);
     });
 });
