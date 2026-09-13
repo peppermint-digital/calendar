@@ -1,8 +1,13 @@
-# Das Frontend gehoert ins selbe Repository wie der PHP-Kern — ein Tag bedient
-# beide. Im Composer-Archiv hat es aber nichts verloren: Wer nur das PHP-Paket
-# einbindet, soll kein Frontend im vendor/ liegen haben.
-/resources/js       export-ignore
-/package.json       export-ignore
-/tsup.config.ts     export-ignore
-/tsconfig.json      export-ignore
-/.gitattributes     export-ignore
+# KEIN export-ignore fuer package.json, resources/js oder die Build-Dateien.
+#
+# npm installiert aus Git ueber ein Archiv — und `export-ignore` wirkt dort
+# genauso wie bei Composer. Wer das Frontend aus dem Composer-Archiv
+# heraushalten will, haelt es damit auch aus dem npm-Paket heraus, und die
+# Installation scheitert mit „Could not read package.json". Beim ersten Versuch
+# genau so passiert.
+#
+# Der Preis dafuer, dass beide aus demselben Repository kommen: PHP-Verbraucher
+# haben ein paar Kilobyte Frontend im vendor/ liegen. Das ist der guenstigere
+# der beiden Fehler.
+/tests          export-ignore
+/phpunit.xml    export-ignore

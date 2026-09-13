@@ -13,11 +13,14 @@
             "import": "./dist/index.js"
         }
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "tsup",
         "dev": "tsup --watch",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "prepare": "npm run build"
     },
     "peerDependencies": {
         "react": "^18 || ^19",
