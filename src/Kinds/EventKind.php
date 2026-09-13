@@ -3,6 +3,7 @@
 namespace Peppermint\Calendar\Kinds;
 
 use Peppermint\Calendar\Models\CalendarEvent;
+use Peppermint\Calendar\Sources\ExternalKind;
 
 /**
  * An event kind. The consuming application subclasses this once per kind and
@@ -118,6 +119,59 @@ abstract class EventKind
     public function forbiddenAttributes(): array
     {
         return [];
+    }
+
+    /**
+     * Fields this kind cannot be saved without, read off its own `rules()`.
+     *
+     * Derived rather than declared a second time: a kind that states `required`
+     * in its rules and then repeats the same list for the form has two places
+     * to forget, and they drift apart quietly.
+     *
+     * @return array<int, string>
+     */
+    public function requiredAttributes(): array
+    {
+        $required = [];
+
+        foreach ($this->rules() as $field => $rule) {
+            $tokens = match (true) {
+                is_string($rule) => explode('|', $rule),
+                is_array($rule) => $rule,
+                default => [],
+            };
+
+            foreach ($tokens as $token) {
+                if ($token === 'required') {
+                    $required[] = (string) $field;
+
+                    continue 2;
+                }
+            }
+        }
+
+        return $required;
+    }
+
+    /**
+     * The kind as a user interface needs it.
+     *
+     * Deliberately the same keys as {@see ExternalKind::toArray()}:
+     * a dialogue that has to read its own kinds differently from another
+     * system's kinds is two dialogues, and the point of this package is that it
+     * is one.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'key' => $this->key(),
+            'label' => $this->label(),
+            'requires' => $this->requiredAttributes(),
+            'forbids' => array_values($this->forbiddenAttributes()),
+            'usesCategories' => $this->usesCategories(),
+        ];
     }
 
     /** Hook for the application before an event of this kind is saved. */
