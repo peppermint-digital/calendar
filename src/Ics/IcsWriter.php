@@ -44,6 +44,37 @@ class IcsWriter
         return $this;
     }
 
+    /**
+     * Eine Eigenschaft mit mehreren Werten, etwa CATEGORIES.
+     *
+     * Der Grund fuer eine eigene Methode: Bei diesen Eigenschaften ist das
+     * Komma das TRENNZEICHEN, waehrend `escape()` es maskiert. Ein naives
+     * `implode(',', ...)` durch `property()` macht aus zwei Kategorien eine
+     * einzige namens `Arzt\,Sport`. Also jeden Wert einzeln maskieren und mit
+     * unmaskierten Kommas verbinden.
+     *
+     * @param  array<int, string>  $values
+     * @param  array<string, string|null>  $parameters
+     */
+    public function listProperty(string $name, array $values, array $parameters = []): self
+    {
+        $values = array_values(array_filter(
+            array_map(static fn (string $value): string => trim($value), $values),
+            static fn (string $value): bool => $value !== '',
+        ));
+
+        if ($values === []) {
+            return $this;
+        }
+
+        return $this->property(
+            $name,
+            implode(',', array_map(fn (string $value): string => $this->escape($value), $values)),
+            $parameters,
+            raw: true,
+        );
+    }
+
     public function begin(string $component): self
     {
         $this->lines[] = 'BEGIN:'.$component;

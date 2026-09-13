@@ -31,6 +31,10 @@ abstract class TestCase extends Orchestra
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
+        // Sonst nur per vendor:publish — in Tests direkt geladen, damit die
+        // Kategorienfunktion ueberhaupt pruefbar ist.
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations-optional');
+
         // Profile tables live in the application, not the package — these two
         // stand in for applications with different extra fields.
         Schema::create('calendar_event_profile_business', function (Blueprint $table) {

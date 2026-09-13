@@ -104,6 +104,73 @@ kind, and not for the next one.
 | `rules()` | validation rules the application pulls into its requests |
 | `saving()` | a hook before every save |
 
+## Categories
+
+An extra, not a core field. An application without categories has none — no column, no
+table, no empty select next to every event.
+
+Turning them on takes three steps, on purpose:
+
+```
+php artisan vendor:publish --tag=calendar-categories
+```
+
+then run the published migration, then set `categories.enabled` and give the kinds that
+have them `usesCategories()`.
+
+### How far the list may grow
+
+```php
+'categories' => [
+    'enabled' => true,
+    'mode' => 'personal',            // closed | personal | open
+    'create_ability' => 'categories.create',
+    'defaults' => [
+        ['slug' => 'health', 'label' => 'Health', 'colour' => '#10b981'],
+    ],
+],
+```
+
+| Mode | Who may add one |
+| --- | --- |
+| `closed` | nobody — only the managed list |
+| `personal` | everyone, **for themselves** |
+| `open` | everyone, for everyone |
+
+`personal` is the default because it answers both failure modes at once. A list nobody may
+touch gets worked around — people put the missing word in the title. A list everyone may
+extend for everyone fills up with near-duplicates until it means nothing. In between: a
+freely typed category belongs to the person who typed it, and an administrator can promote
+it to the shared list. That promotion is a decision someone makes, not a side effect.
+
+Comparison runs over a slug, so `Sport`, `sport` and `  SPORT  ` are the same category
+rather than three. Whether a person may create one at all is the application's call: the
+package knows the name of an ability, not what it means.
+
+### Where the link lives
+
+The package owns the **list**, not the connection. Whether an event points at its category
+through the profile of its kind or through a column of your own adopted table is your
+decision — and it stays out of the shared events table either way.
+
+### On export
+
+`CATEGORIES` is a comma-separated list of free text in RFC 5545 — no registry, no ids. So a
+managed list with ids at home travels as plain labels, and the kind says which:
+
+```php
+public function categories(CalendarEvent $event): array
+{
+    return array_filter([$event->profile?->category?->label]);
+}
+```
+
+Empty means the line is left out; an empty `CATEGORIES:` is noise some clients trip over.
+The kind returns strings and never finished iCalendar — escaping, separators and folding
+stay in the package. That matters more than it looks: the comma is the *separator* here
+while escaping turns a comma into `\,`, so a naive `implode` collapses two categories into
+one called `Health\, Sport`.
+
 ## Recurrence
 
 Rules are stored as an array on the event and validated by building a

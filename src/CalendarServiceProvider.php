@@ -3,6 +3,7 @@
 namespace Peppermint\Calendar;
 
 use Illuminate\Support\ServiceProvider;
+use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Console\PurgeTrashedEventsCommand;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
@@ -14,6 +15,8 @@ class CalendarServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/calendar.php', 'calendar');
+
+        $this->app->singleton(CategoryRegistry::class);
 
         $this->app->singleton(EventKindRegistry::class, function ($app): EventKindRegistry {
             $registry = new EventKindRegistry;
@@ -76,6 +79,14 @@ class CalendarServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'calendar-migrations');
+
+            // Kategorien sind eine Zusatzfunktion und werden deshalb nicht von
+            // selbst geladen: Wer keine fuehrt, soll keine leere Tabelle
+            // bekommen. Ein Schalter waere hier falsch — Laravel merkt sich
+            // eine Migration als ausgefuehrt, auch wenn sie nichts getan hat.
+            $this->publishes([
+                __DIR__.'/../database/migrations-optional' => database_path('migrations'),
+            ], 'calendar-categories');
 
             $this->commands([
                 PurgeTrashedEventsCommand::class,

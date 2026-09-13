@@ -35,6 +35,7 @@ return [
     'tables' => [
         'events' => 'calendar_events',
         'attendees' => 'calendar_event_attendees',
+        'categories' => 'calendar_categories',
     ],
 
     /*
@@ -63,6 +64,52 @@ return [
     | publish them with the `calendar-migrations` tag to start from a copy.
     */
     'run_migrations' => true,
+
+    /*
+    | Categories — an extra, not a core field.
+    |
+    | An application without categories has none: no column, no table, no empty
+    | select. Wanting them takes three steps, on purpose:
+    |
+    |   1. vendor:publish --tag=calendar-categories
+    |   2. run the published migration
+    |   3. 'enabled' => true, and usesCategories() on the kinds that have them
+    |
+    | Where the link from an event to its category lives is the application's
+    | business — the profile of its kind, or a column of its own adopted table.
+    | The package owns the list, not the connection.
+    */
+    'categories' => [
+        'enabled' => false,
+
+        /*
+        | How far the list may grow. See Peppermint\Calendar\Enums\CategoryMode.
+        |
+        |   closed   — only the managed list
+        |   personal — everyone may extend it for themselves (default)
+        |   open     — everyone may extend it for everyone
+        |
+        | "personal" answers both failure modes: a list nobody may touch gets
+        | worked around, and a list everyone may extend for everyone fills up
+        | with near-duplicates.
+        */
+        'mode' => 'personal',
+
+        /*
+        | Ability asked before a new category is created. The package knows the
+        | name, the application knows what it means. null = not asked.
+        */
+        'create_ability' => null,
+
+        /*
+        | Seeded once by CategoryRegistry::seed(), idempotent by slug. Not read
+        | afterwards: a label renamed in the database must not fall back on the
+        | next boot.
+        |
+        | ['slug' => 'health', 'label' => 'Health', 'colour' => '#10b981']
+        */
+        'defaults' => [],
+    ],
 
     'ics' => [
         /*

@@ -71,6 +71,33 @@ abstract class EventKind
     }
 
     /**
+     * Does this kind carry categories at all?
+     *
+     * Categories are an extra. A time block on a task does not need one, and
+     * offering an empty select next to it is worse than offering nothing.
+     */
+    public function usesCategories(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Free-text labels for this event's `CATEGORIES` line, in the order they
+     * should appear. Empty means the line is left out entirely.
+     *
+     * The kind answers this because only it knows where its categories live —
+     * in its profile, in an adopted column, or nowhere. Strings, not finished
+     * iCalendar: escaping, separators and folding stay in the package, or they
+     * end up built a second time and wrong.
+     *
+     * @return array<int, string>
+     */
+    public function categories(CalendarEvent $event): array
+    {
+        return [];
+    }
+
+    /**
      * Validation rules for this kind's extra fields. The core does not apply
      * them itself — the application pulls them into its own requests.
      *

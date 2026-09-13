@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Ics;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Enums\Frequency;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Recurrence\RecurrenceRule;
@@ -56,6 +57,12 @@ class IcsExporter
         $writer->property('SUMMARY', $event->title)
             ->property('DESCRIPTION', $event->description === null ? null : strip_tags($event->description))
             ->property('LOCATION', $event->location);
+
+        // Kategorien sind eine Zusatzfunktion: Wer keine fuehrt, exportiert
+        // keine Zeile. Die Art liefert Zeichenketten, das Schreiben bleibt hier.
+        if (app(CategoryRegistry::class)->enabled()) {
+            $writer->listProperty('CATEGORIES', $event->kindDefinition()->categories($event));
+        }
 
         if ($rrule = $this->rrule($event)) {
             $writer->property('RRULE', $rrule, raw: true);
