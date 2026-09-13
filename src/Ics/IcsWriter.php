@@ -117,6 +117,38 @@ class IcsWriter
      * not characters: a folded multi-byte character would produce a broken
      * file, and umlauts in a German title are enough to hit that.
      */
+    /**
+     * Faltet ein fertiges iCalendar-Dokument nachtraeglich.
+     *
+     * Fuer Anwendungen, die ihre Zeilen aus historischen Gruenden selbst
+     * zusammensetzen: Maskieren vergisst kaum jemand — es faellt beim ersten
+     * Semikolon auf. Falten vergessen fast alle, weil nichts passiert, bis
+     * jemand eine laengere Beschreibung schreibt. Und dann passiert es im
+     * Kalender des Empfaengers, nicht im eigenen.
+     *
+     * Bereits gefaltete Fortsetzungszeilen (die mit einem Leerzeichen oder Tab
+     * beginnen) bleiben unangetastet — sonst wuerde ein zweiter Durchlauf die
+     * Faltung des ersten zerlegen.
+     */
+    public static function foldDocument(string $document): string
+    {
+        $writer = new self;
+
+        $lines = array_map(
+            static fn (string $line): string => rtrim($line, "\r"),
+            explode("\n", $document),
+        );
+
+        $out = array_map(
+            static fn (string $line): string => str_starts_with($line, ' ') || str_starts_with($line, "\t")
+                ? $line
+                : $writer->fold($line),
+            $lines,
+        );
+
+        return implode("\r\n", $out);
+    }
+
     protected function fold(string $line): string
     {
         if (strlen($line) <= self::OCTET_LIMIT) {
