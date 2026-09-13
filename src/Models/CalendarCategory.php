@@ -34,9 +34,21 @@ class CalendarCategory extends Model
         ];
     }
 
+    /**
+     * Spaltenname dieser Tabelle.
+     *
+     * Zuerst die tabellenbezogene Abbildung, dann die gemeinsame. Der Grund
+     * ist ein Feld, das es in BEIDEN Tabellen gibt: `owner_id`. Wer seine
+     * Termine auf `user_id` abbildet, hat damit auch die Kategorien darauf
+     * abgebildet — was zufaellig passen kann und ebenso zufaellig nicht.
+     *
+     * Die gemeinsame Abbildung bleibt der Rueckfall, damit bestehende
+     * Konfigurationen unveraendert weiterlaufen.
+     */
     public static function column(string $field): string
     {
-        return config("calendar.columns.{$field}", $field);
+        return config("calendar.columns.categories.{$field}")
+            ?? config("calendar.columns.{$field}", $field);
     }
 
     public function field(string $name): mixed

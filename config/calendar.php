@@ -45,6 +45,18 @@ return [
     | several hundred references to them. Renaming those is a migration of the
     | codebase, not of the schema — so the package bends instead. Keys are what
     | the package calls a column, values are what your table calls it.
+    |
+    | Entries at this level apply to every table the package touches. Where two
+    | tables disagree — `owner_id` exists on events AND on categories — nest
+    | them under the table:
+    |
+    |     'columns' => [
+    |         'owner_id'   => 'user_id',        // events
+    |         'categories' => ['owner_id' => 'created_by'],
+    |     ],
+    |
+    | The nested entry wins; the flat one stays the fallback, so existing
+    | configurations keep working unchanged.
     */
     'columns' => [
         'uid' => 'uid',

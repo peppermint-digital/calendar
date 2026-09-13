@@ -97,7 +97,8 @@ class CalendarEvent extends Model
 
     public static function column(string $field): string
     {
-        return config("calendar.columns.{$field}", $field);
+        return config("calendar.columns.events.{$field}")
+            ?? config("calendar.columns.{$field}", $field);
     }
 
     /**
