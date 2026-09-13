@@ -6,4 +6,4 @@ export { useEventForm } from './useEventForm';
 export { eventFormRules, weekdayOf } from './rules';
 export type { EventFormRules } from './rules';
 export { emptyDraft, emptyRecurrence, FIELD, WEEKDAYS } from './types';
-export type { EventCategory, EventDraft, EventKind, FieldKey, Frequency, RecurrenceDraft, Weekday } from './types';
+export type { CategoryMode, EventCategory, EventDraft, EventKind, FieldKey, Frequency, RecurrenceDraft, Weekday } from './types';

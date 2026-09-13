@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { weekdayOf } from './rules';
-import { emptyRecurrence, WEEKDAYS, type EventCategory, type EventDraft, type EventKind, type FieldKey, type Frequency, type RecurrenceDraft } from './types';
+import { emptyRecurrence, WEEKDAYS, type CategoryMode, type EventCategory, type EventDraft, type EventKind, type FieldKey, type Frequency, type RecurrenceDraft } from './types';
 import { useEventForm } from './useEventForm';
 
 export type EventFormLabels = {
@@ -9,6 +9,7 @@ export type EventFormLabels = {
     date: string;
     from: string;
     to: string;
+    endDate: string;
     allDay: string;
     location: string;
     description: string;
@@ -32,6 +33,7 @@ const DEFAULTS: EventFormLabels = {
     date: 'Datum',
     from: 'Von',
     to: 'Bis',
+    endDate: 'Enddatum',
     allDay: 'Ganztägig',
     location: 'Ort',
     description: 'Beschreibung',
@@ -75,6 +77,19 @@ function FieldError({ message }: { message?: string }) {
 export type EventFormProps = {
     kinds: EventKind[];
     categories?: EventCategory[];
+    /**
+     * Wie die Kategorienliste gefuehrt wird. `closed` gibt eine Auswahl ueber
+     * `categoryId`, alles andere ein Textfeld mit Vorschlaegen ueber `category`.
+     */
+    categoryMode?: CategoryMode;
+    /**
+     * Kennt dieser Kalender Termine ueber mehrere Tage?
+     *
+     * Eine Eigenschaft des Produkts, nicht der Terminart: Ein persoenlicher
+     * Kalender ohne Mehrtagestermine soll kein Enddatum zeigen, das immer dem
+     * Starttag entspricht.
+     */
+    multiDay?: boolean;
     value: EventDraft;
     onChange: (draft: EventDraft) => void;
     onSubmit: () => void;
@@ -109,6 +124,8 @@ export type EventFormProps = {
 export function EventForm({
     kinds,
     categories = [],
+    categoryMode = 'personal',
+    multiDay = false,
     value,
     onChange,
     onSubmit,
@@ -178,6 +195,21 @@ export function EventForm({
                     />
                     <FieldError message={fieldErrors?.date} />
                 </div>
+
+                {multiDay && (
+                    <div className="min-w-36 flex-1">
+                        <label className={label} htmlFor="calendar-end-date">{text.endDate}</label>
+                        <input
+                            id="calendar-end-date"
+                            type="date"
+                            className={field}
+                            min={value.date || undefined}
+                            value={value.endDate}
+                            onChange={(event) => set('endDate', event.target.value)}
+                        />
+                        <FieldError message={fieldErrors?.endDate} />
+                    </div>
+                )}
 
                 {!value.allDay && (
                     <>
@@ -251,21 +283,43 @@ export function EventForm({
             {rules.usesCategories && categories.length > 0 && (
                 <div>
                     <label className={label} htmlFor="calendar-category">{text.category}</label>
-                    <input
-                        id="calendar-category"
-                        className={field}
-                        list="calendar-category-options"
-                        value={value.category}
-                        onChange={(event) => set('category', event.target.value)}
-                    />
-                    {/* Vorschlaege aus der gepflegten Liste, Tippen bleibt erlaubt —
-                        ob eine neue entstehen darf, entscheidet der Server. */}
-                    <datalist id="calendar-category-options">
-                        {categories.map((category) => (
-                            <option key={category.label} value={category.label} />
-                        ))}
-                    </datalist>
-                    <FieldError message={fieldErrors?.category} />
+
+                    {categoryMode === 'closed' ? (
+                        /* Eine gepflegte Liste: Tippen liesse etwas eingeben, was der
+                           Server anschliessend ablehnt. Also eine Auswahl. */
+                        <select
+                            id="calendar-category"
+                            className={field}
+                            value={value.categoryId}
+                            onChange={(event) => set('categoryId', event.target.value)}
+                        >
+                            <option value="">—</option>
+                            {categories.map((category) => (
+                                <option key={String(category.id ?? category.label)} value={String(category.id ?? '')}>
+                                    {category.label}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <>
+                            <input
+                                id="calendar-category"
+                                className={field}
+                                list="calendar-category-options"
+                                value={value.category}
+                                onChange={(event) => set('category', event.target.value)}
+                            />
+                            {/* Vorschlaege aus der gepflegten Liste, Tippen bleibt erlaubt —
+                                ob eine neue entstehen darf, entscheidet der Server. */}
+                            <datalist id="calendar-category-options">
+                                {categories.map((category) => (
+                                    <option key={category.label} value={category.label} />
+                                ))}
+                            </datalist>
+                        </>
+                    )}
+
+                    <FieldError message={fieldErrors?.category ?? fieldErrors?.categoryId} />
                 </div>
             )}
 

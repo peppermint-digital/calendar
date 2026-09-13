@@ -46,6 +46,15 @@ describe('eventFormRules', () => {
         expect(eventFormRules(requires, draft({ allDay: true })).missing).toEqual(['date']);
     });
 
+    it('verlangt nie ein zweites Datum, auch wenn die Art ends_at braucht', () => {
+        // `endDate` und `end` teilen sich `ends_at`. Ohne den Riegel verlangte
+        // jede Art mit Endzeit auch ein Enddatum — und ein leeres heisst
+        // „derselbe Tag", fehlt also nicht.
+        const requires = [kind({ requires: ['ends_at'] })];
+
+        expect(eventFormRules(requires, draft({ endDate: '' })).missing).not.toContain('endDate');
+    });
+
     it('haelt einen Entwurf erst fuer vollstaendig, wenn nichts mehr fehlt', () => {
         const requires = [kind({ requires: ['location'] })];
 

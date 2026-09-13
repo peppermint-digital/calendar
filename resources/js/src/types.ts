@@ -59,9 +59,21 @@ export const emptyRecurrence = (): RecurrenceDraft => ({
 });
 
 export type EventCategory = {
+    /** Fehlt bei Listen, die ueber die Beschriftung gefuehrt werden. */
+    id?: string | number;
     label: string;
     colour?: string | null;
 };
+
+/**
+ * Wie die Kategorienliste gefuehrt wird — dieselben Werte wie
+ * `Peppermint\Calendar\Enums\CategoryMode`.
+ *
+ * `closed` heisst: eine gepflegte Liste, an der niemand im Vorbeigehen etwas
+ * ergaenzt. Dann ist eine Auswahl richtig und ein Textfeld mit Vorschlaegen
+ * falsch — es liesse etwas eintippen, was der Server anschliessend ablehnt.
+ */
+export type CategoryMode = 'closed' | 'personal' | 'open';
 
 /** Die Felder, die jeder Kalender teilt. Alles Weitere reicht das Produkt hinein. */
 export type EventDraft = {
@@ -69,6 +81,11 @@ export type EventDraft = {
     title: string;
     /** Kalendertag, `YYYY-MM-DD`. */
     date: string;
+    /**
+     * Letzter Kalendertag, wenn der Termin ueber mehrere geht. Leer heisst:
+     * derselbe Tag. Nur sichtbar, wo das Produkt Mehrtagestermine kennt.
+     */
+    endDate: string;
     /** `HH:MM`, leer bei ganztaegig. */
     start: string;
     end: string;
@@ -76,7 +93,10 @@ export type EventDraft = {
     location: string;
     description: string;
     meetingUrl: string;
+    /** Die Beschriftung — bei offenen und persoenlichen Listen. */
     category: string;
+    /** Die Kennung — bei einer gepflegten Liste (`closed`). */
+    categoryId: string;
     /** null heisst: einmalig. Arten, die keine Serien fuehren, lassen es dabei. */
     recurrence: RecurrenceDraft | null;
 };
@@ -85,6 +105,7 @@ export const emptyDraft = (kind = ''): EventDraft => ({
     kind,
     title: '',
     date: '',
+    endDate: '',
     start: '',
     end: '',
     allDay: false,
@@ -92,6 +113,7 @@ export const emptyDraft = (kind = ''): EventDraft => ({
     description: '',
     meetingUrl: '',
     category: '',
+    categoryId: '',
     recurrence: null,
 });
 
@@ -102,6 +124,7 @@ export const emptyDraft = (kind = ''): EventDraft => ({
 export const FIELD = {
     title: 'title',
     date: 'starts_at',
+    endDate: 'ends_at',
     start: 'starts_at',
     end: 'ends_at',
     allDay: 'all_day',
@@ -109,6 +132,7 @@ export const FIELD = {
     description: 'description',
     meetingUrl: 'meeting_url',
     category: 'category',
+    categoryId: 'category_id',
     recurrence: 'recurrence_rules',
 } as const;
 

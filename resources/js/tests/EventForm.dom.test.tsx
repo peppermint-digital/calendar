@@ -73,6 +73,49 @@ describe('EventForm', () => {
         expect(onSubmit).not.toHaveBeenCalled();
     });
 
+    it('zeigt ein Enddatum nur, wo der Kalender Mehrtagestermine kennt', () => {
+        show();
+        expect(screen.queryByLabelText('Enddatum')).toBeNull();
+
+        cleanup();
+        show({ multiDay: true });
+        // Und nicht vor dem Starttag: Ein Ende vor dem Anfang ist kein Termin.
+        expect(screen.getByLabelText('Enddatum')).toHaveProperty('min', '2026-09-14');
+    });
+
+    it('gibt bei einer gepflegten Liste eine Auswahl statt eines Textfelds', () => {
+        const kategorien = [
+            { id: 7, label: 'Kundentermin' },
+            { id: 8, label: 'Intern' },
+        ];
+        const onChange = vi.fn();
+
+        show({
+            kinds: [kind({ usesCategories: true })],
+            categories: kategorien,
+            categoryMode: 'closed',
+            onChange,
+        });
+
+        const auswahl = screen.getByLabelText('Kategorie');
+        expect(auswahl.tagName).toBe('SELECT');
+
+        fireEvent.change(auswahl, { target: { value: '8' } });
+        expect(onChange.mock.calls[0]?.[0].categoryId).toBe('8');
+    });
+
+    it('gibt bei einer persoenlichen Liste ein Textfeld mit Vorschlaegen', () => {
+        show({
+            kinds: [kind({ usesCategories: true })],
+            categories: [{ label: 'Sport' }],
+            categoryMode: 'personal',
+        });
+
+        // Der Unterschied ist nicht Geschmack: Bei einer gepflegten Liste liesse
+        // ein Textfeld etwas eintippen, was der Server hinterher ablehnt.
+        expect(screen.getByLabelText('Kategorie').tagName).toBe('INPUT');
+    });
+
     it('legt beim Einschalten der Serie Wochentag und Ende schon hin', () => {
         const onChange = vi.fn();
         show({ onChange });

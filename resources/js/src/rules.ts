@@ -52,6 +52,13 @@ export function eventFormRules(kinds: EventKind[], draft: EventDraft): EventForm
             return draft.recurrence === null;
         }
 
+        // Ein leeres Enddatum heisst „derselbe Tag" und fehlt damit nicht. Es
+        // teilt sich `ends_at` mit der Uhrzeit; ohne diesen Riegel verlangte
+        // jede Art, die eine Endzeit braucht, auch ein zweites Datum.
+        if (field === 'endDate') {
+            return false;
+        }
+
         return String(draft[field] ?? '').trim() === '';
     });
 
