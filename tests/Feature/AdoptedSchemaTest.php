@@ -40,7 +40,6 @@ beforeEach(function () {
         $table->string('title');
         $table->text('description')->nullable();
         $table->string('location')->nullable();
-        $table->string('meeting_url', 500)->nullable();
         $table->timestamp('start_datetime');
         $table->timestamp('end_datetime');
         $table->boolean('all_day')->default(false);

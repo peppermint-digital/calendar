@@ -29,6 +29,6 @@ class PrivateKind extends EventKind
 
     public function forbiddenAttributes(): array
     {
-        return ['meeting_url'];
+        return ['subject_type', 'subject_id'];
     }
 }

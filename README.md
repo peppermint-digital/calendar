@@ -19,6 +19,47 @@ calendar_events                  title, time range, all-day, location,
   └── <your profile table>  1:1  your columns, your constraints
 ```
 
+## Vocabulary
+
+Six words that are easy to mix up, and the line between them. Getting this wrong is how a
+calendar ends up with two half-working ways to say the same thing.
+
+| Word | What it is | Where it lives | Who creates one |
+| --- | --- | --- | --- |
+| **Kind** | What an event *is*. Decides which extra fields exist, how deletion behaves, what is required. | A class, registered in config | A developer, in a release |
+| **Category** | A label *within* a kind. Optional feature; a product without categories has none. | Rows in a table | Anyone, at runtime |
+| **Profile** | The kind's own table, one row per event. | A table per kind | A developer |
+| **Source** | Another system's calendar, shown here and owned there. | A class, registered in config | A developer |
+| **Subject** | What the event is *about* when the core cannot know: a task, a shift, a booking. | Two columns, `subject_type` / `subject_id` | — |
+| **Visibility** | How openly an event may be seen. Not the kind: a business event may be confidential, a private one shared. | A core column, exported as `CLASS` | — |
+
+The test that separates the first two:
+
+> **A kind is structure, a category is content.**
+> Adding a kind means a class, a migration and a release. Adding a category means a row.
+> If a user could plausibly create it while using the application, it is a category. If it
+> changes *which fields an event has*, it is a kind.
+
+So "digital meeting" is a kind — it requires a link that an in-person meeting must not have.
+"Customer visit" is a category — it changes nothing about the shape of the event.
+
+## Naming
+
+Names that end up in stored data or in another system's payload cannot be changed later
+without breaking something. These are fixed by convention:
+
+| Thing | Rule | Example |
+| --- | --- | --- |
+| Kind key | lowercase snake case, stable forever — it lives in every row | `business`, `meeting_digital` |
+| Category slug | lowercase snake case, product-defined | `customer_visit` |
+| Source key | lowercase, no vendor prefix — it prefixes ids and is stored in user filters | `manager`, not `acme-manager` |
+| External id | `<source key>:<remote id>`, built by the package | `manager:7` |
+| `extra` key | snake case, the other system's own vocabulary | `is_not_billable` |
+| Capability | `calendar.events.<verb>` | `calendar.events.create` |
+
+A kind key is the one that hurts most if it changes: it is written into every row, and
+nothing in the database remembers what it used to be.
+
 ## Defining an event kind
 
 ```php
@@ -34,7 +75,7 @@ class PrivateKind extends EventKind
     public function usesTrash(): bool         { return false; }
 
     // Guards the kind against becoming a meaningless flag.
-    public function forbiddenAttributes(): array { return ['meeting_url']; }
+    public function forbiddenAttributes(): array { return ['subject_type', 'subject_id']; }
 }
 ```
 

@@ -55,8 +55,7 @@ class IcsExporter
 
         $writer->property('SUMMARY', $event->title)
             ->property('DESCRIPTION', $event->description === null ? null : strip_tags($event->description))
-            ->property('LOCATION', $event->location)
-            ->property('URL', $event->meeting_url);
+            ->property('LOCATION', $event->location);
 
         if ($rrule = $this->rrule($event)) {
             $writer->property('RRULE', $rrule, raw: true);

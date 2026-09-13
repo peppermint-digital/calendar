@@ -38,14 +38,14 @@ it('names the known kinds and where to register new ones', function () {
 });
 
 it('rejects a field the event kind forbids', function () {
-    expect(fn () => makeEvent(['kind' => 'private', 'meeting_url' => 'https://meet.example/x']))
+    expect(fn () => makeEvent(['kind' => 'private', 'subject_type' => 'task']))
         ->toThrow(ForbiddenAttributeForKind::class);
 });
 
 it('allows that same field for a kind that does not forbid it', function () {
-    $event = makeEvent(['meeting_url' => 'https://meet.example/x']);
+    $event = makeEvent(['subject_type' => 'task']);
 
-    expect($event->fresh()->meeting_url)->toBe('https://meet.example/x');
+    expect($event->fresh()->subject_type)->toBe('task');
 });
 
 it('resolves the kind definition for an event', function () {
@@ -72,7 +72,7 @@ it('lets an existing row keep a forbidden value it already carried', function ()
     // Data older than the kind: the row was created before the application
     // adopted event kinds, and carries a field the kind now forbids. Editing
     // its title must not be blocked by that.
-    $event = makeEvent(['meeting_url' => 'https://meet.example/legacy']);
+    $event = makeEvent(['subject_type' => 'task']);
 
     DB::table('calendar_events')->where('id', $event->id)->update(['kind' => 'private']);
 
@@ -88,7 +88,7 @@ it('still refuses to set a forbidden value on an existing row', function () {
     DB::table('calendar_events')->where('id', $event->id)->update(['kind' => 'private']);
 
     $legacy = CalendarEvent::find($event->id);
-    $legacy->meeting_url = 'https://meet.example/new';
+    $legacy->subject_type = 'task';
 
     expect(fn () => $legacy->save())->toThrow(ForbiddenAttributeForKind::class);
 });

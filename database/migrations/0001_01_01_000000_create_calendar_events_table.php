@@ -24,7 +24,6 @@ return new class extends Migration
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('location')->nullable();
-            $table->string('meeting_url', 500)->nullable();
 
             $table->timestamp('starts_at');
             $table->timestamp('ends_at');
