@@ -208,6 +208,31 @@ silent behaviour, because both choices surprise somebody.
 Labels come from the package's language files (English and German included), so
 `describe()` follows the application's locale instead of hard-coding one.
 
+### Changing one occurrence, or all the ones after it
+
+Three ways to edit a series, and a calendar needs all three:
+
+```php
+$editor = app(SeriesEditor::class);
+
+$editor->cancelOccurrence($series, $tuesday);              // just this one, gone
+$editor->detachOccurrence($series, $tuesday, [...]);       // just this one, changed
+$editor->splitSeries($series, $october, ['recurrence_rules' => [...]]);  // this one and all after
+```
+
+The third is the one that is easy to leave out and impossible to fake. Someone who
+wants Thursdays from next month means neither "this Tuesday" nor "every Tuesday that
+ever was".
+
+It produces **two series**, not one that changes its rule halfway: the old one ends the
+day before, a new one starts at the split. A rule that changes in the middle cannot be
+expressed as iCalendar, and applying it backwards would rewrite what already happened.
+
+Exceptions move with it — cancellations before the split stay with the old series, later
+ones go to the new one. Without that a long-cancelled occurrence quietly reappears. And
+splitting at the first occurrence changes the series in place rather than leaving an
+empty one behind, because there is nothing before it to keep.
+
 ## Time blocking
 
 Time blocking is a way of working, not a data structure: a list of things to do

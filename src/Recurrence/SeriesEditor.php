@@ -50,6 +50,97 @@ class SeriesEditor
     }
 
     /**
+     * Teilt eine Serie: „dieser und alle künftigen".
+     *
+     * Der dritte Bedienweg neben „nur dieser" und „die ganze Serie" — und der
+     * einzige, der ohne ihn gar nicht geht. Wer ab nächstem Monat donnerstags
+     * statt dienstags will, meint weder das eine noch das andere.
+     *
+     * Zwei Reihen, nicht eine mit Sonderfällen: Die alte endet am Tag davor,
+     * ab dem Stichtag beginnt eine neue mit der geänderten Regel. Eine Serie,
+     * die ihre Regel in der Mitte wechselt, könnte niemand mehr als iCalendar
+     * ausdrücken — und rückwirkend würde sie die Vergangenheit umschreiben.
+     *
+     * Ausnahmen wandern mit: Was vor dem Stichtag abgesagt war, bleibt bei der
+     * alten Reihe; was danach liegt, gehört zur neuen. Ohne das käme ein längst
+     * abgesagter Termin wieder zum Vorschein.
+     *
+     * @param  DateTimeInterface  $occurrence  das erste Vorkommen der neuen Reihe
+     * @param  array<string, mixed>  $changes  was ab dort anders sein soll
+     */
+    public function splitSeries(
+        CalendarEvent $series,
+        DateTimeInterface $occurrence,
+        array $changes = [],
+    ): CalendarEvent {
+        $start = CarbonImmutable::instance($occurrence);
+        $seriesStart = CarbonImmutable::parse($series->field('starts_at'));
+
+        // Am ersten Vorkommen gibt es nichts zu teilen: Die „alte" Reihe wäre
+        // leer, und eine leere Serie ist kein Datensatz, den jemand haben will.
+        // Dann ist „dieser und alle künftigen" dasselbe wie „die ganze Serie".
+        if ($start->lessThanOrEqualTo($seriesStart)) {
+            $series->forceFill($changes)->save();
+
+            return $series;
+        }
+
+        $length = $seriesStart->diffInSeconds(CarbonImmutable::parse($series->field('ends_at')));
+        $exceptions = is_array($series->recurrence_exceptions) ? $series->recurrence_exceptions : [];
+
+        $davor = [];
+        $danach = [];
+
+        foreach ($exceptions as $date) {
+            $tag = CarbonImmutable::parse($date);
+
+            if ($tag->lessThan($start->startOfDay())) {
+                $davor[] = $tag->toDateString();
+            } else {
+                $danach[] = $tag->toDateString();
+            }
+        }
+
+        // Was die Vorlage nicht gesetzt hat, wird nicht mitgeschickt: Ein
+        // frisch angelegter Termin traegt die Vorgaben seiner Spalten erst nach
+        // dem Neuladen im Modell — `visibility` waere sonst null, obwohl in der
+        // Datenbank `shared` steht, und der Insert scheitert an der Spalte.
+        $vorlage = array_filter([
+            'kind' => $series->field('kind'),
+            CalendarEvent::column('owner_id') => $series->field('owner_id'),
+            'title' => $series->title,
+            'description' => $series->description,
+            'location' => $series->location,
+            CalendarEvent::column('all_day') => (bool) $series->field('all_day'),
+            'timezone' => $series->timezone,
+            CalendarEvent::column('visibility') => $series->field('visibility'),
+            CalendarEvent::column('subject_type') => $series->field('subject_type'),
+            CalendarEvent::column('subject_id') => $series->field('subject_id'),
+        ], static fn ($wert) => $wert !== null);
+
+        $neu = CalendarEvent::create(array_merge($vorlage, [
+            CalendarEvent::column('starts_at') => $start,
+            CalendarEvent::column('ends_at') => $start->addSeconds($length),
+
+            // Eine eigenständige Serie, keine Fortsetzung: eigene Gruppe, eigene
+            // Kennung. Was die beiden verbindet, ist Geschichte, nicht Struktur —
+            // und Geschichte gehört nicht in einen Fremdschlüssel.
+            'recurrence_group_id' => null,
+            'is_recurrence_master' => false,
+            'recurrence_rules' => $series->recurrence_rules,
+            'recurrence_until' => $series->recurrence_until,
+            'recurrence_exceptions' => $danach === [] ? null : $danach,
+        ], $changes));
+
+        $series->forceFill([
+            'recurrence_until' => $start->subDay()->toDateString(),
+            'recurrence_exceptions' => $davor === [] ? null : $davor,
+        ])->save();
+
+        return $neu;
+    }
+
+    /**
      * Löst ein einzelnes Vorkommen aus der Serie heraus.
      *
      * Das Ergebnis ist ein eigenständiger Termin: Er trägt die Angaben der
