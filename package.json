@@ -1,7 +1,7 @@
 {
     "name": "@peppermint-digital/calendar",
-    "version": "0.23.0",
-    "description": "Kalender-Oberflaeche zum gleichnamigen PHP-Paket: ein Termin-Dialog, der sich aus den Terminarten baut, und die Agenda-Ansicht.",
+    "version": "0.24.0",
+    "description": "Kalender-Oberflaeche zum gleichnamigen PHP-Paket: das Raster, seine Werkzeugleiste, ein Termin-Dialog, der sich aus den Terminarten baut, und die Agenda-Ansicht.",
     "license": "MIT",
     "type": "module",
     "main": "./dist/index.js",
@@ -24,10 +24,22 @@
         "prepare": "npm run build"
     },
     "peerDependencies": {
+        "@fullcalendar/core": "^6.1.19",
+        "@fullcalendar/daygrid": "^6.1.19",
+        "@fullcalendar/interaction": "^6.1.19",
+        "@fullcalendar/list": "^6.1.19",
+        "@fullcalendar/react": "^6.1.19",
+        "@fullcalendar/timegrid": "^6.1.19",
         "react": "^18 || ^19",
         "react-dom": "^18 || ^19"
     },
     "devDependencies": {
+        "@fullcalendar/core": "^6.1.21",
+        "@fullcalendar/daygrid": "^6.1.21",
+        "@fullcalendar/interaction": "^6.1.21",
+        "@fullcalendar/list": "^6.1.21",
+        "@fullcalendar/react": "^6.1.21",
+        "@fullcalendar/timegrid": "^6.1.21",
         "@testing-library/dom": "^10.4.2",
         "@testing-library/react": "^16.3.3",
         "@types/react": "^19.0.0",
