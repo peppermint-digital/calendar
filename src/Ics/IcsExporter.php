@@ -170,6 +170,44 @@ class IcsExporter
         }
 
         $component->rrule($rrule);
+
+        $this->addExceptions($component, $event);
+    }
+
+    /**
+     * Abgesagte Vorkommen als EXDATE (RFC 5545 §3.8.5.1).
+     *
+     * Ohne diese Zeile sagen Anwendung und Abo etwas Verschiedenes ueber
+     * denselben Termin: Der Ausklapper ueberspringt das abgesagte Vorkommen,
+     * der fremde Kalender kennt nur die Regel und zeigt es weiter. Und das Abo
+     * ist die Fassung, die im Telefonkalender klingelt.
+     *
+     * EXDATE muss zu DTSTART passen — gleiche Wertart und gleiche Uhrzeit.
+     * Gespeichert ist nur der Tag, die Uhrzeit kommt deshalb vom Serienbeginn;
+     * ein EXDATE mit 00:00 an einem Termin um 09:00 trifft nichts.
+     */
+    protected function addExceptions(IcsEvent $component, CalendarEvent $event): void
+    {
+        $exceptions = $event->recurrence_exceptions;
+
+        if (! is_array($exceptions) || $exceptions === []) {
+            return;
+        }
+
+        $start = CarbonImmutable::parse($event->field('starts_at'));
+        $allDay = (bool) $event->field('all_day');
+
+        $dates = array_map(
+            fn ($date) => $allDay
+                ? CarbonImmutable::parse($date)->startOfDay()
+                : CarbonImmutable::parse($date)
+                    ->setTimeFrom($start)
+                    ->setTimezone($start->getTimezone())
+                    ->utc(),
+            $exceptions,
+        );
+
+        $component->doNotRepeatOn(array_values($dates), ! $allDay);
     }
 
     protected function addAttendees(IcsEvent $component, CalendarEvent $event): void

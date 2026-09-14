@@ -148,3 +148,45 @@ it('wraps events in a calendar with the configured identity', function () {
         ->toContain('X-WR-CALNAME:Team')
         ->toEndWith('END:VCALENDAR');
 });
+
+it('nimmt abgesagte Vorkommen als EXDATE mit, mit der Uhrzeit des Serienbeginns', function () {
+    // Ohne diese Zeile sagen Anwendung und Abo etwas Verschiedenes ueber
+    // denselben Termin (Bug #829): Der Ausklapper ueberspringt das abgesagte
+    // Vorkommen, der fremde Kalender kennt nur die Regel und zeigt es weiter.
+    $out = ics(icsEvent([
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['TU']],
+        'recurrence_until' => '2026-10-31',
+        'recurrence_exceptions' => ['2026-09-15', '2026-09-29'],
+    ]));
+
+    // Die Uhrzeit muss die des Serienbeginns sein — ein EXDATE um 00:00 an
+    // einem Termin um 09:00 trifft nichts.
+    expect($out)
+        // Die Bibliothek schreibt die Wertart aus (VALUE=DATE-TIME). Nach
+        // RFC 5545 ist sie die Vorgabe und damit ueberfluessig, aber erlaubt.
+        ->toContain('EXDATE;VALUE=DATE-TIME:20260915T090000Z')
+        ->toContain('EXDATE;VALUE=DATE-TIME:20260929T090000Z')
+        ->toContain('RRULE:');
+});
+
+it('schreibt EXDATE eines ganztaegigen Termins als Datum ohne Uhrzeit', function () {
+    $out = ics(icsEvent([
+        'starts_at' => '2026-09-08 00:00:00',
+        'ends_at' => '2026-09-08 00:00:00',
+        'all_day' => true,
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['TU']],
+        'recurrence_until' => '2026-10-31',
+        'recurrence_exceptions' => ['2026-09-15'],
+    ]));
+
+    expect($out)->toContain('EXDATE;VALUE=DATE:20260915');
+});
+
+it('laesst die Zeile weg, wenn nichts abgesagt ist', function () {
+    $out = ics(icsEvent([
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['TU']],
+        'recurrence_until' => '2026-10-31',
+    ]));
+
+    expect($out)->toContain('RRULE:')->not->toContain('EXDATE');
+});

@@ -1,6 +1,6 @@
 {
     "name": "@peppermint-digital/calendar",
-    "version": "0.21.0",
+    "version": "0.22.0",
     "description": "Kalender-Oberflaeche zum gleichnamigen PHP-Paket: ein Termin-Dialog, der sich aus den Terminarten baut, und die Agenda-Ansicht.",
     "license": "MIT",
     "type": "module",
