@@ -116,6 +116,28 @@ describe('EventForm', () => {
         expect(screen.getByLabelText('Kategorie').tagName).toBe('INPUT');
     });
 
+    it('laesst ein Produkt sein eigenes Zeit-Bedienelement einsetzen', () => {
+        const onChange = vi.fn();
+
+        show({
+            renderTime: ({ id, value: wert, onChange: setzen }) => (
+                <select id={id} value={wert} onChange={(e) => setzen(e.target.value)}>
+                    <option value="">—</option>
+                    <option value="09:15">09:15</option>
+                </select>
+            ),
+            value: draft({ start: '', end: '' }),
+            onChange,
+        });
+
+        // Kein natives Zeitfeld mehr, und der eigene Baustein schreibt in denselben Entwurf.
+        const von = screen.getByLabelText('Von');
+        expect(von.tagName).toBe('SELECT');
+
+        fireEvent.change(von, { target: { value: '09:15' } });
+        expect(onChange.mock.calls[0]?.[0].start).toBe('09:15');
+    });
+
     it('legt beim Einschalten der Serie Wochentag und Ende schon hin', () => {
         const onChange = vi.fn();
         show({ onChange });

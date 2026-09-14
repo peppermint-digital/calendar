@@ -90,6 +90,14 @@ export type EventFormProps = {
      * Starttag entspricht.
      */
     multiDay?: boolean;
+    /**
+     * Eigenes Bedienelement fuer Uhrzeiten statt `<input type="time">`.
+     *
+     * Der Manager waehlt Stunde und Minute ueber zwei Listen mit Fuenf-Minuten-
+     * Raster. Das ist kein Zierrat, sondern eine Entscheidung mit Begruendung —
+     * und die Reihenfolge der Felder zu teilen heisst nicht, sie aufzugeben.
+     */
+    renderTime?: (props: { id: string; value: string; onChange: (value: string) => void }) => ReactNode;
     value: EventDraft;
     onChange: (draft: EventDraft) => void;
     onSubmit: () => void;
@@ -126,6 +134,7 @@ export function EventForm({
     categories = [],
     categoryMode = 'personal',
     multiDay = false,
+    renderTime,
     value,
     onChange,
     onSubmit,
@@ -215,24 +224,40 @@ export function EventForm({
                     <>
                         <div className="w-28">
                             <label className={label} htmlFor="calendar-start">{text.from}</label>
-                            <input
-                                id="calendar-start"
-                                type="time"
-                                className={field}
-                                value={value.start}
-                                onChange={(event) => set('start', event.target.value)}
-                            />
+                            {renderTime ? (
+                                renderTime({
+                                    id: 'calendar-start',
+                                    value: value.start,
+                                    onChange: (next) => set('start', next),
+                                })
+                            ) : (
+                                <input
+                                    id="calendar-start"
+                                    type="time"
+                                    className={field}
+                                    value={value.start}
+                                    onChange={(event) => set('start', event.target.value)}
+                                />
+                            )}
                             <FieldError message={fieldErrors?.start} />
                         </div>
                         <div className="w-28">
                             <label className={label} htmlFor="calendar-end">{text.to}</label>
-                            <input
-                                id="calendar-end"
-                                type="time"
-                                className={field}
-                                value={value.end}
-                                onChange={(event) => set('end', event.target.value)}
-                            />
+                            {renderTime ? (
+                                renderTime({
+                                    id: 'calendar-end',
+                                    value: value.end,
+                                    onChange: (next) => set('end', next),
+                                })
+                            ) : (
+                                <input
+                                    id="calendar-end"
+                                    type="time"
+                                    className={field}
+                                    value={value.end}
+                                    onChange={(event) => set('end', event.target.value)}
+                                />
+                            )}
                             <FieldError message={fieldErrors?.end} />
                         </div>
                     </>
