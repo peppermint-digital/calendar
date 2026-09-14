@@ -15,6 +15,8 @@ export type EventFormLabels = {
     description: string;
     meetingUrl: string;
     category: string;
+    /** Erklaerung unter dem Kategoriefeld. Leer heisst: keine. */
+    categoryHint: string;
     recurring: string;
     frequency: string;
     weekdays: string;
@@ -39,6 +41,7 @@ const DEFAULTS: EventFormLabels = {
     description: 'Beschreibung',
     meetingUrl: 'Meeting-Link',
     category: 'Kategorie',
+    categoryHint: '',
     recurring: 'Wiederholt sich',
     frequency: 'Frequenz',
     weekdays: 'An diesen Tagen',
@@ -192,7 +195,7 @@ export function EventForm({
             </div>
 
             <div className="flex flex-wrap gap-2">
-                <div className="min-w-36 flex-1">
+                <div className="w-40">
                     <label className={label} htmlFor="calendar-date">{text.date}</label>
                     <input
                         id="calendar-date"
@@ -206,7 +209,7 @@ export function EventForm({
                 </div>
 
                 {multiDay && (
-                    <div className="min-w-36 flex-1">
+                    <div className="w-40">
                         <label className={label} htmlFor="calendar-end-date">{text.endDate}</label>
                         <input
                             id="calendar-end-date"
@@ -344,6 +347,9 @@ export function EventForm({
                         </>
                     )}
 
+                    {text.categoryHint !== '' && (
+                        <p className="text-muted-foreground mt-1 text-xs">{text.categoryHint}</p>
+                    )}
                     <FieldError message={fieldErrors?.category ?? fieldErrors?.categoryId} />
                 </div>
             )}

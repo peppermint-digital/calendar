@@ -116,6 +116,32 @@ describe('EventForm', () => {
         expect(screen.getByLabelText('Kategorie').tagName).toBe('INPUT');
     });
 
+    it('haengt eine Erklaerung unter das Kategoriefeld, wenn das Produkt eine hat', () => {
+        const kategorien = [{ id: 7, label: 'Kundentermin' }];
+
+        show({
+            kinds: [kind({ usesCategories: true })],
+            categories: kategorien,
+            categoryMode: 'closed',
+            labels: { categoryHint: 'Pflicht ohne Projekt.' },
+        });
+
+        // Unter dem Feld, nicht irgendwo: Ein Hinweis, der drei Felder weiter
+        // steht, liest sich wie die Erklaerung des falschen Feldes.
+        const kategorie = screen.getByLabelText('Kategorie').parentElement;
+        expect(kategorie?.textContent).toContain('Pflicht ohne Projekt.');
+    });
+
+    it('laesst die Erklaerung weg, wenn es keine gibt', () => {
+        show({
+            kinds: [kind({ usesCategories: true })],
+            categories: [{ id: 7, label: 'Kundentermin' }],
+            categoryMode: 'closed',
+        });
+
+        expect(screen.getByLabelText('Kategorie').parentElement?.querySelector('p')).toBeNull();
+    });
+
     it('laesst ein Produkt sein eigenes Zeit-Bedienelement einsetzen', () => {
         const onChange = vi.fn();
 
