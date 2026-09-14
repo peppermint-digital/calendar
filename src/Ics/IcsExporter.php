@@ -5,16 +5,12 @@ namespace Peppermint\Calendar\Ics;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Peppermint\Calendar\Categories\CategoryRegistry;
-use Peppermint\Calendar\Enums\Frequency;
 use Peppermint\Calendar\Models\CalendarEvent;
-use Peppermint\Calendar\Recurrence\RecurrenceRule;
 use Spatie\IcalendarGenerator\Components\Calendar as IcsCalendar;
 use Spatie\IcalendarGenerator\Components\Event as IcsEvent;
 use Spatie\IcalendarGenerator\Enums\Classification;
 use Spatie\IcalendarGenerator\Enums\EventStatus;
 use Spatie\IcalendarGenerator\Enums\ParticipationStatus;
-use Spatie\IcalendarGenerator\Enums\RecurrenceDay;
-use Spatie\IcalendarGenerator\Enums\RecurrenceFrequency;
 use Spatie\IcalendarGenerator\Properties\TextProperty;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -135,79 +131,14 @@ class IcsExporter
      */
     protected function addRecurrence(IcsEvent $component, CalendarEvent $event): void
     {
-        $rules = $event->recurrence_rules;
-
-        if (! is_array($rules) || $rules === []) {
-            return;
-        }
-
-        $rule = RecurrenceRule::fromArray($rules);
-
-        $rrule = UtcRRule::of(match ($rule->frequency) {
-            Frequency::Daily => RecurrenceFrequency::Daily,
-            Frequency::Weekly, Frequency::Biweekly => RecurrenceFrequency::Weekly,
-            Frequency::Monthly => RecurrenceFrequency::Monthly,
-        });
-
-        if ($rule->frequency === Frequency::Biweekly) {
-            $rrule->interval(2);
-        }
-
-        if ($rule->frequency->needsWeekdays()) {
-            foreach ($rule->byDay as $day) {
-                if (($tag = RecurrenceDay::tryFrom($day)) !== null) {
-                    $rrule->onWeekDay($tag);
-                }
-            }
-        }
-
-        if ($rule->frequency === Frequency::Monthly && $rule->byMonthDay !== null) {
-            $rrule->onMonthDay($rule->byMonthDay);
-        }
-
-        if ($event->recurrence_until !== null) {
-            $rrule->until(CarbonImmutable::parse($event->recurrence_until)->endOfDay()->utc());
-        }
-
-        $component->rrule($rrule);
-
-        $this->addExceptions($component, $event);
-    }
-
-    /**
-     * Abgesagte Vorkommen als EXDATE (RFC 5545 §3.8.5.1).
-     *
-     * Ohne diese Zeile sagen Anwendung und Abo etwas Verschiedenes ueber
-     * denselben Termin: Der Ausklapper ueberspringt das abgesagte Vorkommen,
-     * der fremde Kalender kennt nur die Regel und zeigt es weiter. Und das Abo
-     * ist die Fassung, die im Telefonkalender klingelt.
-     *
-     * EXDATE muss zu DTSTART passen — gleiche Wertart und gleiche Uhrzeit.
-     * Gespeichert ist nur der Tag, die Uhrzeit kommt deshalb vom Serienbeginn;
-     * ein EXDATE mit 00:00 an einem Termin um 09:00 trifft nichts.
-     */
-    protected function addExceptions(IcsEvent $component, CalendarEvent $event): void
-    {
-        $exceptions = $event->recurrence_exceptions;
-
-        if (! is_array($exceptions) || $exceptions === []) {
-            return;
-        }
-
-        $start = CarbonImmutable::parse($event->field('starts_at'));
-        $allDay = (bool) $event->field('all_day');
-
-        $dates = array_map(
-            fn ($date) => $allDay
-                ? CarbonImmutable::parse($date)->startOfDay()
-                : CarbonImmutable::parse($date)
-                    ->setTimeFrom($start)
-                    ->setTimezone($start->getTimezone())
-                    ->utc(),
-            $exceptions,
+        IcsRecurrence::apply(
+            $component,
+            $event->recurrence_rules,
+            CarbonImmutable::parse($event->field('starts_at')),
+            $event->recurrence_until,
+            $event->recurrence_exceptions,
+            (bool) $event->field('all_day'),
         );
-
-        $component->doNotRepeatOn(array_values($dates), ! $allDay);
     }
 
     protected function addAttendees(IcsEvent $component, CalendarEvent $event): void

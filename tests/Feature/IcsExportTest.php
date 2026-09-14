@@ -1,7 +1,10 @@
 <?php
 
 use Peppermint\Calendar\Ics\IcsExporter;
+use Peppermint\Calendar\Ics\IcsRecurrence;
 use Peppermint\Calendar\Models\CalendarEvent;
+use Spatie\IcalendarGenerator\Components\Calendar;
+use Spatie\IcalendarGenerator\Components\Event;
 
 function icsEvent(array $attributes = []): CalendarEvent
 {
@@ -189,4 +192,31 @@ it('laesst die Zeile weg, wenn nichts abgesagt ist', function () {
     ]));
 
     expect($out)->toContain('RRULE:')->not->toContain('EXDATE');
+});
+
+it('haengt Serie und Ausnahmen auch an einen fremd gebauten Termin', function () {
+    // Der Peppermint Manager setzt sein Abo und CalDAV aus eigenen Bausteinen
+    // zusammen und mischt Dinge hinein, die keine Kalendertermine sind. Ohne
+    // diesen Weg entstuende die Regel dort ein zweites Mal von Hand.
+    $component = Event::create()
+        ->uniqueIdentifier('fremd-1')
+        ->name('Jour Fixe')
+        ->startsAt(new DateTimeImmutable('2026-09-08 09:00:00'))
+        ->endsAt(new DateTimeImmutable('2026-09-08 10:00:00'));
+
+    IcsRecurrence::apply(
+        $component,
+        ['frequency' => 'biweekly', 'byDay' => ['TU']],
+        new DateTimeImmutable('2026-09-08 09:00:00'),
+        '2026-10-31',
+        ['2026-09-22'],
+    );
+
+    $out = Calendar::create()->event($component)->get();
+
+    expect($out)
+        ->toContain('FREQ=WEEKLY')
+        // „Alle zwei Wochen" ist in iCalendar keine eigene Frequenz.
+        ->toContain('INTERVAL=2')
+        ->toContain('EXDATE;VALUE=DATE-TIME:20260922T090000');
 });
