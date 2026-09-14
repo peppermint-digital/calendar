@@ -142,6 +142,29 @@ describe('EventForm', () => {
         expect(screen.getByLabelText('Kategorie').parentElement?.querySelector('p')).toBeNull();
     });
 
+    it('laesst die Serie weg, wo die Maske sie nicht festlegen darf', () => {
+        // Nicht dasselbe wie „die Art fuehrt keine Serien": Der Manager legt
+        // eine Serie beim Anlegen fest und aendert sie beim Bearbeiten ueber
+        // den Geltungsbereich. Ein Block dort verspraeche etwas, das der
+        // Endpunkt nicht annimmt.
+        show({ allowRecurrence: false });
+        expect(screen.queryByText('Wiederholt sich')).toBeNull();
+
+        cleanup();
+        show();
+        expect(screen.queryByText('Wiederholt sich')).not.toBeNull();
+    });
+
+    it('haengt eine Erklaerung unter die Artenwahl', () => {
+        show({
+            kinds: [kind(), kind({ key: 'business', label: 'Geschaeftlich' })],
+            labels: { kindHint: 'Die Art vergibt das System.' },
+        });
+
+        const art = screen.getByLabelText('Terminart').parentElement;
+        expect(art?.textContent).toContain('Die Art vergibt das System.');
+    });
+
     it('laesst ein Produkt sein eigenes Zeit-Bedienelement einsetzen', () => {
         const onChange = vi.fn();
 

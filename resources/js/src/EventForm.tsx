@@ -5,6 +5,8 @@ import { useEventForm } from './useEventForm';
 
 export type EventFormLabels = {
     kind: string;
+    /** Erklaerung unter der Artenwahl. Leer heisst: keine. */
+    kindHint: string;
     title: string;
     date: string;
     from: string;
@@ -31,6 +33,7 @@ export type EventFormLabels = {
 
 const DEFAULTS: EventFormLabels = {
     kind: 'Terminart',
+    kindHint: '',
     title: 'Titel',
     date: 'Datum',
     from: 'Von',
@@ -94,6 +97,16 @@ export type EventFormProps = {
      */
     multiDay?: boolean;
     /**
+     * Darf die Serie in DIESER Maske festgelegt werden?
+     *
+     * Nicht dasselbe wie „die Art fuehrt Serien": Der Manager legt eine Serie
+     * beim Anlegen fest, aendert sie beim Bearbeiten aber ueber den
+     * Geltungsbereich (dieser Termin / kuenftige / alle) statt ueber die Regel.
+     * Ein Serienblock in der Bearbeiten-Maske verspraeche etwas, das der
+     * Endpunkt dort nicht annimmt.
+     */
+    allowRecurrence?: boolean;
+    /**
      * Eigenes Bedienelement fuer Uhrzeiten statt `<input type="time">`.
      *
      * Der Manager waehlt Stunde und Minute ueber zwei Listen mit Fuenf-Minuten-
@@ -137,6 +150,7 @@ export function EventForm({
     categories = [],
     categoryMode = 'personal',
     multiDay = false,
+    allowRecurrence = true,
     renderTime,
     value,
     onChange,
@@ -178,6 +192,9 @@ export function EventForm({
                             <option key={kind.key} value={kind.key}>{kind.label}</option>
                         ))}
                     </select>
+                    {text.kindHint !== '' && (
+                        <p className="text-muted-foreground mt-1 text-xs">{text.kindHint}</p>
+                    )}
                     <FieldError message={fieldErrors?.kind} />
                 </div>
             )}
@@ -368,7 +385,7 @@ export function EventForm({
                 </div>
             )}
 
-            {rules.shows('recurrence') && (
+            {allowRecurrence && rules.shows('recurrence') && (
                 <RecurrenceFields
                     value={value.recurrence}
                     onChange={(next) => set('recurrence', next)}
