@@ -1,11 +1,9 @@
 import type { CalendarApi, DateSelectArg, EventClickArg, EventContentArg, EventDropArg } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
 import type { DateClickArg, DropArg, EventResizeDoneArg } from '@fullcalendar/interaction';
-import listPlugin from '@fullcalendar/list';
 import FullCalendar from '@fullcalendar/react';
-import timeGridPlugin from '@fullcalendar/timegrid';
 import { forwardRef, useImperativeHandle, useRef, type ReactNode } from 'react';
+
+import { calendarDefaults } from './calendarDefaults';
 
 export type CalendarViewName = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek';
 
@@ -41,6 +39,8 @@ export type CalendarGridProps = {
     /** Erster Wochentag nach ISO-Zaehlung. 1 = Montag. */
     firstDay?: number;
     locale?: string;
+    /** Telefon-Anpassungen durchreichen — siehe `calendarDefaults`. */
+    mobile?: boolean;
     onSelect?: (start: Date, end: Date, allDay: boolean) => void;
     onDateClick?: (date: Date, allDay: boolean) => void;
     onEntryClick?: (payload: unknown) => void;
@@ -82,6 +82,7 @@ export const CalendarGrid = forwardRef<CalendarGridHandle, CalendarGridProps>(fu
         height = 'auto',
         firstDay = 1,
         locale = 'de',
+        mobile = false,
         onSelect,
         onDateClick,
         onEntryClick,
@@ -104,41 +105,12 @@ export const CalendarGrid = forwardRef<CalendarGridHandle, CalendarGridProps>(fu
     return (
         <FullCalendar
             ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+            {...calendarDefaults({ fullDay, weekends, mobile })}
             initialView={view}
-            headerToolbar={false}
             height={height}
-            // Deutsche Woche: Montag zuerst, Kalenderwochen an der Seite.
             locale={locale}
             firstDay={firstDay}
-            weekNumbers
-            weekNumberCalculation="ISO"
-            weekText="KW"
-            allDayText="Ganztägig"
-            noEventsText="Keine Termine in diesem Zeitraum"
-            buttonText={{ today: 'Heute' }}
-            // 24 Stunden statt AM/PM — alles andere liest hierzulande niemand.
-            eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-            slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-            // Viertelstundenraster mit stuendlicher Beschriftung: fein genug,
-            // um einen Termin auf Viertel zu setzen, ohne die Zeitachse mit
-            // Zahlen zuzupflastern.
-            slotDuration="00:15:00"
-            slotLabelInterval="01:00:00"
-            slotMinTime={fullDay ? '00:00:00' : '07:00:00'}
-            slotMaxTime={fullDay ? '24:00:00' : '23:00:00'}
-            dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
-            weekends={weekends}
-            nowIndicator
-            expandRows
-            editable
-            selectable
-            selectMirror
             droppable={acceptsExternalDrops}
-            dayMaxEvents={3}
-            moreLinkClick="popover"
-            fixedWeekCount={false}
-            businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '18:00' }}
             events={entries.map((entry) => ({
                 id: entry.id,
                 title: entry.title,
