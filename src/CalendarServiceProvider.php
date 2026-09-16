@@ -8,6 +8,7 @@ use Peppermint\Calendar\Console\PurgeTrashedEventsCommand;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
 use Peppermint\Calendar\Sources\EventSource;
+use Peppermint\Calendar\Sources\EventSourceProvider;
 use Peppermint\Calendar\Sources\EventSourceRegistry;
 
 class CalendarServiceProvider extends ServiceProvider
@@ -41,6 +42,25 @@ class CalendarServiceProvider extends ServiceProvider
 
             foreach ((array) $app['config']->get('calendar.sources', []) as $class) {
                 $source = $app->make($class);
+
+                // Ein Anbieter steht fuer mehrere Quellen, die erst zur
+                // Laufzeit feststehen — angebundene Produkte, die ihre
+                // Faehigkeiten selbst melden. Ohne ihn braeuchte jedes neue
+                // System eine eigene Klasse UND eine Zeile hier, und genau die
+                // vergisst jemand.
+                if ($source instanceof EventSourceProvider) {
+                    foreach ($source->sources() as $geliefert) {
+                        if (! $geliefert instanceof EventSource) {
+                            throw new \InvalidArgumentException(
+                                "Source provider [{$class}] returned something that does not extend ".EventSource::class.'.'
+                            );
+                        }
+
+                        $registry->register($geliefert);
+                    }
+
+                    continue;
+                }
 
                 if (! $source instanceof EventSource) {
                     throw new \InvalidArgumentException(
