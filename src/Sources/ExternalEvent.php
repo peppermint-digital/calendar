@@ -7,9 +7,16 @@ use Carbon\CarbonImmutable;
 /**
  * An event that lives in another system.
  *
- * It is shown, not owned: no row in this database, no editing, no deleting.
- * Copying it here would create a second truth and a synchronisation problem
- * nobody asked for — the other system remains the place where it is changed.
+ * It is shown, not owned: no row in this database. Copying it here would
+ * create a second truth and a synchronisation problem nobody asked for.
+ *
+ * It CAN be acted upon — created, moved and deleted — but never here: every
+ * such action travels to the owning system through a
+ * {@see WritableEventSource} and returns whatever that system made of it. The
+ * one thing that stays over there entirely is the full edit: title, attendees,
+ * recurrence. Those live in a form with fields this application does not know,
+ * and rebuilding it here would mean maintaining it twice. {@see $url} is the
+ * way in.
  */
 class ExternalEvent
 {

@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Tests\Fixtures;
 
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Peppermint\Calendar\Exceptions\ExternalSourceFailed;
 use Peppermint\Calendar\Sources\ExternalEvent;
 use Peppermint\Calendar\Sources\ExternalKind;
 use Peppermint\Calendar\Sources\NewExternalEvent;
@@ -16,6 +17,13 @@ class WritableDemoSource extends WritableEventSource
 
     /** @var array<int, NewExternalEvent> */
     public static array $received = [];
+
+    /** Was verschoben und geloescht wurde — und ob es scheitern soll. */
+    public static array $verschoben = [];
+
+    public static array $geloescht = [];
+
+    public static bool $scheitert = false;
 
     public function key(): string
     {
@@ -61,5 +69,39 @@ class WritableDemoSource extends WritableEventSource
             location: $event->location,
             extra: $event->extra,
         );
+    }
+
+    public function move(
+        int $userId,
+        string $eventId,
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+        ?bool $allDay = null,
+    ): ExternalEvent {
+        if (self::$scheitert) {
+            throw ExternalSourceFailed::beim('verschieben', $this->key());
+        }
+
+        self::$verschoben[] = compact('eventId', 'startsAt', 'endsAt', 'allDay');
+
+        // Auch beim Verschieben rundet das Zielsystem — und genau seine
+        // Fassung muss angezeigt werden, nicht die gezogene.
+        return new ExternalEvent(
+            sourceKey: $this->key(),
+            id: $eventId,
+            title: 'Kundentermin',
+            startsAt: $startsAt->startOfHour(),
+            endsAt: $endsAt->startOfHour(),
+            allDay: $allDay ?? false,
+        );
+    }
+
+    public function delete(int $userId, string $eventId): void
+    {
+        if (self::$scheitert) {
+            throw ExternalSourceFailed::beim('loeschen', $this->key());
+        }
+
+        self::$geloescht[] = $eventId;
     }
 }

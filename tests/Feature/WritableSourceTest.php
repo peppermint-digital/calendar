@@ -1,6 +1,7 @@
 <?php
 
 use Carbon\CarbonImmutable;
+use Peppermint\Calendar\Exceptions\ExternalSourceFailed;
 use Peppermint\Calendar\Sources\EventSourceRegistry;
 use Peppermint\Calendar\Sources\NewExternalEvent;
 use Peppermint\Calendar\Tests\Fixtures\DemoSource;
@@ -12,6 +13,9 @@ beforeEach(function () {
     DemoSource::$extra = [];
     WritableDemoSource::$writable = true;
     WritableDemoSource::$received = [];
+    WritableDemoSource::$verschoben = [];
+    WritableDemoSource::$geloescht = [];
+    WritableDemoSource::$scheitert = false;
 
     config()->set('calendar.sources', [DemoSource::class, WritableDemoSource::class]);
     app()->forgetInstance(EventSourceRegistry::class);
@@ -82,4 +86,82 @@ it('schickt nur mit, was gesetzt ist', function () {
         ->and($payload)->not->toHaveKey('description')
         ->and($payload)->not->toHaveKey('extra')
         ->and($payload['kind'])->toBe('business');
+});
+
+it('verschiebt einen Termin und zeigt die Fassung des Zielsystems', function () {
+    // Der haeufigste Eingriff ueberhaupt: ziehen im Raster. Zurueck kommt,
+    // was das andere System daraus gemacht hat — hier gerundet.
+    $verschoben = app(EventSourceRegistry::class)->writable()['writable-demo']->move(
+        1,
+        '99',
+        CarbonImmutable::parse('2026-09-15 14:23'),
+        CarbonImmutable::parse('2026-09-15 15:23'),
+    );
+
+    expect($verschoben->startsAt->format('Y-m-d H:i'))->toBe('2026-09-15 14:00')
+        ->and(WritableDemoSource::$verschoben[0]['eventId'])->toBe('99');
+});
+
+it('nimmt den Wechsel zwischen Ganztagszeile und Raster mit', function () {
+    // Ohne diesen Weg braeuchte die Oberflaeche einen zweiten fuers Ziehen in
+    // die Ganztagszeile — und der kennt die Regeln irgendwann nicht mehr.
+    app(EventSourceRegistry::class)->writable()['writable-demo']->move(
+        1,
+        '99',
+        CarbonImmutable::parse('2026-09-15 00:00'),
+        CarbonImmutable::parse('2026-09-16 00:00'),
+        allDay: true,
+    );
+
+    expect(WritableDemoSource::$verschoben[0]['allDay'])->toBeTrue();
+});
+
+it('laesst unveraendert, was nicht mitgeschickt wird', function () {
+    // `null` heisst „daran aendert sich nichts". Wer hier `false` schickte,
+    // machte aus jedem Ganztagstermin beim Verschieben einen Zeittermin.
+    app(EventSourceRegistry::class)->writable()['writable-demo']->move(
+        1,
+        '99',
+        CarbonImmutable::parse('2026-09-15 09:00'),
+        CarbonImmutable::parse('2026-09-15 10:00'),
+    );
+
+    expect(WritableDemoSource::$verschoben[0]['allDay'])->toBeNull();
+});
+
+it('loescht einen Termin drueben', function () {
+    app(EventSourceRegistry::class)->writable()['writable-demo']->delete(1, '99');
+
+    expect(WritableDemoSource::$geloescht)->toBe(['99']);
+});
+
+it('scheitert LAUT, wenn das andere System nicht mitspielt', function () {
+    // Der Gegensatz zum Lesen: Dort verschluckt die Registry den Ausfall, weil
+    // ein leerer Kalender schlimmer waere als ein unvollstaendiger. Beim
+    // Schreiben hinterliesse dasselbe Verhalten einen Termin, den jemand
+    // angelegt zu haben GLAUBT und den es nirgends gibt.
+    WritableDemoSource::$scheitert = true;
+
+    $quelle = app(EventSourceRegistry::class)->writable()['writable-demo'];
+
+    expect(fn () => $quelle->move(1, '99', CarbonImmutable::now(), CarbonImmutable::now()->addHour()))
+        ->toThrow(ExternalSourceFailed::class)
+        ->and(fn () => $quelle->delete(1, '99'))
+        ->toThrow(ExternalSourceFailed::class);
+});
+
+it('nennt in der Ausnahme, welcher Vorgang in welchem System scheiterte', function () {
+    // Eine Meldung „Fehler" hilft niemandem. Die Oberflaeche muss sagen
+    // koennen, WAS drueben nicht ging.
+    WritableDemoSource::$scheitert = true;
+
+    try {
+        app(EventSourceRegistry::class)->writable()['writable-demo']->delete(1, '99');
+        $ausnahme = null;
+    } catch (ExternalSourceFailed $e) {
+        $ausnahme = $e;
+    }
+
+    expect($ausnahme?->vorgang)->toBe('loeschen')
+        ->and($ausnahme?->sourceKey)->toBe('writable-demo');
 });

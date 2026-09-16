@@ -2,8 +2,10 @@
 
 namespace Peppermint\Calendar\Sources;
 
+use Carbon\CarbonImmutable;
+
 /**
- * Eine Quelle, in der man auch anlegen darf.
+ * Eine Quelle, in der man auch anlegen, verschieben und loeschen darf.
  *
  * Bewusst eine eigene Klasse und kein Schalter an `EventSource`. Ein Schalter
  * waere eine Abfrage, die jemand vergisst — und die Folge waere ein Schreibweg
@@ -33,7 +35,51 @@ abstract class WritableEventSource extends EventSource
     abstract public function create(int $userId, NewExternalEvent $event): ExternalEvent;
 
     /**
-     * Darf diese Person hier gerade anlegen?
+     * Verschiebt den Termin drueben — neuer Anfang, neues Ende.
+     *
+     * Der haeufigste Eingriff ueberhaupt und der einzige, der beim Ziehen im
+     * Raster entsteht. Deshalb ein eigener Vorgang und kein „aendere alles":
+     * Wer eine Stunde nach hinten zieht, will nicht, dass dabei Titel,
+     * Teilnehmer und Serie mitgeschickt werden — und schon gar nicht in der
+     * Fassung, die diese Anwendung gerade zufaellig im Speicher hat.
+     *
+     * `$allDay` ist `null`, wenn sich daran nichts aendert. Gesetzt wird es
+     * beim Ziehen zwischen Ganztagszeile und Zeitraster — ohne diesen Weg
+     * braeuchte die Oberflaeche dafuer einen zweiten, und der kennt die Regeln
+     * dann irgendwann nicht mehr.
+     *
+     * Bei einer Serie entscheidet das Zielsystem, ob ein Vorkommen oder die
+     * Regel wandert. Der Vertrag reicht durch, er legt es nicht aus: Was eine
+     * Serie bedeutet, weiss nur, wem sie gehoert.
+     *
+     * @throws \Peppermint\Calendar\Exceptions\ExternalSourceFailed
+     */
+    abstract public function move(
+        int $userId,
+        string $eventId,
+        CarbonImmutable $startsAt,
+        CarbonImmutable $endsAt,
+        ?bool $allDay = null,
+    ): ExternalEvent;
+
+    /**
+     * Loescht den Termin drueben.
+     *
+     * Ohne Rueckgabe: Was es nicht mehr gibt, kann nichts zurueckgeben. Ein
+     * Fehlschlag wirft — stillschweigend nichts zu tun waere hier am
+     * schlimmsten, weil die Oberflaeche die Zeile bereits entfernt hat.
+     *
+     * @throws \Peppermint\Calendar\Exceptions\ExternalSourceFailed
+     */
+    abstract public function delete(int $userId, string $eventId): void;
+
+    /**
+     * Darf diese Person hier gerade anlegen, aendern und loeschen?
+     *
+     * EIN Schalter fuer alle drei Vorgaenge, nicht drei. Getrennte Rechte
+     * waeren drei Abfragen, und die dritte vergisst jemand — dieselbe
+     * Ueberlegung, aus der diese Klasse eine eigene ist und kein Schalter an
+     * `EventSource`.
      *
      * Getrennt von `isAvailable()`: Eine Quelle kann erreichbar sein und
      * trotzdem nicht beschreibbar — etwa wenn das Zielsystem den Vorgang zum
