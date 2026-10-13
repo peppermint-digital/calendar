@@ -26,7 +26,7 @@ The package ships its front end in the same repository: `composer.json` for the 
 
 ```
 composer require peppermint/calendar
-npm install github:peppermint-digital/calendar#v0.11.0
+npm install github:peppermint-digital/calendar#v0.34.0
 ```
 
 ```tsx
@@ -793,9 +793,16 @@ vendor/bin/pest
 
 ## Status
 
-Early. Kinds, profiles, attendees, scopes, deletion, recurrence, iCalendar
-export and the time-blocking primitives are in place and covered by tests.
-CalDAV and invitation mails are next.
+In production in four systems — Peppermint Manager, AI Brain, Peppermint
+Verwaltung and Peppermint CRM — with 228 tests.
+
+In place: kinds and profiles, satellites, flat profile fields (so a field can
+leave a shared core table without rewriting every caller), the planned-block
+shape, attendees, scopes, per-kind deletion, recurrence, iCalendar export, the
+time-blocking primitives, and remote calendars of other systems — read and
+write, over whatever transport the host provides.
+
+Not in place: CalDAV and invitation mails.
 
 ## License
 
