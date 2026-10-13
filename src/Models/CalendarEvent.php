@@ -59,6 +59,21 @@ class CalendarEvent extends Model
     protected array $profileAttributes = [];
 
     /**
+     * Die Profilzeile, einmal geholt.
+     *
+     * Eigenes Feld und NICHT `$this->relations['profile']`: `refresh()` laedt
+     * jede geladene Beziehung nach — und baut sie dabei auf einer frischen,
+     * LEEREN Modellinstanz. Die hat keine Terminart, also kein Profilmodell,
+     * also keine Beziehung. Ein Profil, das je Art ein anderes Modell ist,
+     * laesst sich ueber eine einzelne `hasOne` grundsaetzlich nicht eager
+     * laden; wer es in die Beziehungen legt, bricht `refresh()` und `load()`
+     * fuer jeden Termin, der einmal ein Profilfeld gelesen hat.
+     */
+    protected ?Model $profileRow = null;
+
+    protected bool $profileLoaded = false;
+
+    /**
      * Spaltenlisten je Verbindung und Tabelle.
      *
      * @var array<string, array<int, string>>
@@ -156,6 +171,9 @@ class CalendarEvent extends Model
         }
 
         $beziehung->updateOrCreate([], $werte);
+
+        $this->profileRow = null;
+        $this->profileLoaded = false;
     }
 
     /**
@@ -203,11 +221,12 @@ class CalendarEvent extends Model
             return $wert;
         }
 
-        if (! $this->relationLoaded('profile')) {
-            $this->setRelation('profile', $this->profile()?->getResults());
+        if (! $this->profileLoaded) {
+            $this->profileRow = $this->profile()?->getResults();
+            $this->profileLoaded = true;
         }
 
-        return $this->getRelation('profile')?->getAttribute($key);
+        return $this->profileRow?->getAttribute($key);
     }
 
     /**
@@ -263,6 +282,22 @@ class CalendarEvent extends Model
     public function kindDefinition(): EventKind
     {
         return static::kinds()->get((string) $this->field('kind'));
+    }
+
+    /**
+     * Jede Neubefuellung der Attribute verwirft das gemerkte Profil.
+     *
+     * Deckt beides ab: das Hydrieren aus der Datenbank und `refresh()`. Ohne
+     * das wuerde ein aufgefrischter Termin das Profil von vorhin weiterlesen.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function setRawAttributes(array $attributes, $sync = false)
+    {
+        $this->profileRow = null;
+        $this->profileLoaded = false;
+
+        return parent::setRawAttributes($attributes, $sync);
     }
 
     protected static function kinds(): EventKindRegistry

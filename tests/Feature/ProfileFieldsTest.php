@@ -119,6 +119,29 @@ it('wirft nicht, wenn die Zeile nur halb geladen ist', function () {
         ->and($schmal->project_id)->toBeNull();
 });
 
+it('uebersteht ein refresh, nachdem ein Profilfeld gelesen wurde', function () {
+    $termin = termin(['project_id' => 7]);
+
+    // Das gemerkte Profil darf NICHT in den Beziehungen liegen: `refresh()`
+    // laedt jede geladene Beziehung nach und baut sie auf einer leeren
+    // Modellinstanz — ohne Terminart, also ohne Profilmodell. Drei Tests im
+    // Manager sind genau daran umgefallen, an einem `refresh()` im Controller.
+    expect($termin->project_id)->toBe(7);
+
+    expect(fn () => $termin->refresh())->not->toThrow(Throwable::class)
+        ->and($termin->project_id)->toBe(7);
+});
+
+it('liest nach einer Aenderung den neuen Wert, nicht den gemerkten', function () {
+    $termin = termin(['project_id' => 7]);
+    expect($termin->project_id)->toBe(7);
+
+    $termin->update(['project_id' => 9]);
+
+    expect($termin->project_id)->toBe(9)
+        ->and(CalendarEvent::findOrFail($termin->id)->project_id)->toBe(9);
+});
+
 describe('solange die Kernspalte noch steht', function () {
     beforeEach(function () {
         Schema::table('calendar_events', function (Blueprint $table) {
