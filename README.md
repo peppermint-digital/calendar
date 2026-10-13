@@ -192,6 +192,21 @@ Reading never throws, though: an unknown or empty kind makes a profile field
 answer `null` rather than raise. Saving is the opposite — there a guessed kind
 would decide fields, visibility and deletion behaviour, so it stops.
 
+### Fields a kind has no place for
+
+A grown form posts every field it knows, empty ones included — `'organization_id'
+=> null` reaches a private appointment too. A wide core table absorbed that
+silently, which is the width this whole mechanism removes. So:
+
+| value | what happens |
+| --- | --- |
+| empty, and the kind has no place for it | left out — nothing was there to lose |
+| filled, and the kind has no place for it | `AttributeWithoutHome` |
+
+That is a different question from `forbiddenAttributes()`, which says what a kind
+must not carry even though a column exists. This one says there is no place at
+all.
+
 ## What the kind decides
 
 | Method | Question it answers |

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Peppermint\Calendar\Eloquent\CalendarEventBuilder;
+use Peppermint\Calendar\Exceptions\AttributeWithoutHome;
 use Peppermint\Calendar\Exceptions\ForbiddenAttributeForKind;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
@@ -132,7 +133,9 @@ class CalendarEvent extends Model
      */
     protected function liftProfileAttributes(EventKind $kind): void
     {
-        foreach ($kind->profileFields() as $field) {
+        $felder = $kind->profileFields();
+
+        foreach ($felder as $field) {
             if (! array_key_exists($field, $this->attributes)) {
                 continue;
             }
@@ -142,6 +145,52 @@ class CalendarEvent extends Model
             if (! $this->hasRealColumn($field)) {
                 unset($this->attributes[$field]);
             }
+        }
+
+        $this->raeumeHeimatloseWerteWeg($kind, $felder);
+    }
+
+    /**
+     * Was weder Spalte noch Feld dieser Art ist, kann nicht gespeichert werden.
+     *
+     * ## Warum es diesen Schritt braucht
+     *
+     * Gewachsene Anwendungen schicken beim Speichern ALLE Felder der Maske
+     * mit, auch die leeren — `'organization_id' => null` steht dann auch an
+     * einem Privattermin im Array. Solange die Kerntabelle breit war, nahm sie
+     * das stumm auf. Genau diese Breite soll weg, und sobald die Spalte faellt,
+     * bricht dasselbe INSERT ab:
+     *
+     *     table calendar_events has no column named organization_id
+     *
+     * Ein leerer Wert fuer ein Feld, das diese Art nicht hat, sagt nichts aus.
+     * Er wird weggelassen — dabei geht nichts verloren, weil nichts da war.
+     *
+     * ## Ein BELEGTER Wert dagegen wirft
+     *
+     * Wer `meeting_url` an einem Privattermin uebergibt, haelt sie fuer
+     * gespeichert. Sie still wegzulassen waere der Datenverlust, den der ganze
+     * Umzug vermeidet; sie in die Kerntabelle zu schreiben, war das Problem.
+     * Also laut.
+     *
+     * `forbiddenAttributes()` greift vorher und ist etwas anderes: Dort steht,
+     * was eine Art nicht tragen DARF, auch wenn der Kern eine Spalte dafuer
+     * hat. Hier geht es darum, dass es ueberhaupt keinen Ort gibt.
+     *
+     * @param  array<int, string>  $felder
+     */
+    protected function raeumeHeimatloseWerteWeg(EventKind $kind, array $felder): void
+    {
+        foreach (array_keys($this->attributes) as $key) {
+            if ($this->hasRealColumn($key) || in_array($key, $felder, true)) {
+                continue;
+            }
+
+            if (filled($this->attributes[$key])) {
+                throw AttributeWithoutHome::make($kind->key(), $key);
+            }
+
+            unset($this->attributes[$key]);
         }
     }
 

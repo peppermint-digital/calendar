@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Peppermint\Calendar\Exceptions\AttributeWithoutHome;
 use Peppermint\Calendar\Exceptions\ProfileFieldsWithoutProfile;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
@@ -140,6 +141,23 @@ it('liest nach einer Aenderung den neuen Wert, nicht den gemerkten', function ()
 
     expect($termin->project_id)->toBe(9)
         ->and(CalendarEvent::findOrFail($termin->id)->project_id)->toBe(9);
+});
+
+it('laesst einen leeren Wert weg, den diese Art nicht ablegen kann', function () {
+    // Gewachsene Masken schicken ALLE Felder mit, auch die leeren. Solange die
+    // Kerntabelle breit war, nahm sie das stumm auf — und genau diese Breite
+    // soll weg. Ein leerer Wert sagt nichts aus, also geht nichts verloren.
+    $termin = termin(['kind' => 'private', 'project_id' => null, 'is_not_billable' => null]);
+
+    expect($termin->exists)->toBeTrue()
+        ->and($termin->project_id)->toBeNull();
+});
+
+it('wirft bei einem BELEGTEN Wert, fuer den diese Art keinen Ort hat', function () {
+    // Wer den Wert uebergibt, haelt ihn fuer gespeichert. Still weglassen waere
+    // der Datenverlust, den der Umzug vermeidet.
+    expect(fn () => termin(['kind' => 'private', 'project_id' => 7]))
+        ->toThrow(AttributeWithoutHome::class);
 });
 
 describe('solange die Kernspalte noch steht', function () {
