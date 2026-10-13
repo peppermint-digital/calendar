@@ -91,6 +91,34 @@ it('laesst Felder einer Art ohne Profil nicht ins Leere laufen', function () {
         ->toThrow(ProfileFieldsWithoutProfile::class);
 });
 
+it('wirft nicht, wenn die Art leer oder unbekannt ist', function () {
+    $termin = termin(['project_id' => 7]);
+
+    // Beides kommt in gewachsenen Anwendungen vor: ein Formular schickt eine
+    // leere Art mit, und eine Art verschwindet aus der Registrierung, waehrend
+    // ihre Zeilen stehen bleiben. Ein LESEZUGRIFF darf daran nicht scheitern —
+    // beim Speichern ist der Abbruch richtig, hier waere er eine Ausnahme aus
+    // einem Getter, der nur ein Feld liefern sollte.
+    foreach (['', 'gibt_es_nicht'] as $art) {
+        $halb = CalendarEvent::findOrFail($termin->id);
+        $halb->setRawAttributes(['id' => $termin->id, 'kind' => $art] + $halb->getAttributes(), true);
+
+        expect(fn () => $halb->project_id)->not->toThrow(Throwable::class);
+    }
+});
+
+it('wirft nicht, wenn die Zeile nur halb geladen ist', function () {
+    termin(['project_id' => 7]);
+
+    // Ohne `kind` in der Spaltenliste kann der Zugriffspfad das Profil nicht
+    // finden. Die richtige Antwort ist `null`, nicht eine Ausnahme — und wer
+    // so liest, muss wissen, dass er das Feld damit verliert.
+    $schmal = CalendarEvent::query()->select(['id', 'title'])->firstOrFail();
+
+    expect(fn () => $schmal->project_id)->not->toThrow(Throwable::class)
+        ->and($schmal->project_id)->toBeNull();
+});
+
 describe('solange die Kernspalte noch steht', function () {
     beforeEach(function () {
         Schema::table('calendar_events', function (Blueprint $table) {

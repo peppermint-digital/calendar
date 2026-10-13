@@ -183,6 +183,15 @@ Naming the fields in `profileFields()` is therefore also the to-do list: the
 accessors buy time for everything that goes through the model, and the queries
 are what is left to do by hand.
 
+And one more: a **narrow select**. `select(['id', 'title'])` leaves `kind` behind,
+and without the kind the event cannot tell which profile to ask — the field reads
+as `null`, quietly. Include the kind column, or do not read profile fields off
+that result.
+
+Reading never throws, though: an unknown or empty kind makes a profile field
+answer `null` rather than raise. Saving is the opposite — there a guessed kind
+would decide fields, visibility and deletion behaviour, so it stops.
+
 ## What the kind decides
 
 | Method | Question it answers |

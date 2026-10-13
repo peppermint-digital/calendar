@@ -181,14 +181,25 @@ class CalendarEvent extends Model
         // Die Art selbst darf hier nicht nachgefragt werden: Sie ist die
         // Bedingung dafuer, dass es ueberhaupt Profilfelder gibt — ein Blick
         // auf sie ueber diesen Weg wuerde sich endlos im Kreis drehen.
-        if ($key === static::column('kind') || ($this->attributes[static::column('kind')] ?? null) === null) {
-            // Ohne Art gibt es keine Profilfelder, und `kindDefinition()`
-            // wuerde werfen. Kommt beim Hydrieren einer halben Zeile vor, etwa
-            // nach `select('id')`.
+        if ($key === static::column('kind')) {
             return $wert;
         }
 
-        if (! in_array($key, $this->kindDefinition()->profileFields(), true)) {
+        $art = $this->attributes[static::column('kind')] ?? null;
+
+        // Ein Lesezugriff darf nicht werfen. `kindDefinition()` tut das bei
+        // einer unbekannten Art — mit Recht, denn beim SPEICHERN waere eine
+        // geratene Art schlimmer als ein Abbruch. Hier ist die Lage anders:
+        // Das Modell kann halb hydriert sein (`select('id')`), die Art kann
+        // leer durch ein Formular gekommen sein, und in beiden Faellen ist die
+        // richtige Antwort „der Kern sagt dazu nichts" — nicht eine Ausnahme
+        // aus einem Getter, die den Aufrufer an einer Stelle trifft, an der er
+        // nur ein Feld lesen wollte.
+        if (! is_string($art) || $art === '' || ! static::kinds()->has($art)) {
+            return $wert;
+        }
+
+        if (! in_array($key, static::kinds()->get($art)->profileFields(), true)) {
             return $wert;
         }
 
@@ -251,7 +262,12 @@ class CalendarEvent extends Model
 
     public function kindDefinition(): EventKind
     {
-        return app(EventKindRegistry::class)->get((string) $this->field('kind'));
+        return static::kinds()->get((string) $this->field('kind'));
+    }
+
+    protected static function kinds(): EventKindRegistry
+    {
+        return app(EventKindRegistry::class);
     }
 
     public function owner(): BelongsTo
