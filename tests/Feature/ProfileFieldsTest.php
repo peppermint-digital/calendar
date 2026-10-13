@@ -123,7 +123,14 @@ it('wirft nicht, wenn die Art leer oder unbekannt ist', function () {
         $halb = CalendarEvent::findOrFail($termin->id);
         $halb->setRawAttributes(['id' => $termin->id, 'kind' => $art] + $halb->getAttributes(), true);
 
-        expect(fn () => $halb->project_id)->not->toThrow(Throwable::class);
+        // Einfach lesen. Wirft es, faellt der Test mit der echten Ausnahme um
+        // — das ist staerker als jede „wirft nicht"-Zusicherung und kann nicht
+        // ins Leere greifen.
+        //
+        // `null` ist dabei die richtige Antwort und nicht die 7: Ohne gueltige
+        // Art gibt es kein Profil, das etwas sagen koennte. „Der Kern sagt dazu
+        // nichts" — nicht „der Wert ist weg".
+        expect($halb->project_id)->toBeNull();
     }
 });
 
@@ -135,8 +142,7 @@ it('wirft nicht, wenn die Zeile nur halb geladen ist', function () {
     // so liest, muss wissen, dass er das Feld damit verliert.
     $schmal = CalendarEvent::query()->select(['id', 'title'])->firstOrFail();
 
-    expect(fn () => $schmal->project_id)->not->toThrow(Throwable::class)
-        ->and($schmal->project_id)->toBeNull();
+    expect($schmal->project_id)->toBeNull();
 });
 
 it('uebersteht ein refresh, nachdem ein Profilfeld gelesen wurde', function () {
@@ -148,8 +154,9 @@ it('uebersteht ein refresh, nachdem ein Profilfeld gelesen wurde', function () {
     // Manager sind genau daran umgefallen, an einem `refresh()` im Controller.
     expect($termin->project_id)->toBe(7);
 
-    expect(fn () => $termin->refresh())->not->toThrow(Throwable::class)
-        ->and($termin->project_id)->toBe(7);
+    $termin->refresh();
+
+    expect($termin->project_id)->toBe(7);
 });
 
 it('liest nach einer Aenderung den neuen Wert, nicht den gemerkten', function () {

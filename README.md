@@ -207,6 +207,71 @@ That is a different question from `forbiddenAttributes()`, which says what a kin
 must not carry even though a column exists. This one says there is no place at
 all.
 
+## Two ways to hang something on an appointment
+
+Mixing these two up is what makes a core table wide.
+
+**Profile** — 1:1, belongs to ONE kind. Only business appointments carry a
+category. A kind with no extra fields needs none.
+
+**Satellite** — belongs to a MODULE and works for EVERY kind. Attendees are the
+model: `calendar_event_attendees` hangs off `event_id` and works for leave, for
+a planned block and for a habit alike, without any of those kinds knowing it
+exists.
+
+```php
+use Peppermint\Calendar\Schema\CalendarSchema;
+
+// in the notes module's own migration
+CalendarSchema::satellite('calendar_event_notes', function (Blueprint $table) {
+    $table->foreignId('note_id')->constrained()->cascadeOnDelete();
+});
+```
+
+Install the module and the table and its interface exist. Don't install it and
+the feature does not exist — and there is no column anywhere. In one sentence: a
+satellite needs no cooperation from the kinds, a profile field needs all of them.
+
+## The planned block
+
+A task, a ticket, a deal planned into the calendar: the appointment is not the
+thing itself, it is its planning. This shape turned up in four systems
+independently and was built **three different ways** — two with a profile and a
+real foreign key, one with no profile at all, on `subject_type`/`subject_id`.
+Three answers to one question, so nothing could be shared: no common query, no
+common conflict rule, no common display.
+
+The kind itself cannot be shipped — the subject differs per system, and a
+foreign key can only point at a table that exists. What ships is the shape:
+
+```php
+class TicketBlockKind extends PlannedBlockKind
+{
+    public function key(): string          { return 'verwaltung_ticket'; }
+    public function label(): string        { return 'Ticket block'; }
+    public function subjectModel(): string { return Ticket::class; }
+}
+
+class TicketBlockProfile extends PlannedBlockProfile
+{
+    protected $table = 'calendar_event_profile_verwaltung_ticket';
+    protected string $subjectModel = Ticket::class;
+    protected string $subjectKey = 'ticket_id';
+}
+
+// migration
+CalendarSchema::plannedBlockProfile('verwaltung_ticket', 'tickets');
+```
+
+The base class brings the three decisions each system was making for itself:
+not user-creatable (a block comes into being by dragging something into a day),
+no trash (a block whose subject is gone marks time as busy that is free), and
+the foreign key in the profile rather than in the core.
+
+`CalendarSchema` also checks MySQL's 64-character identifier limit **before** the
+migration runs — SQLite does not enforce it, so a green suite says nothing about
+it, and the generated name of a foreign key adds up faster than anyone counts.
+
 ## What the kind decides
 
 | Method | Question it answers |
