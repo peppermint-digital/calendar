@@ -563,6 +563,36 @@ source out, keeping the rest of the calendar visible. A failed write raises
 page and pressing save: a source that answered on open can be dead on create, and an event
 somebody *believes* they created and that exists nowhere is worse than an error message.
 
+### The four operations, already wired
+
+Fetching another system's kinds, creating there, moving there, deleting there — that is
+wiring, and it is the same wiring in every application: pull the source from the registry,
+404 when it is not writable, validate, run the operation, answer a failure with 502. Four
+endpoints containing nothing that distinguishes one product from another.
+
+```php
+use Peppermint\Calendar\Http\CalendarRoutes;
+
+Route::middleware(['web', 'auth'])->prefix('api/calendar')->group(function () {
+    CalendarRoutes::sources();
+});
+```
+
+**The package registers nothing by itself.** A package that registers a route also decides
+how it is guarded — prefix, authentication, throttling. These are write paths into *other*
+systems, which is the last place a product should hand over control. So the product lays them
+where its own guards already stand, and authorization stays where the contract says it stays.
+
+Two status codes carry the distinction that matters:
+
+| | When | Why not the other one |
+| --- | --- | --- |
+| **404** | the source is not (or no longer) writable | Not an error — it is the answer to "not enabled for you". Lose the tool or the grant over there and the system disappears here by itself. |
+| **502** | the operation failed over there | Not 500: this application is fine, the other one did not play along. The response names the source and the operation, because "something went wrong" sends the next person looking in the wrong place. |
+
+Listing the sources is *not* here. Which ones exist and how they appear — colour, order,
+label — is presentation, and that stays in the product.
+
 ## Adopting an existing calendar
 
 An application that has kept a calendar for years has its own table and column
