@@ -59,6 +59,25 @@ it('legt gar kein Profil an, wenn kein Profilfeld uebergeben wurde', function ()
         ->and($termin->project_id)->toBeNull();
 });
 
+it('legt keine Zeile voller Nullen an, wenn die Maske alle Felder leer mitschickt', function () {
+    // So kommt es aus einem gewachsenen Controller: jedes Feld der Maske im
+    // Array, die meisten leer. Ohne Pruefung waere die Profiltabelle wieder so
+    // breit und so leer wie die Kerntabelle, aus der die Felder gerade
+    // herausgezogen wurden.
+    $termin = termin(['project_id' => null, 'is_not_billable' => null]);
+
+    expect(BusinessProfile::where('event_id', $termin->id)->exists())->toBeFalse();
+});
+
+it('schreibt null in eine BESTEHENDE Zeile — dort heisst es „leer das Feld"', function () {
+    $termin = termin(['project_id' => 7]);
+
+    $termin->update(['project_id' => null]);
+
+    expect(BusinessProfile::where('event_id', $termin->id)->value('project_id'))->toBeNull()
+        ->and(CalendarEvent::findOrFail($termin->id)->project_id)->toBeNull();
+});
+
 it('bekommt sein Profil auch nachtraeglich, wenn es vor dem Umzug ohne entstand', function () {
     $termin = termin();
 

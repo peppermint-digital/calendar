@@ -212,6 +212,20 @@ class CalendarEvent extends Model
 
         $beziehung = $this->profile();
 
+        // Keine leere Zeile anlegen. Eine gewachsene Maske schickt ALLE ihre
+        // Felder mit, auch die leeren — ohne diese Pruefung bekaeme jeder
+        // Termin eine Profilzeile voller Nullen, und die Profiltabelle waere
+        // wieder so breit und so leer wie die Kerntabelle, aus der die Felder
+        // gerade herausgezogen wurden.
+        //
+        // Eine BESTEHENDE Zeile wird trotzdem geschrieben: Dort heisst `null`
+        // „leer das Feld", und das ist eine Aussage.
+        if ($beziehung !== null
+            && ! $beziehung->exists()
+            && array_filter($werte, fn ($wert) => filled($wert)) === []) {
+            return;
+        }
+
         if ($beziehung === null) {
             // Die Art nennt Profilfelder, hat aber kein Profilmodell. Das ist
             // ein Fehler in der Art, kein Zustand, der sich still korrigieren
