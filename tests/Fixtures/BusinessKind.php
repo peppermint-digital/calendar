@@ -25,6 +25,14 @@ class BusinessKind extends EventKind
         return BusinessProfile::class;
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public function profileFields(): array
+    {
+        return ['project_id', 'is_not_billable'];
+    }
+
     public function trashRetentionDays(): ?int
     {
         return 30;

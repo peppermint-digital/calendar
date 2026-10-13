@@ -2,6 +2,7 @@
 
 namespace Peppermint\Calendar\Models;
 
+use Peppermint\Calendar\Exceptions\ProfileFieldsWithoutProfile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +51,20 @@ class CalendarEvent extends Model
         ];
     }
 
+    /**
+     * Flach uebergebene Profilfelder, die auf ihre Profilzeile warten.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $profileAttributes = [];
+
+    /**
+     * Spaltenlisten je Verbindung und Tabelle.
+     *
+     * @var array<string, array<int, string>>
+     */
+    protected static array $columnCache = [];
+
     protected static function booted(): void
     {
         static::creating(function (self $event): void {
@@ -80,7 +95,131 @@ class CalendarEvent extends Model
             }
 
             $kind->saving($event);
+
+            $event->liftProfileAttributes($kind);
         });
+
+        // Nach dem Speichern, nicht davor: Vorher hat die Zeile noch keine
+        // Kennung, auf die das Profil zeigen koennte.
+        static::saved(function (self $event): void {
+            $event->writeProfileAttributes();
+        });
+    }
+
+    /**
+     * Nimmt die flach uebergebenen Profilfelder aus den Attributen heraus.
+     *
+     * Solange die Kernspalte noch existiert, bleibt der Wert ZUSAETZLICH dort
+     * stehen: Ein Rueckbau der Anwendung findet ihn dann an der alten Stelle
+     * vor, und die Lesestelle unten liest ihn weiter von dort. Erst wenn die
+     * Spalte gefallen ist, wird der Wert hier herausgenommen — sonst scheiterte
+     * das INSERT an einer Spalte, die es nicht mehr gibt.
+     */
+    protected function liftProfileAttributes(EventKind $kind): void
+    {
+        foreach ($kind->profileFields() as $field) {
+            if (! array_key_exists($field, $this->attributes)) {
+                continue;
+            }
+
+            $this->profileAttributes[$field] = $this->attributes[$field];
+
+            if (! $this->hasRealColumn($field)) {
+                unset($this->attributes[$field]);
+            }
+        }
+    }
+
+    /**
+     * Schreibt die gesammelten Felder ins Profil.
+     *
+     * `updateOrCreate`, weil dasselbe Feld beim Anlegen und beim Aendern
+     * denselben Weg nimmt — und weil ein Termin sein Profil auch dann bekommen
+     * soll, wenn er vor dem Umzug ohne eines entstanden ist.
+     */
+    protected function writeProfileAttributes(): void
+    {
+        if ($this->profileAttributes === []) {
+            return;
+        }
+
+        $werte = $this->profileAttributes;
+        $this->profileAttributes = [];
+
+        $beziehung = $this->profile();
+
+        if ($beziehung === null) {
+            // Die Art nennt Profilfelder, hat aber kein Profilmodell. Das ist
+            // ein Fehler in der Art, kein Zustand, der sich still korrigieren
+            // laesst: Die Werte haetten nirgends einen Platz.
+            throw ProfileFieldsWithoutProfile::make($this->kindDefinition()->key());
+        }
+
+        $beziehung->updateOrCreate([], $werte);
+    }
+
+    /**
+     * Liest ein Profilfeld, wenn der Kern dazu nichts sagt.
+     *
+     * Reihenfolge mit Absicht: erst der Kern, dann das Profil. Zeilen von vor
+     * dem Umzug tragen ihren Wert noch in der Kernspalte, und die ist die
+     * Wahrheit, solange sie existiert. Faellt sie, antwortet das Profil — ohne
+     * dass eine einzige Lesestelle sich aendert.
+     */
+    public function getAttribute($key)
+    {
+        $wert = parent::getAttribute($key);
+
+        if ($wert !== null || ! is_string($key)) {
+            return $wert;
+        }
+
+        if (array_key_exists($key, $this->profileAttributes)) {
+            return $this->profileAttributes[$key];
+        }
+
+        // Die Art selbst darf hier nicht nachgefragt werden: Sie ist die
+        // Bedingung dafuer, dass es ueberhaupt Profilfelder gibt — ein Blick
+        // auf sie ueber diesen Weg wuerde sich endlos im Kreis drehen.
+        if ($key === static::column('kind') || ($this->attributes[static::column('kind')] ?? null) === null) {
+            // Ohne Art gibt es keine Profilfelder, und `kindDefinition()`
+            // wuerde werfen. Kommt beim Hydrieren einer halben Zeile vor, etwa
+            // nach `select('id')`.
+            return $wert;
+        }
+
+        if (! in_array($key, $this->kindDefinition()->profileFields(), true)) {
+            return $wert;
+        }
+
+        if (! $this->relationLoaded('profile')) {
+            $this->setRelation('profile', $this->profile()?->getResults());
+        }
+
+        return $this->getRelation('profile')?->getAttribute($key);
+    }
+
+    /**
+     * Gibt es diese Spalte in der Kerntabelle (noch)?
+     *
+     * Einmal je Tabelle und Verbindung erfragt. Die Antwort aendert sich genau
+     * dann, wenn eine Migration laeuft — in Tests also durchaus mitten im Lauf,
+     * deshalb `forgetColumns()`.
+     */
+    protected function hasRealColumn(string $field): bool
+    {
+        $schluessel = $this->getConnectionName().'|'.$this->getTable();
+
+        static::$columnCache[$schluessel] ??= $this->getConnection()
+            ->getSchemaBuilder()
+            ->getColumnListing($this->getTable());
+
+        return in_array($field, static::$columnCache[$schluessel], true);
+    }
+
+    public static function forgetColumns(): void
+    {
+        static::$columnCache = [];
     }
 
     /**

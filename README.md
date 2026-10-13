@@ -128,12 +128,68 @@ Add a migration for the profile table with `event_id` constrained to
 `calendar_events`, and you are done. The core needs no changes — not for your
 kind, and not for the next one.
 
+## Moving a field out of the core table
+
+A grown calendar table collects fields that belong to one kind: a project, a
+leave request, a billing flag. They are in the way for every other application
+that installs this package — it has no projects, and it still carries the
+column.
+
+The field moves into the kind's profile. What it does NOT have to do is move in
+the code:
+
+```php
+class BusinessKind extends EventKind
+{
+    public function profileModel(): ?string { return BusinessProfile::class; }
+
+    public function profileFields(): array  { return ['project_id', 'is_not_billable']; }
+}
+```
+
+From here on the field keeps its name, wherever the application touches it:
+
+```php
+CalendarEvent::create(['kind' => 'business', 'project_id' => 7, ...]);   // lands in the profile
+$event->project_id;                                                      // answers from the profile
+$event->update(['project_id' => 9]);                                     // updates the profile
+$event->project;                                                         // the relation still resolves
+```
+
+### Two states, no flag day
+
+| Core column | Written to | Read from |
+| --- | --- | --- |
+| still there | core **and** profile | core |
+| dropped | profile | profile |
+
+Writing both while the column exists is what makes the move reversible: a
+deployment that goes backwards finds the value where the old code looks for it.
+Dropping the column needs no code change — the event notices and stops writing
+it.
+
+### What it does not cover
+
+Queries. `where('project_id', 7)` and `whereHas('project')` ask the database
+about the events table; no accessor reaches that far, and neither does
+`insert()` or a mass `update()` on the query builder. Those places have to be
+converted to the profile before the column can go:
+
+```php
+CalendarEvent::whereIn('id', BusinessProfile::where('project_id', 7)->select('event_id'))
+```
+
+Naming the fields in `profileFields()` is therefore also the to-do list: the
+accessors buy time for everything that goes through the model, and the queries
+are what is left to do by hand.
+
 ## What the kind decides
 
 | Method | Question it answers |
 | --- | --- |
 | `key()` / `label()` | how the kind is stored and shown |
 | `profileModel()` | which table holds the extra fields |
+| `profileFields()` | which profile fields may be passed flat on the event |
 | `usesTrash()` | soft delete with a trash bin, or delete for good |
 | `trashRetentionDays()` | how long deleted events stay recoverable |
 | `forbiddenAttributes()` | which core fields this kind must never set |

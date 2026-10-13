@@ -110,6 +110,37 @@ abstract class EventKind
     }
 
     /**
+     * Fields of this kind's profile that may also be handed to the EVENT, flat.
+     *
+     * Without this, moving a field out of the shared table means rewriting
+     * every place that reads or writes it — and in a grown application that is
+     * dozens of files, each one a chance to get it wrong. With it, the field
+     * keeps its name: `$event->project_id` and
+     * `CalendarEvent::create(['project_id' => 7])` go on working while the
+     * value lives in the profile.
+     *
+     * ## How the two states behave
+     *
+     * As long as the core table still HAS the column, the value is written to
+     * both and read from the core — nothing to roll back if a deployment goes
+     * backwards. Once the column is dropped, the event stops writing it and
+     * the profile answers the read. No flag day, no coordinated release.
+     *
+     * ## What this does NOT cover
+     *
+     * Queries. `where('project_id', 7)` on the events table asks the database,
+     * not the model, and no accessor reaches that far. Those places have to be
+     * converted before the column can go — which is exactly the point of
+     * naming the fields here: the list is the to-do list.
+     *
+     * @return array<int, string>
+     */
+    public function profileFields(): array
+    {
+        return [];
+    }
+
+    /**
      * Core fields this kind must never set. The guard against a kind decaying
      * into a meaningless flag: a private appointment carrying a project and a
      * billing target is not a private appointment any more.
