@@ -479,6 +479,65 @@ different from the system that owns the event.
 The event belongs to the other system from the first moment: no row here, exactly as when
 reading.
 
+### One source class for every connected system
+
+Writing a source per remote system works while you know at build time which systems exist. It
+stops working once they arrive at runtime — connected products that announce their own
+capabilities. Then every new system needs a class *and* a line of configuration in every other
+system, and that line is the one somebody forgets.
+
+`RemoteEventSource` is that class, written once. What differs between applications is not the
+mechanism — ask, map, tell failures apart, resolve the person — but the **way** to the other
+system: a hub calls its connected products over its own gateway, a product calls over its
+client library, and a third has neither. So the way is a contract:
+
+```php
+use Peppermint\Calendar\Sources\RemoteCalendar;
+use Peppermint\Calendar\Sources\RemoteEventSource;
+use Peppermint\Calendar\Sources\RemoteResult;
+
+class ManagerCalendar implements RemoteCalendar
+{
+    public function key(): string   { return 'manager'; }
+    public function label(): string { return 'Manager'; }
+
+    // Measured against a capability registry, never guessed: lose the tool
+    // over there and the source disappears here by itself.
+    public function offers(string $capability): bool { return $this->product->has($capability); }
+
+    // Rights, which do not live in this package. Separate from offers(),
+    // because a system may show its calendar without letting anyone write.
+    public function mayWrite(int $userId): bool { return $this->access->allows($userId); }
+
+    // Two systems, two user tables. null means the operation does not happen.
+    public function identify(int $userId): ?string { return $this->mapping->emailOf($userId); }
+
+    public function baseUrl(): ?string { return $this->product->url; }
+
+    public function call(string $capability, array $arguments = []): RemoteResult
+    {
+        $response = $this->client->call($capability, $arguments, $this->product->slug);
+
+        return new RemoteResult($response['ok'], $response['data'], $response['message']);
+    }
+}
+
+$registry->register(new RemoteEventSource(new ManagerCalendar($product)));
+```
+
+The capability names are the package's own (`calendar.events.list`, `calendar.events.show`,
+`calendar.events.create`, `calendar.events.update`, `calendar.events.delete`,
+`calendar.kinds.list`) — the same six listed under *Naming*.
+
+`call()` must not throw. An unreachable system is the normal case, not an exceptional one:
+throw there and every caller needs a `try`, and one of them will not have it. The source
+decides what a failure means instead, and it is not the same answer twice — **reading stays
+quiet, writing shouts.** A failed read raises so the registry can log it and leave that one
+source out, keeping the rest of the calendar visible. A failed write raises
+`ExternalSourceFailed` all the way to the interface, because minutes pass between opening a
+page and pressing save: a source that answered on open can be dead on create, and an event
+somebody *believes* they created and that exists nowhere is worse than an error message.
+
 ## Adopting an existing calendar
 
 An application that has kept a calendar for years has its own table and column
