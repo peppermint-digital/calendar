@@ -6,6 +6,8 @@ export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';
 export type { CalendarToolbarButton, CalendarToolbarLabels, CalendarToolbarProps } from './CalendarToolbar';
 export { AgendaList, groupByDay } from './AgendaList';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
+export { PlannableList, PLANNABLE_ATTRIBUTE } from './PlannableList';
+export type { PlannableEntry, PlannableListProps } from './PlannableList';
 export { EventForm } from './EventForm';
 export type { EventFormErrorKey, EventFormErrors, EventFormLabels, EventFormProps } from './EventForm';
 export { useEventForm } from './useEventForm';

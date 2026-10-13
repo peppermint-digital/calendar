@@ -232,6 +232,37 @@ Install the module and the table and its interface exist. Don't install it and
 the feature does not exist — and there is no column anywhere. In one sentence: a
 satellite needs no cooperation from the kinds, a profile field needs all of them.
 
+## Time blocking
+
+The server side has been here since the beginning: `TimeBlocking\Board::build()`
+takes whatever the application offers for planning, splits it into open and
+scheduled, and returns the events, the collisions and the window. It handles
+several kinds of subject at once — tasks, habits, tickets — because ids are only
+unique within their own type.
+
+What was missing is the other half, and two applications built it separately:
+the list you drag from.
+
+```tsx
+import { PlannableList } from '@peppermint-digital/calendar';
+
+<PlannableList
+    items={open}
+    renderItem={(item) => <TicketCard ticket={item} />}
+    eventData={(item) => ({ kind: 'verwaltung_ticket', ticketId: item.id })}
+/>
+```
+
+The package owns the wiring — the container, the data attributes the drop reads,
+and the rebuild. That last one is the point: after every redraw of the list
+(search, tab change, week change) FullCalendar's `Draggable` has to be built
+again, or the fresh cards look draggable and are not. Both applications had to
+discover that on their own.
+
+The look stays with the application, through `renderItem` — same reason as
+`renderButton` on the toolbar: a second button style in the middle of a finished
+interface shows immediately.
+
 ## The planned block
 
 A task, a ticket, a deal planned into the calendar: the appointment is not the
