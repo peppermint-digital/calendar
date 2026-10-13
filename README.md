@@ -529,6 +529,31 @@ The capability names are the package's own (`calendar.events.list`, `calendar.ev
 `calendar.events.create`, `calendar.events.update`, `calendar.events.delete`,
 `calendar.kinds.list`) — the same six listed under *Naming*.
 
+**For the ordinary case there is a shortcut.** The first consumer's implementation looked
+product-specific. The second one was character-identical except for its user model, which is
+where the contract's own question — *does every application write the same wiring?* — gets
+answered with yes. So the ordinary case lives here:
+
+```php
+new RemoteEventSource(new CallableRemoteCalendar(
+    key: 'verwaltung',
+    label: 'Verwaltung',
+    capabilities: ['calendar.events.list', 'calendar.kinds.list'],
+    transport: fn (string $op, array $args) => $client->call($op, $args, 'peppermint-verwaltung'),
+    identify: fn (int $userId) => User::find($userId)?->email,
+    baseUrl: 'https://vw.example.com',
+));
+```
+
+A closure rather than a dependency, because the way out is what genuinely differs between
+applications: a hub calls its connected products over its own gateway, a product over its
+client library, a third over something else. Requiring one of them here would force a
+dependency on two consumers out of three that do not need it.
+
+Without a `mayWrite` closure the rule is: whoever can be named may try. That is not
+carelessness — the rights live in the target system, and a second list here would age without
+anyone noticing. The refusal then comes from over there, loudly and with a reason.
+
 `call()` must not throw. An unreachable system is the normal case, not an exceptional one:
 throw there and every caller needs a `try`, and one of them will not have it. The source
 decides what a failure means instead, and it is not the same answer twice — **reading stays
