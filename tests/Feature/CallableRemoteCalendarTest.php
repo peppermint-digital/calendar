@@ -89,3 +89,30 @@ it('traegt eine Quelle, die sich wie jede andere verhaelt', function () {
         ->and($termine[0]->id)->toBe('7')
         ->and($termine[0]->sourceKey)->toBe('verwaltung');
 });
+
+it('wandelt die Antwort eines Kommunikationslayers um', function () {
+    // Die vier Schluessel sind die Form, in der jeder uns bekannte Weg
+    // antwortet. Die Umwandlung gehoert ins Paket, weil sie sonst in jedem
+    // Produkt zeichengleich stuende — und weil ein falsch gesetztes `??`
+    // genau hier aus einem Fehlschlag einen stillen Erfolg macht.
+    $erfolg = RemoteResult::fromArray(['ok' => true, 'data' => [['id' => 7]], 'product' => 'manager']);
+
+    expect($erfolg->ok)->toBeTrue()
+        ->and($erfolg->rows())->toBe([['id' => 7]]);
+
+    // Fehlende Angaben heissen Fehlschlag, nicht Erfolg ohne Daten.
+    expect(RemoteResult::fromArray([])->ok)->toBeFalse();
+});
+
+it('faellt bei der Meldung auf die Fehlerklasse zurueck', function () {
+    // „nicht erreichbar: " ist schlimmer als „nicht erreichbar: unreachable".
+    $ergebnis = RemoteResult::fromArray(['ok' => false, 'error' => 'unreachable']);
+
+    expect($ergebnis->message)->toBe('unreachable');
+});
+
+it('haelt ein data, das keine Liste ist, fuer keines', function () {
+    // Eine Gegenstelle, die `data: "fertig"` schickt, darf nicht zu einer
+    // Zeile werden, die niemand lesen kann.
+    expect(RemoteResult::fromArray(['ok' => true, 'data' => 'fertig'])->data)->toBeNull();
+});

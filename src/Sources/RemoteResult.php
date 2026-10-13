@@ -44,6 +44,33 @@ class RemoteResult
     }
 
     /**
+     * Aus der Antwort eines Kommunikationslayers.
+     *
+     * Die vier Schluessel `ok`, `data`, `message`, `error` sind die Form, in
+     * der jeder uns bekannte Weg antwortet. Die Umwandlung hier zu haben statt
+     * in jedem Produkt ist kein Luxus: Beim zweiten Abnehmer stand sie
+     * zeichengleich da, beim dritten waere sie es wieder — und sie ist genau
+     * die Stelle, an der ein `??` falsch gesetzt aus einem Fehlschlag einen
+     * stillen Erfolg macht.
+     *
+     * `message` faellt auf `error` zurueck: Eine Gegenstelle, die nur die
+     * Fehlerklasse nennt, soll nicht zu einer Fehlermeldung ohne Text fuehren
+     * — „nicht erreichbar: " ist schlimmer als „nicht erreichbar:
+     * unreachable".
+     *
+     * @param  array<string, mixed>  $antwort
+     */
+    public static function fromArray(array $antwort): self
+    {
+        return new self(
+            ok: (bool) ($antwort['ok'] ?? false),
+            data: is_array($antwort['data'] ?? null) ? $antwort['data'] : null,
+            message: $antwort['message'] ?? $antwort['error'] ?? null,
+            error: $antwort['error'] ?? null,
+        );
+    }
+
+    /**
      * Die Zeilen der Antwort — jede fuer sich, und nur die, die eine sind.
      *
      * Eine Liste, in der eine Zeichenkette zwischen den Zeilen liegt, ist
