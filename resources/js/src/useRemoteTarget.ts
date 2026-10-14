@@ -52,7 +52,14 @@ export interface UseRemoteTargetOptions {
     headers?: () => Record<string, string>;
     /** Wird mit einer fertigen Meldung gerufen, wenn etwas schiefgeht. */
     onError?: (meldung: string) => void;
-    /** Nach jedem erfolgreichen Vorgang — zum Neuladen des Rasters. */
+    /**
+     * Nach JEDEM Vorgang — auch nach einem gescheiterten.
+     *
+     * Das ist kein Versehen: Beim Verschieben hat das Raster die neue Lage
+     * schon gezeichnet, bevor der Server gefragt wurde. Ohne Nachladen im
+     * Fehlerfall bliebe der Termin dort liegen, wo ihn niemand hingelegt hat —
+     * mit Nachladen springt er zurueck.
+     */
     onDone?: () => void;
 }
 
@@ -206,8 +213,6 @@ export function useRemoteTarget({
                     return false;
                 }
 
-                onDone?.();
-
                 return true;
             } catch {
                 melden('Das andere System hat nicht geantwortet.');
@@ -215,6 +220,7 @@ export function useRemoteTarget({
                 return false;
             } finally {
                 setBusy(false);
+                onDone?.();
             }
         },
         [basePath, kopf, melden, onDone, target, targetKind],
@@ -278,8 +284,6 @@ export function useRemoteTarget({
                 return false;
             }
 
-            onDone?.();
-
             return true;
         } catch {
             melden(fehlermeldung);
@@ -287,6 +291,7 @@ export function useRemoteTarget({
             return false;
         } finally {
             setBusy(false);
+            onDone?.();
         }
     }
 

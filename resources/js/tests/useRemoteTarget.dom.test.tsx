@@ -311,4 +311,44 @@ describe('nach jedem Vorgang', () => {
         // und der Termin stünde noch da, obwohl er drüben weg ist.
         expect(fertig).toHaveBeenCalledTimes(1);
     });
+
+    /**
+     * Der Grund, warum `onDone` auch im Fehlerfall läuft — gefunden beim
+     * Vergleich mit der Fassung des AI Brain, die das von Anfang an so macht.
+     */
+    it('meldet sich AUCH, wenn das andere System ablehnt', async () => {
+        vi.stubGlobal('fetch', () => antwortet({ message: 'Nicht erlaubt.' }, false, 403));
+
+        const fertig = vi.fn();
+        const { result } = renderHook(() =>
+            useRemoteTarget({ sources: QUELLEN, onDone: fertig, onError: () => {} }),
+        );
+
+        let erfolg = true;
+        await act(async () => {
+            erfolg = await result.current.moveThere('manager:42', new Date(), new Date());
+        });
+
+        expect(erfolg).toBe(false);
+
+        // Beim Verschieben hat das Raster die neue Lage schon gezeichnet,
+        // bevor der Server gefragt wurde. Ohne Nachladen bliebe der Termin
+        // dort liegen, wo ihn niemand hingelegt hat.
+        expect(fertig).toHaveBeenCalledTimes(1);
+    });
+
+    it('meldet sich auch, wenn das andere System gar nicht antwortet', async () => {
+        vi.stubGlobal('fetch', () => Promise.reject(new Error('Netz weg')));
+
+        const fertig = vi.fn();
+        const { result } = renderHook(() =>
+            useRemoteTarget({ sources: QUELLEN, onDone: fertig, onError: () => {} }),
+        );
+
+        await act(async () => {
+            await result.current.deleteThere('manager:42');
+        });
+
+        expect(fertig).toHaveBeenCalledTimes(1);
+    });
 });
