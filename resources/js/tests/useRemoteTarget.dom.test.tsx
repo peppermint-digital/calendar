@@ -185,6 +185,69 @@ describe('drüben anlegen', () => {
         expect(nutzlast.starts_at).toMatch(/Z$|[+-]\d{2}:\d{2}$/);
     });
 
+    it('schickt den Meeting-Link mit, wenn die Zielart ihn verlangt', async () => {
+        // `meeting_digital` im Manager meldet `meeting_url` über `requires`.
+        // Bis zum 14.10.2026 kannte `RemoteDraft` das Feld gar nicht: Die Maske
+        // fragte danach, und die Angabe blieb auf dem Weg liegen — das
+        // Zielsystem lehnte ab, mit einer Meldung über etwas, das der Mensch
+        // eingetragen zu haben glaubte.
+        vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+            anfragen.push({ url, init });
+
+            return url.endsWith('/kinds')
+                ? antwortet({
+                      kinds: [{ key: 'meeting_digital', label: 'Meeting digital', requires: ['meeting_url'] }],
+                  })
+                : antwortet({ id: 'manager:43' });
+        });
+
+        const { result } = renderHook(() => useRemoteTarget({ sources: QUELLEN }));
+
+        await act(async () => {
+            await result.current.chooseTarget('manager');
+        });
+
+        // Die Art kommt mit ihren Pflichtfeldern an — danach zeichnet die Maske.
+        expect(result.current.targetKinds[0]?.requires).toEqual(['meeting_url']);
+
+        await act(async () => {
+            await result.current.createThere({
+                date: '2026-10-20',
+                start: '09:00',
+                end: '10:00',
+                title: 'Abstimmung',
+                meetingUrl: 'https://meet.example.com/abc',
+            });
+        });
+
+        const nutzlast = JSON.parse(String(anfragen[1].init?.body));
+        expect(nutzlast.meeting_url).toBe('https://meet.example.com/abc');
+    });
+
+    it('schickt keinen leeren Meeting-Link, sondern null', async () => {
+        // Ein leerer Text ist keine Angabe. Als "" käme er drüben als gesetztes
+        // Feld an und überschriebe womöglich eine Vorgabe des Zielsystems.
+        vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+            anfragen.push({ url, init });
+
+            return url.endsWith('/kinds')
+                ? antwortet({ kinds: [{ key: 'business', label: 'Geschäftlich' }] })
+                : antwortet({ id: 'manager:44' });
+        });
+
+        const { result } = renderHook(() => useRemoteTarget({ sources: QUELLEN }));
+
+        await act(async () => {
+            await result.current.chooseTarget('manager');
+        });
+
+        await act(async () => {
+            await result.current.createThere({ date: '2026-10-20', start: '09:00', title: 'Ohne Link' });
+        });
+
+        expect(JSON.parse(String(anfragen[1].init?.body)).meeting_url).toBeNull();
+    });
+
     it('legt ohne gewählte Art nichts an', async () => {
         vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
             anfragen.push({ url, init });

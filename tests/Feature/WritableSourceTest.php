@@ -41,15 +41,21 @@ it('laesst eine Quelle sagen, dass gerade niemand anlegen darf', function () {
     expect(app(EventSourceRegistry::class)->writable())->toBe([]);
 });
 
-it('nennt die Terminarten des anderen Systems samt Pflichtfeldern', function () {
+it('nennt die Terminarten des anderen Systems samt Pflicht- und Verbotsfeldern', function () {
     // Arten sind produkteigen — wer drueben anlegen will, muss eine auswaehlen
     // koennen statt sie zu raten.
+    //
+    // `requires` UND `forbids`: Die Maske zeichnet seit dem 14.10.2026 nach der
+    // ZIELART, nicht nach den eigenen Arten (#7760). Ohne die Verbote boete sie
+    // Felder an, die drueben gar nicht existieren — die Eingabe verschwaende
+    // beim Speichern, ohne dass jemand erfuehre, warum.
     $kinds = app(EventSourceRegistry::class)->writable()['writable-demo']->kinds();
 
     expect($kinds[0]->toArray())->toBe([
         'key' => 'business',
         'label' => 'Business',
         'requires' => ['location'],
+        'forbids' => [],
     ]);
 });
 

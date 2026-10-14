@@ -87,6 +87,13 @@ class EventSourceController
             'all_day' => ['sometimes', 'boolean'],
             'location' => ['nullable', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:5000'],
+            // Die Felder, die eine ART des Zielsystems verlangt — nicht jede
+            // tut das. `meeting_digital` im Manager meldet `meeting_url` ueber
+            // `requires`, und ohne dieses Feld hier bliebe die Angabe auf dem
+            // Weg liegen: Die Maske fragte danach, das Zielsystem lehnte ab,
+            // und die Meldung handelte von etwas, das der Mensch eingetragen
+            // zu haben glaubte.
+            'meeting_url' => ['nullable', 'string', 'max:500'],
         ]);
 
         return $this->fremderVorgang(fn () => response()->json([
@@ -98,6 +105,12 @@ class EventSourceController
                 allDay: (bool) ($daten['all_day'] ?? false),
                 location: $daten['location'] ?? null,
                 description: $daten['description'] ?? null,
+                // In den Beutel, nicht als eigener Parameter: Was eine Art
+                // braucht, ist Sache des Zielsystems. `toArray()` mischt ihn
+                // flach ein, damit er drueben dort ankommt, wo gelesen wird.
+                extra: array_filter([
+                    'meeting_url' => $daten['meeting_url'] ?? null,
+                ], static fn ($wert) => $wert !== null && $wert !== ''),
             ))->toArray(),
         ], 201));
     }

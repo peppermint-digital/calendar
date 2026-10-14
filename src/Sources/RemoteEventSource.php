@@ -146,6 +146,10 @@ class RemoteEventSource extends WritableEventSource
                 key: (string) $zeile['key'],
                 label: (string) ($zeile['label'] ?? $zeile['kind_label'] ?? $zeile['key']),
                 requires: array_values(array_filter((array) ($zeile['requires'] ?? []), 'is_string')),
+                // Auch die Verbote: Eine Maske, die ein Feld anbietet, das die
+                // Zielart nicht traegt, nimmt eine Eingabe entgegen und wirft
+                // sie beim Speichern weg.
+                forbids: array_values(array_filter((array) ($zeile['forbids'] ?? []), 'is_string')),
             );
         }
 

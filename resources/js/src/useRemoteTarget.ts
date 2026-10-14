@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import type { EventKind } from './types';
 
 /**
  * Der Kalender eines anderen Systems — als Ziel zum Anlegen.
@@ -26,11 +27,21 @@ export interface RemoteSource {
 }
 
 /** Eine Terminart des ZIELSYSTEMS. Was sie bedeutet, weiss nur das Zielsystem. */
-export interface RemoteKind {
-    key: string;
-    label: string;
-    fields?: string[];
-}
+/**
+ * Eine Terminart, wie ein ANDERES System sie anbietet.
+ *
+ * Deckungsgleich mit `EventKind` — und das ist der Punkt: Die gemeinsame
+ * `EventForm` zeichnet nach `requires` und `forbids`, und wenn ein fremdes Ziel
+ * gewaehlt ist, soll sie nach der ZIELART zeichnen statt nach den eigenen.
+ * Dafuer muessen die beiden Typen zusammenpassen, ohne dass irgendwo eine
+ * Uebersetzung dazwischensteht, die beim naechsten Feld vergessen wird.
+ *
+ * Vorher stand hier `fields?: string[]` — ein Name, der nichts aussagte und den
+ * niemand las. Die Maske zeigte deshalb immer die eigenen Felder, auch wenn
+ * drueben ganz andere gelten: Wer „Meeting digital" im Manager waehlte, bekam
+ * keine Eingabe fuer den Meeting-Link und nach dem Absenden eine Ablehnung.
+ */
+export type RemoteKind = EventKind;
 
 export interface RemoteDraft {
     /** YYYY-MM-DD */
@@ -42,6 +53,15 @@ export interface RemoteDraft {
     title: string;
     location?: string | null;
     description?: string | null;
+    /**
+     * Der Meeting-Link.
+     *
+     * Kein Beiwerk: `meeting_digital` im Manager meldet ihn ueber `requires`,
+     * und ohne ihn lehnt das Zielsystem ab. Bis zum 14.10.2026 transportierte
+     * dieser Entwurf ihn nicht — die Maske fragte danach, und die Angabe blieb
+     * auf dem Weg liegen.
+     */
+    meetingUrl?: string | null;
 }
 
 export interface UseRemoteTargetOptions {
@@ -197,6 +217,7 @@ export function useRemoteTarget({
                         all_day: ganztags,
                         location: draft.location || null,
                         description: draft.description || null,
+                        meeting_url: draft.meetingUrl || null,
                     }),
                 });
 

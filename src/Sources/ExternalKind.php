@@ -20,11 +20,17 @@ final class ExternalKind
      *                                        ablehnt — damit eine Maske sie
      *                                        verlangen kann, statt den Fehler
      *                                        erst nach dem Absenden zu zeigen.
+     * @param  array<int, string>  $forbids   Felder, die diese Art drueben nie
+     *                                        traegt. Ohne sie zeigte die Maske
+     *                                        Eingaben an, die beim Speichern
+     *                                        verfallen — und niemand erfuehre,
+     *                                        warum die Notiz verschwunden ist.
      */
     public function __construct(
         public readonly string $key,
         public readonly string $label,
         public readonly array $requires = [],
+        public readonly array $forbids = [],
     ) {}
 
     /** @return array<string, mixed> */
@@ -34,6 +40,7 @@ final class ExternalKind
             'key' => $this->key,
             'label' => $this->label,
             'requires' => $this->requires,
+            'forbids' => $this->forbids,
         ];
     }
 }
