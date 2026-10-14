@@ -314,6 +314,63 @@ application has to remember is a rule some application forgets.
 `saving()` is `final` for the same reason; override `savingBlock()` when a
 kind needs to do something of its own.
 
+## The whole form, in one component
+
+`EventForm` draws the fields. `EventComposer` draws **the whole task**: pick the
+target system, draw that system's fields, save here or over there.
+
+```tsx
+<EventComposer
+    kinds={Object.values(kinds)}   // what THIS system offers
+    targets={targets}              // other systems that accept events
+    value={event}                  // null when creating
+    onSaveHere={(draft) => post('/calendar/events', draft)}
+    onCancel={() => router.visit('/calendar')}
+    onSavedThere={() => router.visit('/calendar')}
+    extraFields={<ProjectAndTask … />}
+/>
+```
+
+Your app supplies four things: its kinds, its targets, its own save path, and its
+own extra fields. Everything else lives in the package — the target picker, the
+switch to the other system's kinds, the draft state, the error line, the remote
+create.
+
+**Why this is a component and not a recipe.** Until 15.10.2026 every system
+assembled the same pieces itself — `useRemoteTarget`, `emptyDraft`, the picker,
+the kind switch. Measured on that day:
+
+| System | lines |
+|---|---|
+| CRM | 301 |
+| Verwaltung | 280 |
+| Manager | 728 |
+| AI Brain | 1348 |
+
+Same parts, four environments. The consequence was predictable and it happened: a
+change in behaviour needed four rewrites, the third one drifted, and the fourth
+was left behind. On 14.10. a fix shipped to two systems and not to the other two
+— and *half* is worse than either end, because now the dialog differs depending
+on where you open it.
+
+### Two things change when a foreign target is picked
+
+Both follow from one sentence — **over there, the other system's rules apply**:
+
+1. The form draws from the **target's** kind, not yours. Which fields it carries
+   is what that kind's `requires` / `forbids` say.
+2. `extraFields` disappear. Creating from the CRM into the Manager, there is no
+   deal over there — a field for it would take input that arrives nowhere.
+
+The kind picker inside the form *is* the target-kind picker while a foreign
+target is selected. A second list beside it drifts the moment someone touches
+only one of them.
+
+### What stays with your app
+
+`onSaveHere` — because only your app knows its route, its payload and its extra
+fields. The foreign path lives in the package because it is the same everywhere.
+
 ## Writing into another system's calendar
 
 Reading a remote calendar is one half; the other is creating an event *over

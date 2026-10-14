@@ -11,6 +11,10 @@ export type { PlannableEntry, PlannableListProps } from './PlannableList';
 export { useRemoteTarget, remoteMoment } from './useRemoteTarget';
 export type { RemoteDraft, RemoteKind, RemoteSource, UseRemoteTargetOptions } from './useRemoteTarget';
 export { EventForm } from './EventForm';
+// Die vollstaendige Maske: Zielwahl, Felder, Speichern — damit ein Produkt den
+// Vorgang nicht zum fuenften Mal selbst zusammensetzt (#7765).
+export { EventComposer } from './EventComposer';
+export type { EventComposerLabels, EventComposerProps } from './EventComposer';
 export type { EventFormErrorKey, EventFormErrors, EventFormLabels, EventFormProps } from './EventForm';
 export { useEventForm } from './useEventForm';
 export { eventFormRules, weekdayOf } from './rules';
