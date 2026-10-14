@@ -299,6 +299,21 @@ not user-creatable (a block comes into being by dragging something into a day),
 no trash (a block whose subject is gone marks time as busy that is free), and
 the foreign key in the profile rather than in the core.
 
+It also **fills `subject_type` / `subject_id` from that foreign key** and
+refuses to save a block without a subject. The pair and the key say the same
+thing and do different work: the pair is what `PlannedSubjects` and
+`TimeBlocking\Board` read — they do not know your kinds — while the key is the
+one the database watches.
+
+Leaving that to each application does not hold. Measured in a production
+system on 2026-10-14: `subject_type` was null on **all 1207 events**, with 484
+time blocks hanging off the foreign key alone. The board would have found
+nothing there and shown every scheduled task as still open. A rule every
+application has to remember is a rule some application forgets.
+
+`saving()` is `final` for the same reason; override `savingBlock()` when a
+kind needs to do something of its own.
+
 `CalendarSchema` also checks MySQL's 64-character identifier limit **before** the
 migration runs — SQLite does not enforce it, so a green suite says nothing about
 it, and the generated name of a foreign key adds up faster than anyone counts.

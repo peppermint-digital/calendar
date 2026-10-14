@@ -3,6 +3,8 @@
 namespace Peppermint\Calendar\Kinds;
 
 use Illuminate\Support\Str;
+use Peppermint\Calendar\Exceptions\PlannedBlockWithoutSubject;
+use Peppermint\Calendar\Models\CalendarEvent;
 
 /**
  * Ein Gegenstand, der in den Kalender geplant ist.
@@ -94,6 +96,74 @@ abstract class PlannedBlockKind extends EventKind
     {
         return array_merge([$this->subjectKey()], $this->extraProfileFields());
     }
+
+    /**
+     * Was in `subject_type` steht.
+     *
+     * Abgeleitet aus dem Modellnamen, wie `subjectKey()`: `Task` → `task`,
+     * `Ticket` → `ticket`, `TrainingUnit` → `training_unit`. Der Wert ist
+     * absichtlich NICHT der Klassenname — das lose Paar lesen auch andere
+     * Systeme, und die kennen unsere Namensraeume nicht.
+     */
+    public function subjectType(): string
+    {
+        return Str::snake(class_basename($this->subjectModel()));
+    }
+
+    /**
+     * Fuellt das lose Paar aus dem Fremdschluessel — und laesst keinen Block
+     * ohne Gegenstand durch.
+     *
+     * ## Warum das Paar ueberhaupt noch gefuellt wird
+     *
+     * `subject_type`/`subject_id` und der Fremdschluessel im Profil sagen
+     * dasselbe und leisten Verschiedenes: Das Paar lesen die Planungsregeln
+     * des Pakets, OHNE die Terminart zu kennen (`PlannedSubjects`,
+     * `TimeBlocking\Board`) — der Fremdschluessel ist der Weg, auf den die
+     * Datenbank aufpasst. So steht es in Entscheidung #3489.
+     *
+     * ## Warum das Paket es tut und nicht die Anwendung
+     *
+     * Gemessen am 14.10.2026 im Peppermint Manager: `subject_type` war bei
+     * ALLEN 1207 Terminen leer, `subject_id` ebenso — die 484 Zeitbloecke
+     * hingen nur am Fremdschluessel. Das Board haette dort nichts gefunden und
+     * jede eingeplante Aufgabe wieder als „offen" gezeigt. Eine Regel, die
+     * jedes System selbst einhalten muss, wird irgendwo nicht eingehalten;
+     * eine, die die Form mitbringt, gilt ueberall.
+     *
+     * `final`, damit sie nicht aus Versehen weggeerbt wird — wer am Speichern
+     * mitreden will, ueberschreibt {@see savingBlock()}.
+     */
+    final public function saving(CalendarEvent $event): void
+    {
+        $schluessel = $this->subjectKey();
+        $gegenstand = $event->getAttribute($schluessel);
+
+        if (blank($gegenstand)) {
+            // Eine BESTEHENDE Zeile ohne Gegenstand geht durch, solange
+            // niemand an ihr dreht. Derselbe Grund wie bei den verbotenen
+            // Feldern: Anwendungen uebernehmen Arten fuer Daten, die aelter
+            // sind als die Regel — und ein Riegel, der eine unangetastete
+            // Altzeile ablehnt, macht aus „das darf nicht dazukommen" ein
+            // „diese Zeile ist nie wieder speicherbar". Im Manager sind das
+            // am 14.10.2026 drei von 484 Bloecken.
+            if ($event->exists && ! $event->isDirty($schluessel)) {
+                $this->savingBlock($event);
+
+                return;
+            }
+
+            throw PlannedBlockWithoutSubject::make($this->key(), $schluessel);
+        }
+
+        $event->setAttribute(CalendarEvent::column('subject_type'), $this->subjectType());
+        $event->setAttribute(CalendarEvent::column('subject_id'), $gegenstand);
+
+        $this->savingBlock($event);
+    }
+
+    /** Der Haken fuer alles, was DIESE Art beim Speichern zusaetzlich tut. */
+    public function savingBlock(CalendarEvent $event): void {}
 
     public function isUserCreatable(): bool
     {

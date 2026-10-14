@@ -7,7 +7,11 @@ use Peppermint\Calendar\Exceptions\IdentifierTooLong;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Schema\CalendarSchema;
+use Peppermint\Calendar\Exceptions\PlannedBlockWithoutSubject;
+use Peppermint\Calendar\Kinds\PlannedBlockKind;
+use Peppermint\Calendar\Scheduling\PlannedSubjects;
 use Peppermint\Calendar\Tests\Fixtures\DemoTask;
+use ReflectionMethod;
 use Peppermint\Calendar\Tests\Fixtures\TaskBlockKind;
 use Peppermint\Calendar\Tests\Fixtures\TaskBlockProfile;
 
@@ -35,6 +39,13 @@ afterEach(function () {
     Schema::dropIfExists('demo_tasks');
 });
 
+/**
+ * Ein geplanter Block — mit Gegenstand, weil es ohne keinen gibt.
+ *
+ * Der Gegenstand steht in der Vorgabe und nicht in jedem Aufruf: Ein Block
+ * ohne ihn ist seit v0.36.0 nicht mehr speicherbar, und ein Testhelfer, der
+ * eine unmoegliche Zeile baut, prueft eine Welt, die es nicht gibt.
+ */
 function geplanterBlock(array $werte = []): CalendarEvent
 {
     return CalendarEvent::create(array_merge([
@@ -43,6 +54,7 @@ function geplanterBlock(array $werte = []): CalendarEvent
         'title' => 'Angebot schreiben',
         'starts_at' => now()->addDay(),
         'ends_at' => now()->addDay()->addHour(),
+        'demo_task_id' => DemoTask::create(['title' => 'Irgendeine Aufgabe'])->id,
     ], $werte));
 }
 
@@ -96,6 +108,64 @@ it('leert den Zeiger, wenn der Gegenstand geht — der Block bleibt', function (
     // hinter dem Rücken der Anwendung.
     expect(CalendarEvent::find($block->id))->not->toBeNull()
         ->and(TaskBlockProfile::where('event_id', $block->id)->value('demo_task_id'))->toBeNull();
+});
+
+it('fuellt das lose Paar aus dem Fremdschluessel', function () {
+    $block = geplanterBlock(['demo_task_id' => $this->aufgabe->id]);
+
+    // `subject_type` ist der abgeleitete Name des Gegenstands, NICHT die
+    // Klasse: Das Paar lesen auch andere Systeme, und die kennen unsere
+    // Namensraeume nicht.
+    expect($block->fresh()->subject_type)->toBe('demo_task')
+        ->and((int) $block->fresh()->subject_id)->toBe($this->aufgabe->id);
+});
+
+it('macht damit die Planung fuer das Board sichtbar', function () {
+    $block = geplanterBlock(['demo_task_id' => $this->aufgabe->id]);
+
+    // Der Grund, warum das Paar ueberhaupt gefuellt wird: `PlannedSubjects`
+    // kennt die Terminart nicht und fragt nur ueber `subject_*`. Im Manager
+    // war das Paar am 14.10.2026 bei allen 1207 Zeilen leer — das Board
+    // haette dort jede eingeplante Aufgabe wieder als „offen" gezeigt.
+    $geplant = app(PlannedSubjects::class)->ever((int) $block->owner_id, 'demo_task');
+
+    expect($geplant)->toContain($this->aufgabe->id);
+});
+
+it('laesst keinen Block ohne Gegenstand entstehen', function () {
+    expect(fn () => CalendarEvent::create([
+        'kind' => 'task_block',
+        'owner_id' => 1,
+        'title' => 'Planung ohne Gegenstand',
+        'starts_at' => now()->addDay(),
+        'ends_at' => now()->addDay()->addHour(),
+    ]))->toThrow(PlannedBlockWithoutSubject::class);
+});
+
+it('laesst eine BESTEHENDE Zeile ohne Gegenstand weiter speichern', function () {
+    $block = geplanterBlock(['demo_task_id' => $this->aufgabe->id]);
+
+    // Eine Altzeile herstellen: Gegenstand weg, am Riegel vorbei.
+    DB::table('calendar_event_profile_task_block')->where('event_id', $block->id)->delete();
+
+    $alt = CalendarEvent::findOrFail($block->id);
+    $alt->title = 'Umbenannt';
+
+    // Derselbe Grund wie bei den verbotenen Feldern: Ein Riegel, der eine
+    // unangetastete Altzeile ablehnt, macht aus „das darf nicht dazukommen"
+    // ein „diese Zeile ist nie wieder speicherbar". Im Manager waeren das am
+    // 14.10.2026 drei von 484 Bloecken.
+    $alt->save();
+
+    expect($alt->fresh()->title)->toBe('Umbenannt');
+});
+
+it('ruft den Haken der Art, ohne dass sie das Fuellen abschalten kann', function () {
+    // `saving()` ist final — wer mitreden will, nimmt `savingBlock()`. Sonst
+    // waere die Regel genau dort weg, wo eine Art etwas Eigenes tut.
+    $methode = new ReflectionMethod(PlannedBlockKind::class, 'saving');
+
+    expect($methode->isFinal())->toBeTrue();
 });
 
 it('laesst einen Termin kein zweites Profil bekommen', function () {
