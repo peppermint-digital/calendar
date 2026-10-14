@@ -8,17 +8,21 @@ use Illuminate\Support\Str;
  * Ein Gegenstand, der in den Kalender geplant ist.
  *
  * Eine Aufgabe, ein Ticket, ein Deal: Der Termin ist nicht die Sache selbst,
- * sondern ihre Planung. Diese Form kam in vier Systemen unabhaengig voneinander
- * vor und war dabei DREIMAL verschieden gebaut:
+ * sondern ihre Planung. Diese Form kam in drei Systemen unabhaengig voneinander
+ * vor und war dabei ZWEIMAL verschieden gebaut:
  *
  *     Manager       manager_task        Profil mit echtem `task_id`
  *     AI Brain      brain_task          Profil mit echtem `task_id`
- *     Verwaltung    verwaltung_ticket   KEIN Profil, `subject_type`/`subject_id`
+ *     Verwaltung    verwaltung_ticket   KEIN Profil, nur `subject_type`/`subject_id`
  *
- * Drei Antworten auf dieselbe Frage. Dadurch war nichts davon teilbar: keine
+ * Zwei Antworten auf dieselbe Frage. Dadurch war nichts davon teilbar: keine
  * gemeinsame Abfrage, keine gemeinsame Konfliktregel, keine gemeinsame
  * Darstellung — jedes System hat seinen Zeitblock von Hand nachgebaut, samt
  * der drei Entscheidungen, die man dabei falsch treffen kann.
+ *
+ * Seit dem 14.10.2026 benutzen alle drei diese Klasse; die Verwaltung hat ihre
+ * Profiltabelle nachgezogen. Die Tabelle oben steht noch hier, weil sie die
+ * Frage beantwortet, warum es diese Klasse gibt.
  *
  * ## Was die Art NICHT ausliefern kann
  *
