@@ -314,6 +314,41 @@ application has to remember is a rule some application forgets.
 `saving()` is `final` for the same reason; override `savingBlock()` when a
 kind needs to do something of its own.
 
+## Writing into another system's calendar
+
+Reading a remote calendar is one half; the other is creating an event *over
+there*. `useRemoteTarget` carries that sequence — pick a target, load **its**
+kinds, create, move, delete:
+
+```tsx
+const remote = useRemoteTarget({
+    sources,                       // what your app knows about other systems
+    headers: () => csrfHeaders(),  // your app's CSRF, not ours
+    onDone: reload,
+});
+
+await remote.chooseTarget('manager');   // loads the Manager's own kinds
+await remote.createThere({ date, start, end, title });
+```
+
+The server half is already in the package — `CalendarRoutes::sources()` plus
+`EventSourceController`. Routes are **laid, not inherited**: a package that
+registers its own routes also decides their prefix, auth and throttling, and
+these are write paths into foreign systems.
+
+```php
+Route::middleware(['web', 'auth'])->prefix('api/calendar')->group(function () {
+    CalendarRoutes::sources();
+});
+```
+
+**One rule is worth knowing before you reimplement this:** a timed event must be
+sent **with a timezone**. Sent as bare wall-clock time, the receiving system
+reads it in *its own* application timezone — 09:00 Berlin became 09:00 UTC, in
+the column, not just on screen. An all-day event is the exception: there the
+bare date stays, because converting it would push the event across midnight.
+`remoteMoment()` holds both halves of that rule.
+
 `CalendarSchema` also checks MySQL's 64-character identifier limit **before** the
 migration runs — SQLite does not enforce it, so a green suite says nothing about
 it, and the generated name of a foreign key adds up faster than anyone counts.

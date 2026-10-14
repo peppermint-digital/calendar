@@ -8,6 +8,8 @@ export { AgendaList, groupByDay } from './AgendaList';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
 export { PlannableList, PLANNABLE_ATTRIBUTE } from './PlannableList';
 export type { PlannableEntry, PlannableListProps } from './PlannableList';
+export { useRemoteTarget, remoteMoment } from './useRemoteTarget';
+export type { RemoteDraft, RemoteKind, RemoteSource, UseRemoteTargetOptions } from './useRemoteTarget';
 export { EventForm } from './EventForm';
 export type { EventFormErrorKey, EventFormErrors, EventFormLabels, EventFormProps } from './EventForm';
 export { useEventForm } from './useEventForm';
