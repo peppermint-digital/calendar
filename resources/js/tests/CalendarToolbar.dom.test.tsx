@@ -120,3 +120,35 @@ describe('CalendarToolbar', () => {
         expect(screen.getByText('Eigenes')).toBeTruthy();
     });
 });
+
+describe('die Ansichts-Knoepfe', () => {
+    /**
+     * Der Schluessel gehoert dem Paket: Die Liste baut diese Leiste. Vorher kam
+     * er — wenn ueberhaupt — aus der Beschriftung, die das Produkt in
+     * `renderButton` setzt. Wo das Produkt ihn vergass, meldete React „unique
+     * key prop" (gesehen im Manager, 15.10.2026) und durfte beim Wechsel der
+     * Ansichtsliste Knoepfe verwechseln.
+     */
+    it('kommt ohne Schluessel aus dem Produkt aus', () => {
+        const meldungen: unknown[] = [];
+        const echt = console.error;
+        console.error = (...args: unknown[]) => meldungen.push(args[0]);
+
+        try {
+            render(
+                <CalendarToolbar
+                    views={['dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listWeek']}
+                    view="timeGridWeek"
+                    onViewChange={() => {}}
+                    // Bewusst OHNE `key` — genau so macht es ein Produkt, das
+                    // nicht weiss, dass es einen setzen muesste.
+                    renderButton={({ onClick, children }) => <button onClick={onClick}>{children}</button>}
+                />,
+            );
+        } finally {
+            console.error = echt;
+        }
+
+        expect(meldungen.filter((m) => String(m).includes('unique "key"'))).toHaveLength(0);
+    });
+});

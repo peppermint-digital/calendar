@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import type { CalendarViewName } from './CalendarGrid';
 
 export type CalendarToolbarButton = {
@@ -113,13 +113,24 @@ export function CalendarToolbar({
 
             {views.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                    {views.map((entry) =>
-                        renderButton({
-                            active: entry === view,
-                            onClick: () => onViewChange?.(entry),
-                            children: text.views[entry] ?? entry,
-                        }),
-                    )}
+                    {/*
+                        Der Schluessel gehoert hierher, nicht in `renderButton`:
+                        Die Liste baut diese Leiste, also muss auch sie sagen,
+                        welcher Knopf welcher ist. Vorher kam er — wenn
+                        ueberhaupt — aus der Beschriftung, die das Produkt
+                        setzt. Wo das Produkt ihn vergass, meldete React
+                        „unique key prop" und durfte beim Wechsel der
+                        Ansichtsliste Knoepfe verwechseln.
+                    */}
+                    {views.map((entry) => (
+                        <Fragment key={entry}>
+                            {renderButton({
+                                active: entry === view,
+                                onClick: () => onViewChange?.(entry),
+                                children: text.views[entry] ?? entry,
+                            })}
+                        </Fragment>
+                    ))}
                 </div>
             )}
 
