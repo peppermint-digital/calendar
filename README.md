@@ -570,6 +570,28 @@ Needs the shadcn colour tokens (`--border`, `--muted`, `--primary`,
 `--foreground`, `--destructive` and their `-foreground` partners). An
 application without them gets a colourless calendar, not a broken one.
 
+### The date field
+
+Typed German (`TT.MM.JJJJ`), kept ISO on the outside — and that is the default
+now, like the time field.
+
+`<input type="date">` follows the *browser's* language, not the application's.
+On an English-set Chrome a thoroughly German form shows `mm/dd/yyyy`, which for
+a date is not merely unfamiliar but ambiguous: the 9th of August and the 8th of
+September look the same. Measured on 15.10.2026 in three of four applications
+at once.
+
+Input is forgiving: `8.9.26` is accepted, and so is `2026-09-08` — people paste
+dates out of mails and other forms, and rejecting that would mean silently
+doing nothing. Incomplete input is not reported upward: someone who has typed
+`8.` is not finished, and a value that escapes on every keystroke leaves the
+draft sitting on dates nobody meant.
+
+The native field used to block earlier days through `min`. A text field cannot,
+and `min` only ever worked in the picker anyway — typing went straight past it.
+So the form now carries the rule itself and says "Das Ende liegt vor dem
+Anfang." when it applies.
+
 ### The time field
 
 Two dropdowns (hour : minute), not `<input type="time">` — that is the default

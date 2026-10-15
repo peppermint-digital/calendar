@@ -12,6 +12,8 @@ export { PlannableList, PLANNABLE_ATTRIBUTE } from './PlannableList';
 export type { PlannableEntry, PlannableListProps } from './PlannableList';
 export { useRemoteTarget, remoteMoment } from './useRemoteTarget';
 export type { RemoteDraft, RemoteKind, RemoteSource, UseRemoteTargetOptions } from './useRemoteTarget';
+export { DateField } from './DateField';
+export type { DateFieldProps } from './DateField';
 export { TimeField } from './TimeField';
 export type { TimeFieldProps } from './TimeField';
 export { EventForm } from './EventForm';

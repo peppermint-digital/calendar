@@ -3,6 +3,7 @@ import { weekdayOf } from './rules';
 import { emptyRecurrence, WEEKDAYS, type CategoryMode, type EventCategory, type EventDraft, type EventKind, type FieldKey, type Frequency, type RecurrenceDraft } from './types';
 import { useEventForm } from './useEventForm';
 import { TimeField } from './TimeField';
+import { DateField } from './DateField';
 
 export type EventFormLabels = {
     kind: string;
@@ -184,6 +185,18 @@ export function EventForm({
     const field = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm';
     const label = 'mb-1 block text-xs font-medium text-muted-foreground';
 
+    /**
+     * „Bis" vor „von" — die einzige Datumsregel, die die Maske selbst kennt.
+     *
+     * Zeichenketten in `YYYY-MM-DD` lassen sich direkt vergleichen; ein
+     * Datumsobjekt braeuchte es dafuer nicht. Leer heisst „derselbe Tag" und
+     * ist kein Fehler.
+     */
+    const endeVorAnfang =
+        value.endDate !== '' && value.date !== '' && value.endDate < value.date
+            ? 'Das Ende liegt vor dem Anfang.'
+            : undefined;
+
     return (
         <form
             className="flex flex-col gap-3"
@@ -228,12 +241,11 @@ export function EventForm({
             <div className="flex flex-wrap gap-2">
                 <div className="w-40">
                     <label className={label} htmlFor="calendar-date">{text.date}</label>
-                    <input
+                    <DateField
                         id="calendar-date"
-                        type="date"
                         className={field}
                         value={value.date}
-                        onChange={(event) => set('date', event.target.value)}
+                        onChange={(next) => set('date', next)}
                         required
                     />
                     <FieldError message={fieldErrors?.date} />
@@ -242,15 +254,18 @@ export function EventForm({
                 {multiDay && (
                     <div className="w-40">
                         <label className={label} htmlFor="calendar-end-date">{text.endDate}</label>
-                        <input
+                        {/* Das native Feld sperrte fruehere Tage ueber `min`.
+                            Ein Textfeld kann das nicht — und `min` war ohnehin
+                            nur im Auswahlkalender wirksam, getippt ging es
+                            vorbei. Deshalb jetzt eine echte Pruefung, die auch
+                            beim Tippen greift. */}
+                        <DateField
                             id="calendar-end-date"
-                            type="date"
                             className={field}
-                            min={value.date || undefined}
                             value={value.endDate}
-                            onChange={(event) => set('endDate', event.target.value)}
+                            onChange={(next) => set('endDate', next)}
                         />
-                        <FieldError message={fieldErrors?.endDate} />
+                        <FieldError message={fieldErrors?.endDate ?? endeVorAnfang} />
                     </div>
                 )}
 
@@ -495,12 +510,11 @@ function RecurrenceFields({
 
                     <div className="w-40">
                         <label className={label} htmlFor="calendar-until">{text.until} *</label>
-                        <input
+                        <DateField
                             id="calendar-until"
-                            type="date"
                             className={field}
                             value={value.until}
-                            onChange={(event) => set('until', event.target.value)}
+                            onChange={(next) => set('until', next)}
                         />
                         <FieldError message={errors?.['recurrence.until']} />
                     </div>

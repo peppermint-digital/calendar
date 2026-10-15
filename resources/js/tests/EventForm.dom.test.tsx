@@ -79,9 +79,16 @@ describe('EventForm', () => {
 
         cleanup();
         show({ multiDay: true });
-        // Und nicht vor dem Starttag: Ein Ende vor dem Anfang ist kein Termin.
-        expect(screen.getByLabelText('Enddatum')).toHaveProperty('min', '2026-09-14');
+        expect(screen.getByLabelText('Enddatum')).not.toBeNull();
     });
+
+    /**
+     * Frueher stand hier eine Pruefung auf `min` am nativen Feld. Seit die
+     * Maske ein deutsches Textfeld zeichnet (v0.48.0), gibt es das Attribut
+     * nicht mehr — und es half ohnehin nur im Auswahlkalender, getippt ging es
+     * vorbei. Die Regel steht jetzt in der Maske und greift immer; geprueft
+     * wird sie weiter unten unter „das Datumsfeld".
+     */
 
     it('gibt bei einer gepflegten Liste eine Auswahl statt eines Textfelds', () => {
         const kategorien = [
@@ -254,5 +261,44 @@ describe('das Zeitfeld', () => {
         show({ value: draft({ allDay: true }) });
 
         expect(document.querySelectorAll('[data-slot="time-field"]')).toHaveLength(0);
+    });
+});
+
+describe('das Datumsfeld', () => {
+    /**
+     * Das native `<input type="date">` folgt der Sprache des BROWSERS. Auf
+     * einem englisch eingestellten Chrome stand in dieser durchweg deutschen
+     * Maske `mm/dd/yyyy` — beim Datum nicht nur ungewohnt, sondern mehrdeutig:
+     * Der 09.08. und der 08.09. sehen gleich aus. Am 15.10.2026 in drei von
+     * vier Anwendungen gleichzeitig gesehen (#7846).
+     */
+    it('nimmt das deutsche Feld, nicht das native', () => {
+        show({ value: draft({ allDay: true }), multiDay: true });
+
+        expect(document.querySelectorAll('[data-slot="date-field"]').length).toBeGreaterThan(0);
+        expect(document.querySelectorAll('input[type="date"]')).toHaveLength(0);
+    });
+
+    /**
+     * Vorher sperrte `min` am nativen Feld fruehere Tage — aber nur im
+     * Auswahlkalender; getippt ging es vorbei. Jetzt eine echte Pruefung.
+     */
+    it('sagt es, wenn das Ende vor dem Anfang liegt', () => {
+        show({ value: draft({ date: '2026-09-14', endDate: '2026-09-01' }), multiDay: true });
+
+        expect(screen.getByText('Das Ende liegt vor dem Anfang.')).toBeTruthy();
+    });
+
+    it('schweigt, solange die Reihenfolge stimmt', () => {
+        show({ value: draft({ date: '2026-09-14', endDate: '2026-09-20' }), multiDay: true });
+
+        expect(screen.queryByText('Das Ende liegt vor dem Anfang.')).toBeNull();
+    });
+
+    /** Ein leeres Enddatum heisst „derselbe Tag" und ist kein Fehler. */
+    it('schweigt bei leerem Enddatum', () => {
+        show({ value: draft({ date: '2026-09-14', endDate: '' }), multiDay: true });
+
+        expect(screen.queryByText('Das Ende liegt vor dem Anfang.')).toBeNull();
     });
 });
