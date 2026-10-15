@@ -95,12 +95,22 @@
  * Ein breiterer Abstand rechts löst das NICHT: Chrome verbreitert die
  * Scrollbar beim Darüberfahren. Sie wächst also genau in dem Moment, in dem
  * man den Streifen treffen will — gegen ein bewegliches Ziel hilft kein fester
- * Wert. Links kann keine Scrollbar dazwischenkommen, in keiner Spalte.
+ * Wert. Im Peppermint Manager ist v1.148.1 genau daran gescheitert.
+ *
+ * Links kann keine Scrollbar dazwischenkommen, in keiner Spalte. Das ist der
+ * verlässliche Weg, deshalb liegt der Streifen dort.
+ *
+ * Rechts bleiben 3 px, rein optisch als schmaler Rand. Für die Trennung zweier
+ * Tage braucht es sie nicht — die trägt der linke Abstand der FOLGENDEN Spalte
+ * zusammen mit der Spaltenlinie. Zum Aufziehen taugt der rechte Rand nicht
+ * mehr; dafür ist die linke Seite da.
  *
  * Der Streifen wird sichtbar markiert, sonst muss man von seiner Existenz
- * wissen. Gezeichnet als Pseudo-Element auf dem Spaltenrahmen, UNTER den
- * Terminen und mit `pointer-events: none` — er darf das Aufziehen nicht
- * abfangen.
+ * wissen. Gezeichnet als Pseudo-Element auf dem Spaltenrahmen, mit `z-index: 1`
+ * UNTER den Terminen (z-index 3) und `pointer-events: none` — er darf das
+ * Aufziehen nicht abfangen. Beim Darüberfahren wird er etwas deutlicher.
+ *
+ * Gilt für alle Spalten, damit die Bedienung überall dieselbe ist.
  *
  * Diese Streifen sind gewollt und bleiben, auch wenn sie wie ein Rest
  * aussehen: Sie kamen fürs Telefon dazu, damit sich der Kalender dort
