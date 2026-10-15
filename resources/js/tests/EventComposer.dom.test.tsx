@@ -151,6 +151,52 @@ describe('ein fremdes Ziel', () => {
     });
 });
 
+describe('der Entwurf', () => {
+    it('liegt beim Produkt, wenn es ihn mitbringt', () => {
+        // Manche Masken brauchen ihn draussen: Der Manager spiegelt ihn in seine
+        // Nutzlast und seine Zusatzfelder lesen ihn mit. Ein Composer, der ihn
+        // einschloesse, zwaenge sie zu einem zweiten Zustand daneben.
+        const geaendert = vi.fn();
+        const entwurf = {
+            kind: 'crm_termin',
+            title: 'Vom Produkt gehalten',
+            date: '2026-11-03',
+            endDate: '',
+            start: '09:00',
+            end: '10:00',
+            allDay: false,
+            location: '',
+            description: '',
+            meetingUrl: '',
+            category: '',
+            categoryId: '',
+            recurrence: null,
+        };
+
+        render(
+            <EventComposer kinds={EIGENE} draft={entwurf} onDraftChange={geaendert} onSaveHere={vi.fn()} />,
+        );
+
+        expect((screen.getByLabelText('Titel') as HTMLInputElement).value).toBe('Vom Produkt gehalten');
+
+        fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'Geändert' } });
+
+        // Der Composer schreibt NICHT selbst — er meldet und laesst das Produkt
+        // entscheiden. Sonst gaebe es den Entwurf zweimal.
+        expect(geaendert).toHaveBeenCalledTimes(1);
+        expect(geaendert.mock.calls[0][0].title).toBe('Geändert');
+        expect((screen.getByLabelText('Titel') as HTMLInputElement).value).toBe('Vom Produkt gehalten');
+    });
+
+    it('liegt beim Composer, wenn das Produkt keinen mitbringt', () => {
+        render(<EventComposer kinds={EIGENE} onSaveHere={vi.fn()} />);
+
+        fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'Selbst gehalten' } });
+
+        expect((screen.getByLabelText('Titel') as HTMLInputElement).value).toBe('Selbst gehalten');
+    });
+});
+
 describe('speichern', () => {
     it('geht im eigenen Kalender ueber das Produkt', () => {
         const gespeichert = vi.fn();

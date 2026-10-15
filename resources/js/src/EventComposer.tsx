@@ -27,6 +27,19 @@ export type EventComposerProps = {
     targets?: RemoteSource[];
     /** Der zu ändernde Termin, oder `null` beim Anlegen. */
     value?: EventDraft | null;
+    /**
+     * Der laufende Entwurf — wenn das Produkt ihn selbst hält.
+     *
+     * Ohne diese beiden hält ihn der Composer, und das ist der einfache Fall.
+     * Manche Masken brauchen ihn aber draußen: Der Manager spiegelt ihn über
+     * einen Effekt in seine Nutzlast (`start_datetime` aus Datum und Uhrzeit,
+     * `category_id`, die Serienregel) und seine Zusatzfelder lesen ihn mit.
+     * Ein Composer, der den Entwurf einschlösse, zwänge solche Masken zu einem
+     * zweiten Zustand daneben — und zwei Zustände für dieselbe Sache laufen
+     * auseinander.
+     */
+    draft?: EventDraft;
+    onDraftChange?: (draft: EventDraft) => void;
     /** Vorbelegung beim Anlegen — etwa aus einem Klick ins Raster. */
     preset?: Partial<EventDraft>;
     /**
@@ -130,6 +143,8 @@ export function EventComposer({
     kinds,
     targets = [],
     value = null,
+    draft,
+    onDraftChange,
     preset,
     onSaveHere,
     onCancel,
@@ -151,9 +166,20 @@ export function EventComposer({
     const beschriftung = { ...COMPOSER_DEFAULTS, ...labels };
     const bearbeiten = value !== null;
 
-    const [entwurf, setEntwurf] = useState<EventDraft>(() =>
+    // Eigener Zustand nur, wenn das Produkt keinen mitbringt.
+    const [innerer, setInnerer] = useState<EventDraft>(() =>
         value ?? { ...emptyDraft(kinds[0]?.key), ...preset },
     );
+    const gesteuert = draft !== undefined;
+    const entwurf = gesteuert ? draft : innerer;
+    const setEntwurf = (naechster: EventDraft) => {
+        if (! gesteuert) {
+            setInnerer(naechster);
+        }
+
+        onDraftChange?.(naechster);
+    };
+
     const [eigenerFehler, setEigenerFehler] = useState<string | null>(null);
 
     const fremd = useRemoteTarget({
