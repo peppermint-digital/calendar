@@ -61,6 +61,18 @@ export type EventComposerProps = {
     fieldErrors?: EventFormErrors;
     labels?: Partial<EventFormLabels & EventComposerLabels>;
 
+    /**
+     * Die Umhuellung der Zielwahl, vom Produkt gestellt.
+     *
+     * Das Paket zeichnet bewusst mit schlichten Elementen — eine Abhaengigkeit
+     * auf eine Komponentensammlung zwaenge sie jedem Verbraucher auf. Das darf
+     * aber nicht heissen, dass die Maske im Produkt fremd aussieht: Wer dort
+     * `<Card>` verwendet, reicht sie hier herein.
+     *
+     * Ohne Angabe ein schlichter Rahmen — brauchbar, aber nicht die Gestaltung
+     * des Produkts.
+     */
+    renderSection?: (children: ReactNode) => ReactNode;
     /** Wo die Routen des Pakets liegen. */
     basePath?: string;
     /** Kopfzeilen für die Aufrufe ins andere System — CSRF und dergleichen. */
@@ -128,6 +140,7 @@ export function EventComposer({
     error = null,
     fieldErrors,
     labels,
+    renderSection,
     basePath,
     headers,
 }: EventComposerProps) {
@@ -194,6 +207,10 @@ export function EventComposer({
 
     const zielname = targets.find((ziel) => ziel.key === fremd.target)?.label ?? '';
 
+    /** Die Umhuellung des Produkts — oder ein schlichter Rahmen. */
+    const umhuellen = (kinder: ReactNode): ReactNode =>
+        renderSection ? renderSection(kinder) : <div className="rounded-lg border p-4">{kinder}</div>;
+
     return (
         <div className="space-y-4">
             {/*
@@ -202,8 +219,8 @@ export function EventComposer({
                 umzuziehen wäre ein anderer Vorgang als ihn zu ändern, und die
                 Maske ließe beides gleich aussehen.
             */}
-            {!bearbeiten && fremd.writableSources.length > 0 && (
-                <div className="space-y-2 rounded-lg border p-4">
+            {!bearbeiten && fremd.writableSources.length > 0 && umhuellen(
+                <div className="space-y-2">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                         <label htmlFor="event-composer-target" className="text-sm font-medium whitespace-nowrap">
                             {beschriftung.target}
@@ -212,7 +229,10 @@ export function EventComposer({
                             id="event-composer-target"
                             value={fremd.target}
                             onChange={(ereignis) => void fremd.chooseTarget(ereignis.target.value)}
-                            className="h-9 w-full rounded-md border bg-transparent px-2 text-sm sm:max-w-xs"
+                            // `bg-background`, nicht `bg-transparent`: Ein
+                            // durchsichtiges Auswahlfeld nimmt im Dunkelmodus die
+                            // Farbe dessen an, was zufaellig dahinterliegt.
+                            className="h-9 w-full rounded-md border bg-background px-2 text-sm sm:max-w-xs"
                         >
                             <option value="">{beschriftung.ownCalendar}</option>
                             {fremd.writableSources.map((ziel) => (
@@ -224,11 +244,11 @@ export function EventComposer({
                     </div>
 
                     {fremdesZiel && (
-                        <p className="text-xs opacity-70">
+                        <p className="text-xs text-muted-foreground">
                             {beschriftung.targetHint.replace('{system}', zielname)}
                         </p>
                     )}
-                </div>
+                </div>,
             )}
 
             <EventForm
