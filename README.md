@@ -536,6 +536,28 @@ page load. Without it a rejected move stays on screen while the server holds
 the old time — which is worse than an error, because it looks like success.
 Over Inertia you do not need it: the entries come back fresh anyway.
 
+### The time field
+
+Two dropdowns (hour : minute), not `<input type="time">` — that is the default
+now, and `renderTime` remains for the product that genuinely needs something
+else.
+
+The native field follows the *browser's* language setting. Set to English it
+renders a twelve-hour field with AM/PM, inside a calendar that counts 24 hours
+everywhere else. Nobody notices until someone on an English browser sets an
+appointment to "07:00 PM". Two lists show the same thing everywhere, and they
+are faster: the times you need in a working day sit almost entirely on the
+five-minute grid, and two clicks beat typing four digits.
+
+`minuteStep` sets that grid (default 5). A stored time rarely sits on it — a
+clocked-in time is 08:37, not 08:35 — so the current minute is always sorted
+in. Without that, Radix falls back to the placeholder: the value is there, just
+invisible, and gone on the next save.
+
+This lived only in the Peppermint Manager until 15.10.2026 and reached the form
+through `renderTime`. The other three calendars showed the native field: one
+form, two different inputs.
+
 ### The day it opens on
 
 ```tsx

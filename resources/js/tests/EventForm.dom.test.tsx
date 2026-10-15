@@ -201,3 +201,38 @@ describe('EventForm', () => {
         });
     });
 });
+
+describe('das Zeitfeld', () => {
+    /**
+     * Bis zum 15.10.2026 gab die Maske hier ein `<input type="time">` aus, und
+     * nur der Manager reichte ueber `renderTime` zwei Auswahllisten hinein.
+     * Dieselbe Maske zeigte damit je nach System zwei verschiedene Eingaben —
+     * und das native Feld wird bei englischer Browsersprache zum
+     * Zwoelfstundenfeld mit AM/PM, mitten in einem Kalender, der sonst 24
+     * Stunden zaehlt (#7846).
+     */
+    it('nimmt von sich aus die beiden Listen, nicht das native Feld', () => {
+        show({ value: draft({ allDay: false, start: '09:00', end: '10:00' }) });
+
+        expect(document.querySelectorAll('[data-slot="time-field"]')).toHaveLength(2);
+        expect(document.querySelectorAll('input[type="time"]')).toHaveLength(0);
+    });
+
+    /** Der Ausweg bleibt: Ein Produkt, das wirklich etwas anderes braucht, kann. */
+    it('laesst sich weiter ueberschreiben', () => {
+        show({
+            value: draft({ allDay: false, start: '09:00', end: '10:00' }),
+            renderTime: ({ id, value }) => <input id={id} data-eigen="ja" readOnly value={value} />,
+        });
+
+        expect(document.querySelectorAll('[data-eigen="ja"]')).toHaveLength(2);
+        expect(document.querySelectorAll('[data-slot="time-field"]')).toHaveLength(0);
+    });
+
+    /** Ganztaegig gibt es keine Uhrzeit — dann auch kein Feld dafuer. */
+    it('faellt ganz weg, wenn der Termin ganztaegig ist', () => {
+        show({ value: draft({ allDay: true }) });
+
+        expect(document.querySelectorAll('[data-slot="time-field"]')).toHaveLength(0);
+    });
+});

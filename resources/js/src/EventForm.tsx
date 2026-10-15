@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { weekdayOf } from './rules';
 import { emptyRecurrence, WEEKDAYS, type CategoryMode, type EventCategory, type EventDraft, type EventKind, type FieldKey, type Frequency, type RecurrenceDraft } from './types';
 import { useEventForm } from './useEventForm';
+import { TimeField } from './TimeField';
 
 export type EventFormLabels = {
     kind: string;
@@ -145,6 +146,19 @@ export type EventFormProps = {
  * Abhaengigkeit auf eine Komponentensammlung zwaenge sie jedem Verbraucher auf,
  * und zwei Sammlungen im selben Baum vertragen sich selten.
  */
+/**
+ * Die Vorgabe fuer Uhrzeiten: zwei Listen statt `<input type="time">`.
+ *
+ * Bis zum 15.10.2026 gab das Paket hier ein natives Zeitfeld aus, und nur der
+ * Manager reichte ueber `renderTime` etwas Besseres hinein. Dieselbe Maske
+ * zeigte damit je nach System zwei verschiedene Eingaben — und das native Feld
+ * wird bei englischer Browsersprache zum Zwoelfstundenfeld mit AM/PM, mitten
+ * in einem Kalender, der sonst 24 Stunden zaehlt (#7846).
+ */
+function zeitfeld({ id, value, onChange }: { id: string; value: string; onChange: (value: string) => void }) {
+    return <TimeField id={id} value={value} onChange={onChange} />;
+}
+
 export function EventForm({
     kinds,
     categories = [],
@@ -244,40 +258,20 @@ export function EventForm({
                     <>
                         <div className="w-28">
                             <label className={label} htmlFor="calendar-start">{text.from}</label>
-                            {renderTime ? (
-                                renderTime({
-                                    id: 'calendar-start',
-                                    value: value.start,
-                                    onChange: (next) => set('start', next),
-                                })
-                            ) : (
-                                <input
-                                    id="calendar-start"
-                                    type="time"
-                                    className={field}
-                                    value={value.start}
-                                    onChange={(event) => set('start', event.target.value)}
-                                />
-                            )}
+                            {(renderTime ?? zeitfeld)({
+                                id: 'calendar-start',
+                                value: value.start,
+                                onChange: (next) => set('start', next),
+                            })}
                             <FieldError message={fieldErrors?.start} />
                         </div>
                         <div className="w-28">
                             <label className={label} htmlFor="calendar-end">{text.to}</label>
-                            {renderTime ? (
-                                renderTime({
-                                    id: 'calendar-end',
-                                    value: value.end,
-                                    onChange: (next) => set('end', next),
-                                })
-                            ) : (
-                                <input
-                                    id="calendar-end"
-                                    type="time"
-                                    className={field}
-                                    value={value.end}
-                                    onChange={(event) => set('end', event.target.value)}
-                                />
-                            )}
+                            {(renderTime ?? zeitfeld)({
+                                id: 'calendar-end',
+                                value: value.end,
+                                onChange: (next) => set('end', next),
+                            })}
                             <FieldError message={fieldErrors?.end} />
                         </div>
                     </>

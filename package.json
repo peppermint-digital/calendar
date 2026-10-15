@@ -1,6 +1,6 @@
 {
     "name": "@peppermint-digital/calendar",
-    "version": "0.45.1",
+    "version": "0.46.0",
     "description": "Kalender-Oberflaeche zum gleichnamigen PHP-Paket: das Raster, seine Werkzeugleiste, ein Termin-Dialog, der sich aus den Terminarten baut, und die Agenda-Ansicht.",
     "license": "MIT",
     "type": "module",
@@ -49,5 +49,11 @@
         "tsup": "^8.0.0",
         "typescript": "^5.4.0",
         "vitest": "^5.0.0"
+    },
+    "dependencies": {
+        "@radix-ui/react-select": "^2.3.7",
+        "clsx": "^2.1.1",
+        "lucide-react": "^1.45.0",
+        "tailwind-merge": "^3.2.0"
     }
 }
