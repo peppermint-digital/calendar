@@ -34,6 +34,14 @@ export interface DateFieldProps {
     className?: string;
     disabled?: boolean;
     required?: boolean;
+    /**
+     * Faehnchen beim Ueberfahren.
+     *
+     * Gebraucht vor allem an einem gesperrten Feld: „Das Datum einer Serie
+     * ergibt sich aus ihrer Regel" sagt, WARUM es nicht geht. Ein graues Feld
+     * ohne Erklaerung sieht aus wie ein Fehler.
+     */
+    title?: string;
 }
 
 /** „2026-09-08" → „08.09.2026". */
@@ -70,7 +78,7 @@ function alsIso(eingabe: string): string {
     return `${vollesJahr}-${monat.padStart(2, '0')}-${tag.padStart(2, '0')}`;
 }
 
-export function DateField({ id, value, onChange, className, disabled, required }: DateFieldProps) {
+export function DateField({ id, value, onChange, className, disabled, required, title }: DateFieldProps) {
     const [text, setText] = useState(() => alsDeutsch(value));
     const [bekannt, setBekannt] = useState(value);
 
@@ -88,6 +96,7 @@ export function DateField({ id, value, onChange, className, disabled, required }
             className={className}
             disabled={disabled}
             required={required}
+            title={title}
             placeholder="TT.MM.JJJJ"
             inputMode="numeric"
             data-slot="date-field"

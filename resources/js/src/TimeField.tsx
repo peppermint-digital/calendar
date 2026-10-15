@@ -49,6 +49,14 @@ export interface TimeFieldProps {
     disabled?: boolean;
     /** Schrittweite der Minutenliste. */
     minuteStep?: number;
+    /**
+     * Faehnchen beim Ueberfahren.
+     *
+     * Gebraucht vor allem an einem gesperrten Feld: „Das Datum einer Serie
+     * ergibt sich aus ihrer Regel" sagt, WARUM es nicht geht. Ein graues Feld
+     * ohne Erklaerung sieht aus wie ein Fehler.
+     */
+    title?: string;
 }
 
 /** Zerlegt „HH:MM" bzw. „HH:MM:SS" und fuellt einstellige Angaben auf. */
@@ -67,7 +75,7 @@ function zerlege(value: string): { stunde: string; minute: string } {
 
 const stunden = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
 
-export function TimeField({ id, value = '', onChange, className, disabled, minuteStep = 5 }: TimeFieldProps) {
+export function TimeField({ id, value = '', onChange, className, disabled, minuteStep = 5, title }: TimeFieldProps) {
     const { stunde, minute } = useMemo(() => zerlege(value), [value]);
 
     const minuten = useMemo(() => {
@@ -87,7 +95,7 @@ export function TimeField({ id, value = '', onChange, className, disabled, minut
     }, [minuteStep, minute]);
 
     return (
-        <div className={cn('flex items-center gap-1', className)} data-slot="time-field">
+        <div className={cn('flex items-center gap-1', className)} data-slot="time-field" title={title}>
             <Select value={stunde} onValueChange={(neu) => onChange?.(`${neu}:${minute || '00'}`)} disabled={disabled}>
                 <SelectTrigger className="w-[70px]" id={id}>
                     <SelectValue placeholder="--" />
