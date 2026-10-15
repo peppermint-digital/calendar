@@ -97,6 +97,37 @@ describe('die Zielwahl', () => {
     });
 });
 
+describe('ein vorgewaehltes Ziel', () => {
+    it('ist gleich gesetzt und holt die Arten des Systems', async () => {
+        // Fuer den Weg „woanders anlegen" aus einem Auswahldialog: Wer dort ein
+        // fremdes System anklickt, hat die Wahl schon getroffen.
+        render(<EventComposer kinds={EIGENE} targets={ZIELE} initialTarget="manager" onSaveHere={vi.fn()} />);
+
+        await waitFor(() => {
+            expect((screen.getByLabelText('Anlegen in') as HTMLSelectElement).value).toBe('manager');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByRole('option', { name: 'Meeting digital' })).toBeTruthy();
+        });
+    });
+
+    it('holt die Arten nur einmal, nicht bei jedem Rendern', async () => {
+        const { rerender } = render(
+            <EventComposer kinds={EIGENE} targets={ZIELE} initialTarget="manager" onSaveHere={vi.fn()} />,
+        );
+
+        await waitFor(() => expect(anfragen.filter((a) => a.url.endsWith('/kinds'))).toHaveLength(1));
+
+        rerender(<EventComposer kinds={EIGENE} targets={ZIELE} initialTarget="manager" onSaveHere={vi.fn()} />);
+        rerender(<EventComposer kinds={EIGENE} targets={ZIELE} initialTarget="manager" onSaveHere={vi.fn()} />);
+
+        // Ein Netzweg je Rendern waere eine Schleife, die niemand bemerkt,
+        // bis das andere System drosselt.
+        expect(anfragen.filter((a) => a.url.endsWith('/kinds'))).toHaveLength(1);
+    });
+});
+
 describe('ein fremdes Ziel', () => {
     it('laesst die Maske nach SEINEN Arten zeichnen', async () => {
         render(<EventComposer kinds={EIGENE} targets={ZIELE} onSaveHere={vi.fn()} />);

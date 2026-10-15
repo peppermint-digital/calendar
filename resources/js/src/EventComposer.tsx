@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { EventForm, type EventFormErrors, type EventFormLabels } from './EventForm';
 import { emptyDraft, type EventCategory, type EventDraft, type EventKind } from './types';
 import { useRemoteTarget, type RemoteSource } from './useRemoteTarget';
@@ -25,6 +25,15 @@ export type EventComposerProps = {
     kinds: EventKind[];
     /** Fremde Kalender, die Termine annehmen. Leer = nur der eigene. */
     targets?: RemoteSource[];
+    /**
+     * Ein Ziel, das von Anfang an gewaehlt ist.
+     *
+     * Fuer den Weg „woanders anlegen" aus einem Auswahldialog: Wer dort ein
+     * fremdes System anklickt, hat die Wahl schon getroffen und soll sie nicht
+     * in der Maske wiederholen muessen. Ohne Angabe beginnt die Maske beim
+     * eigenen Kalender.
+     */
+    initialTarget?: string;
     /** Der zu ändernde Termin, oder `null` beim Anlegen. */
     value?: EventDraft | null;
     /**
@@ -142,6 +151,7 @@ export type EventComposerProps = {
 export function EventComposer({
     kinds,
     targets = [],
+    initialTarget,
     value = null,
     draft,
     onDraftChange,
@@ -189,6 +199,19 @@ export function EventComposer({
         onError: setEigenerFehler,
         onDone: () => onSavedThere?.(),
     });
+
+    // Das Startziel einmal waehlen, nicht bei jedem Rendern: `chooseTarget`
+    // holt die Arten des Zielsystems, und das ist ein Netzweg.
+    const [startzielGewaehlt, setStartzielGewaehlt] = useState(false);
+
+    useEffect(() => {
+        if (startzielGewaehlt || ! initialTarget) {
+            return;
+        }
+
+        setStartzielGewaehlt(true);
+        void fremd.chooseTarget(initialTarget);
+    }, [fremd, initialTarget, startzielGewaehlt]);
 
     const fremdesZiel = fremd.target !== '';
 
