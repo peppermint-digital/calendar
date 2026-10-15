@@ -489,6 +489,63 @@ and silently: the page builds, the component appears, it just sits wrong. On
 15.10.2026 that line was missing in three of the four systems — and `w-28`,
 `w-44` and `text-amber-600` were in fact absent from the CRM's CSS.
 
+### What a single entry carries
+
+```tsx
+{
+    id: 'schedule_12',
+    title: 'Abgabe',
+    start: '2026-03-09T09:00:00',
+    end: '2026-03-09T10:00:00',   // leave out for a point in time
+    allDay: false,
+    colour: '#1e3a8a',
+    textColour: '#ffffff',        // else FullCalendar picks, and legibility moves with the colour
+    editable: true,
+    durationEditable: false,      // movable, but "due for two hours" makes no sense
+    tooltip: ['Abgabe', '📁 Website'],
+    payload: event,               // comes back through the handlers unchanged
+}
+```
+
+`durationEditable` left out means "same as `editable`". It is not passed on to
+FullCalendar then — an explicit `undefined` would override the global option,
+and on a phone dragging is deliberately off.
+
+### Moving and resizing are two things
+
+```tsx
+<CalendarGrid
+    onEntryMove={(payload, start, end, change) => …}
+    onEntryResize={(payload, start, end, change) => …}   // falls back to onEntryMove
+/>
+```
+
+Moving changes the start, resizing only the end. Send both to the same route
+and a resize quietly moves the entry as well.
+
+The fourth argument carries what the first three cannot say:
+
+| | |
+| --- | --- |
+| `change.allDay` | whether the entry landed in the all-day row. Without it, the first drag turns every all-day event into a timed one |
+| `change.end` | the end as it is — `null` for a point in time. The third argument cannot express that and points at the start instead |
+| `change.revert()` | put it back: the server refused |
+
+`revert` matters wherever the change goes through an API call rather than a
+page load. Without it a rejected move stays on screen while the server holds
+the old time — which is worse than an error, because it looks like success.
+Over Inertia you do not need it: the entries come back fresh anyway.
+
+### The day it opens on
+
+```tsx
+<CalendarGrid initialDate="2026-03-09" … />
+```
+
+Only for the first render, like FullCalendar's `initialDate`; after that use
+`ref.api()?.gotoDate(…)`. Needed where the visible range lives in the URL, so a
+reloaded tab brings the same window back instead of falling to today.
+
 ## When the grid sits in a card
 
 `height: '100%'` presumes the container has a **definite** height. Without one

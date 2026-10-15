@@ -3,7 +3,7 @@ export type { CalendarDefaultsOptions } from './calendarDefaults';
 export { CalendarBrowser } from './CalendarBrowser';
 export type { CalendarBrowserProps } from './CalendarBrowser';
 export { CalendarGrid } from './CalendarGrid';
-export type { CalendarEntry, CalendarGridHandle, CalendarGridProps, CalendarViewName } from './CalendarGrid';
+export type { CalendarEntry, CalendarGridHandle, CalendarGridProps, CalendarViewName, EntryChange } from './CalendarGrid';
 export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';
 export type { CalendarToolbarButton, CalendarToolbarLabels, CalendarToolbarProps } from './CalendarToolbar';
 export { AgendaList, groupByDay } from './AgendaList';
