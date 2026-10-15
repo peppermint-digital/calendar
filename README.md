@@ -410,6 +410,37 @@ children straight through: the dialog *is* the wrapper.
 `onSaveHere` — because only your app knows its route, its payload and its extra
 fields. The foreign path lives in the package because it is the same everywhere.
 
+## Planned time on a subject
+
+`PlannedBlocks` shows what is scheduled on *something* — a task, a ticket, a
+deal — with the total, and lets you add and remove:
+
+```tsx
+<PlannedBlocks
+    blocks={blocks}
+    onAdd={() => setDialogOpen(true)}
+    onRemove={(block) => router.delete(`/planning/${block.id}`)}
+    renderExtra={(block) => <BookedBadge block={block} />}
+/>
+```
+
+It lives here and not in the task package for the same reason
+`PlannedBlockKind` does: this is not about tasks. A block hangs on a subject,
+and the core already carries `subject_type` / `subject_id`. Put the component in
+the task package and a ticket system would have to pull in tasks to schedule its
+tickets — and that package is pure PHP, so it would need a JS build first.
+
+Leave out `onAdd` or `onRemove` and the button is not drawn: a read-only view
+shows the planning without promising something that gets rejected on click.
+`renderExtra` is where product-specific detail goes — who scheduled it, whether
+it has been booked as a time entry. The Manager tracks both; the package needs
+to know neither.
+
+Two details that are easy to get wrong and are handled here: a block from 22:00
+to 01:00 is three hours, not minus twenty-one. And the date is read as local
+time — `new Date('2026-11-03')` is midnight UTC and becomes the 2nd west of it,
+which would put the block on the wrong day.
+
 ## Writing into another system's calendar
 
 Reading a remote calendar is one half; the other is creating an event *over

@@ -14,6 +14,9 @@ export { EventForm } from './EventForm';
 // Die vollstaendige Maske: Zielwahl, Felder, Speichern — damit ein Produkt den
 // Vorgang nicht zum fuenften Mal selbst zusammensetzt (#7765).
 export { EventComposer } from './EventComposer';
+// Die geplante Zeit an einem Gegenstand — Liste, Summe, Anlegen, Entfernen.
+export { PlannedBlocks } from './PlannedBlocks';
+export type { PlannedBlock, PlannedBlocksLabels, PlannedBlocksProps } from './PlannedBlocks';
 export type { EventComposerLabels, EventComposerProps } from './EventComposer';
 export type { EventFormErrorKey, EventFormErrors, EventFormLabels, EventFormProps } from './EventForm';
 export { useEventForm } from './useEventForm';
