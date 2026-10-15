@@ -676,6 +676,44 @@ their `.ics` by hand and cannot switch in one go. It is a transition, not a dest
 
 ## Deliberate design decisions
 
+**Kinds are classes, not rows.** A kind answers four questions — what am I
+called, which profile holds my fields, what do I never carry, may a person pick
+me. Three of those are *behaviour*, and `saving()` is outright code. A table
+could store the names but not the rules, so the rules would move somewhere else
+and the kind would become a label pointing at logic held elsewhere.
+
+The price is that adding a kind needs a deploy. The gain is that it needs **no
+migration** — a class with four answers, and it exists. That trade is right for
+anything that decides something. For a pure label without behaviour a table
+would be right; `event_categories` was exactly that, and it quietly ended up
+carrying the brand of an event, which is not a label at all.
+
+**The core table must exist, and must stay thin.** `calendar_events` holds what
+*every* system understands: title, start, end, all-day, kind, visibility. That
+shared floor is what makes a federated calendar possible at all — a foreign
+event can only be drawn because its title and timespan mean the same thing
+everywhere. Without it, each system would need to know every other system's
+fields, and you would have four calendars rather than one.
+
+Everything beyond that belongs to the kind's profile or to a module's satellite.
+On 13./14.10.2026 seven product columns were lifted out of the core for exactly
+this reason. Thinner is better; gone is not.
+
+**The calendar does not know about tasks — and must not.** `PlannedBlockKind`
+describes *something planned*, not a task: "a task, a ticket, a deal: the event
+is not the thing itself, it is its scheduling." The core carries
+`subject_type` / `subject_id` and nothing else about what that subject is.
+
+So the dependency runs **from the task package to the calendar**, never the other
+way. A task has a due date and a planned timespan; the calendar is the instrument
+for setting and seeing them. A task package brings its own kind, its own fields
+and its own small calendar inside the task view — and uses this package for all
+of it.
+
+Pointing the arrow the other way would mean the calendar needs to know what a
+task is, and then what a ticket is, and then what a deal is. That is the version
+of this package that cannot be installed by anyone who has none of those things.
+
 **`kind` has no default.** A guessed event kind decides fields, visibility and
 deletion behaviour. Creating an event without a registered kind throws — and the
 exception names the kinds that *are* registered, plus where to add new ones.
