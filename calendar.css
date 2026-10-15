@@ -1,0 +1,230 @@
+/*
+ * Das Aussehen des Kalenders — für alle vier Anwendungen dieselbe Datei.
+ *
+ * Einbinden in der `app.css` der Anwendung, nach dem Tailwind-Import:
+ *
+ *     @import '@peppermint-digital/calendar/calendar.css';
+ *
+ * ## Warum das hierher gehört
+ *
+ * Am 15.10.2026 gemessen: Der Peppermint Manager und das AI Brain hatten je
+ * einen eigenen Block FullCalendar-CSS, das CRM und die Verwaltung gar keinen.
+ * Die beiden Blöcke überschnitten sich zur Hälfte — im Brain stand sogar
+ * ausdrücklich „Übernommen aus dem Peppermint Manager, wo dieser Weg über
+ * mehrere Anläufe entstanden ist".
+ *
+ * Zwei Fassungen desselben Gedankens sind eine Fassung zu viel. Und die beiden
+ * Systeme ohne Block hatten damit weder die Ziehfläche noch die
+ * Touch-Behandlung — Dinge, die man nicht vermisst, weil man nicht weiß, dass
+ * es sie gibt.
+ *
+ * ## Was es braucht
+ *
+ * Die Farbtokens von shadcn (`--border`, `--muted`, `--primary`,
+ * `--foreground`, `--destructive` und ihre `-foreground`-Partner). Alle vier
+ * Anwendungen haben sie; eine fünfte ohne sie bekäme einen farblosen Kalender,
+ * aber keinen kaputten.
+ */
+
+/*
+ * FullCalendar an das Thema der Anwendung koppeln.
+ *
+ * Die Bibliothek bringt eigene Farben mit, die von einem hellen Hintergrund
+ * ausgehen: Im dunklen Thema sind damit Wochentage, Uhrzeiten und Rahmen
+ * praktisch unsichtbar. Statt einzelne Regeln zu überschreiben, werden die
+ * Variablen der Bibliothek auf die Farbtokens gesetzt — dann folgt der
+ * Kalender jedem Themenwechsel von selbst.
+ */
+.fc {
+    --fc-border-color: var(--border);
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: color-mix(in oklab, var(--muted) 60%, transparent);
+    --fc-today-bg-color: color-mix(in oklab, var(--primary) 8%, transparent);
+    --fc-now-indicator-color: var(--destructive);
+    --fc-event-bg-color: var(--primary);
+    --fc-event-border-color: var(--primary);
+    --fc-event-text-color: var(--primary-foreground);
+    --fc-list-event-hover-bg-color: var(--muted);
+    color: var(--foreground);
+}
+
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number,
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text {
+    color: var(--foreground);
+    text-decoration: none;
+}
+
+.fc .fc-timegrid-slot-label-cushion,
+.fc .fc-timegrid-axis-cushion {
+    color: var(--muted-foreground);
+}
+
+/* Vergangene Tage abschwächen, ohne sie unlesbar zu machen. */
+.fc .fc-day-past {
+    background: color-mix(in oklab, var(--muted) 25%, transparent);
+}
+
+/* Arbeitszeiten heben sich ab, ohne sich vorzudrängen. */
+.fc .fc-non-business {
+    background: color-mix(in oklab, var(--muted) 35%, transparent);
+}
+
+/* Kalenderwoche an der Seite: leise, aber lesbar. */
+.fc .fc-timegrid-axis-cushion,
+.fc .fc-daygrid-week-number {
+    font-size: 0.7rem;
+    color: var(--muted-foreground);
+}
+
+.fc .fc-event {
+    cursor: pointer;
+    border-radius: 0.375rem;
+    padding-inline: 0.125rem;
+}
+
+/*
+ * Ziehfläche LINKS neben einem Termin.
+ *
+ * Neben einem Termin bleibt ein schmaler Streifen frei; über den zieht man mit
+ * der Maus einen neuen Termin auf. Von Haus aus liegt er nur rechts und ist
+ * rund 5 px breit — in der letzten Spalte damit praktisch unerreichbar, weil
+ * dort die Scrollbar sitzt.
+ *
+ * Ein breiterer Abstand rechts löst das NICHT: Chrome verbreitert die
+ * Scrollbar beim Darüberfahren. Sie wächst also genau in dem Moment, in dem
+ * man den Streifen treffen will — gegen ein bewegliches Ziel hilft kein fester
+ * Wert. Links kann keine Scrollbar dazwischenkommen, in keiner Spalte.
+ *
+ * Der Streifen wird sichtbar markiert, sonst muss man von seiner Existenz
+ * wissen. Gezeichnet als Pseudo-Element auf dem Spaltenrahmen, UNTER den
+ * Terminen und mit `pointer-events: none` — er darf das Aufziehen nicht
+ * abfangen.
+ *
+ * Diese Streifen sind gewollt und bleiben, auch wenn sie wie ein Rest
+ * aussehen: Sie kamen fürs Telefon dazu, damit sich der Kalender dort
+ * überhaupt bedienen lässt.
+ */
+.fc .fc-timegrid-cols .fc-timegrid-col-events {
+    margin-left: 12px;
+    margin-right: 3px;
+}
+
+.fc .fc-timegrid-cols td.fc-timegrid-col:not(.fc-timegrid-axis) .fc-timegrid-col-frame::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 12px;
+    z-index: 1;
+    pointer-events: none;
+    background: color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+.fc .fc-timegrid-cols td.fc-timegrid-col:not(.fc-timegrid-axis) .fc-timegrid-col-frame:hover::before {
+    background: color-mix(in oklab, var(--foreground) 12%, transparent);
+}
+
+/* ---------------------------------------------------------------- Telefon */
+
+@media (max-width: 767px) {
+    /* Die Zeitachse braucht feste Breite, sonst wird sie abgeschnitten. */
+    .fc .fc-timegrid-axis,
+    .fc .fc-timegrid-slot-label {
+        min-width: 42px !important;
+        width: 42px !important;
+    }
+
+    .fc .fc-timegrid-axis-frame {
+        overflow: visible !important;
+    }
+
+    .fc .fc-timegrid-slot-label-cushion {
+        font-size: 0.7rem;
+        padding: 0 4px;
+    }
+
+    .fc .fc-col-header-cell-cushion {
+        font-size: 0.75rem;
+        padding: 4px 2px;
+    }
+
+    /*
+     * FullCalendars `fc-timegrid-slots` liegt mit `z-index: 1` ÜBER
+     * `fc-timegrid-cols` — das hält die Uhrzeiten sichtbar, fängt aber alle
+     * Berührungen ab. Auf dem Telefon liess sich dadurch kein Termin
+     * antippen: Der Tipp endete in der Stundenebene darüber.
+     *
+     * Also lässt die Stundenebene Berührungen durch, und nur die
+     * Beschriftungen selbst nehmen sie wieder an — über sie legt man einen
+     * neuen Eintrag an.
+     */
+    .fc .fc-timegrid-slots {
+        pointer-events: none;
+    }
+
+    .fc .fc-timegrid-slot-label {
+        pointer-events: auto;
+        cursor: pointer;
+
+        /* Klebt beim Querscrollen am linken Rand stehen. Nur die
+           Beschriftungen in der Stundentabelle — die Achsenspalte innerhalb
+           von `fc-timegrid-cols` bekäme sonst einen Grund gemalt, der die
+           echten Beschriftungen überdeckt. */
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: var(--background, #fff);
+    }
+
+    .fc .fc-timegrid-slot-label:active,
+    .fc .fc-timegrid-slot-label.slot-label-highlight {
+        background: var(--accent, #e0f2fe) !important;
+    }
+
+    .fc .fc-timegrid-cols .fc-timegrid-axis {
+        background: transparent !important;
+    }
+
+    .fc .fc-timegrid-now-indicator-container {
+        pointer-events: none;
+    }
+
+    /* Grössere Trefferflächen, kleinere Schrift. */
+    .fc .fc-timegrid-event {
+        min-height: 28px;
+    }
+
+    .fc .fc-event-title {
+        font-size: 0.7rem;
+        line-height: 1.2;
+    }
+
+    .fc .fc-event-time {
+        font-size: 0.65rem;
+    }
+
+    .fc .fc-daygrid-day-events {
+        min-height: 1.5em;
+    }
+
+    .fc .fc-daygrid-day-number {
+        font-size: 0.75rem;
+        padding: 2px 4px;
+    }
+
+    .fc .fc-daygrid-event {
+        font-size: 0.65rem;
+        padding: 1px 2px;
+    }
+
+    /* Kein Auswahl-Popup beim langen Drücken — das Ziehen braucht den
+       langen Druck selbst. */
+    .full-calendar-touch-container {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        touch-action: pan-y;
+    }
+}

@@ -536,6 +536,40 @@ page load. Without it a rejected move stays on screen while the server holds
 the old time — which is worse than an error, because it looks like success.
 Over Inertia you do not need it: the entries come back fresh anyway.
 
+### The stylesheet
+
+```css
+/* in your app.css, after the Tailwind import */
+@import '@peppermint-digital/calendar/calendar.css';
+```
+
+It does three things: bind FullCalendar's own colour variables to the shadcn
+tokens so the calendar follows every theme change by itself; draw the drag
+strip to the left of an event; and make the grid usable on a phone.
+
+The drag strip is the one that looks like leftover styling and is not. Beside
+an event a narrow lane stays free, and you drag a new appointment out of it.
+Out of the box that lane sits on the *right* and is about 5px wide — in the
+last column that is unreachable, because the scrollbar sits there. Widening
+the right margin does not help: Chrome grows the scrollbar on hover, so the
+target moves exactly when you aim at it. On the left no scrollbar can get in
+the way, in any column.
+
+On a phone, FullCalendar's `fc-timegrid-slots` layer sits above the columns
+with `z-index: 1`. That keeps the hour labels visible and swallows every
+touch: tapping an event did nothing, because the tap ended in the hour layer
+above it. So the hour layer passes touches through, and only the labels take
+them back — tapping one creates an entry there.
+
+Measured on 15.10.2026: of four applications, two carried their own copy of
+this (overlapping by half — one of them said in a comment that it had been
+copied from the other), and two carried none at all. The two without had
+neither the drag strip nor the touch handling.
+
+Needs the shadcn colour tokens (`--border`, `--muted`, `--primary`,
+`--foreground`, `--destructive` and their `-foreground` partners). An
+application without them gets a colourless calendar, not a broken one.
+
 ### The time field
 
 Two dropdowns (hour : minute), not `<input type="time">` — that is the default
