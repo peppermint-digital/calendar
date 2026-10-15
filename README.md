@@ -366,6 +366,45 @@ The kind picker inside the form *is* the target-kind picker while a foreign
 target is selected. A second list beside it drifts the moment someone touches
 only one of them.
 
+### When your app needs to hold the draft
+
+By default the composer holds it. Pass `draft` + `onDraftChange` when your page
+needs it outside — the Manager mirrors it into its payload through an effect
+(`start_datetime` from date and time, the recurrence rule) and its extra fields
+read along. A composer that locked the draft away would force such pages into a
+second state beside it, and two states for one thing drift.
+
+```tsx
+<EventComposer draft={draft} onDraftChange={setDraft} … />
+```
+
+In controlled mode the composer does not write — it reports and lets your app
+decide.
+
+### Preselecting a target
+
+`initialTarget` is for the „create elsewhere" path out of a choice dialog: the
+person already picked the system and should not pick it again in the form. The
+Manager used to route that path into a *separate little dialog with its own axios
+calls* — the fifth copy of the same form. Now it routes into the same one.
+
+The target is chosen **once**, not on every render: `chooseTarget` fetches the
+other system's kinds, and a network call per render is a loop nobody notices
+until the other system starts throttling.
+
+### Making it look like your app
+
+The package draws with plain elements on purpose — depending on a component
+library would force it on every consumer, and two libraries in one tree rarely
+get along. That must not mean the form looks foreign:
+
+```tsx
+renderSection={(children) => <Card><CardContent>{children}</CardContent></Card>}
+```
+
+Both sections — target picker and form — go through it. In a dialog, pass the
+children straight through: the dialog *is* the wrapper.
+
 ### What stays with your app
 
 `onSaveHere` — because only your app knows its route, its payload and its extra
