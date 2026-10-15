@@ -410,6 +410,27 @@ children straight through: the dialog *is* the wrapper.
 `onSaveHere` — because only your app knows its route, its payload and its extra
 fields. The foreign path lives in the package because it is the same everywhere.
 
+## When the grid sits in a card
+
+`height: '100%'` presumes the container has a **definite** height. Without one
+it resolves to zero and the grid disappears — no error, no warning, just gone.
+That hits every layout where the calendar sits inside a card or a tab.
+
+```tsx
+<CalendarGrid
+    height="100%"
+    fixedHeight={480}          // used when the container has no definite height
+    fillsContainerFromLg       // fill the container from 1024px up, fixed below
+    …
+/>
+```
+
+`fillsContainerFromLg` is for columns that get their height from a neighbour:
+above Tailwind's `lg` the container is definite, stacked below it is not. Keep
+that breakpoint in step with the `lg:` classes around it.
+
+Without `fixedHeight` nothing changes — `height` is used as given.
+
 ## Planned time on a subject
 
 `PlannedBlocks` shows what is scheduled on *something* — a task, a ticket, a

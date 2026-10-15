@@ -1,7 +1,7 @@
 import type { CalendarApi, DateSelectArg, EventClickArg, EventContentArg, EventDropArg } from '@fullcalendar/core';
 import type { DateClickArg, DropArg, EventResizeDoneArg } from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
-import { forwardRef, useImperativeHandle, useRef, type ReactNode } from 'react';
+import { forwardRef, type ReactNode, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import { calendarDefaults } from './calendarDefaults';
 
@@ -35,7 +35,34 @@ export type CalendarGridProps = {
     weekends: boolean;
     /** Nimmt Karten aus einer Liste daneben an (Time-Blocking). */
     acceptsExternalDrops?: boolean;
+    /**
+     * Die Hoehe des Rasters. `auto` waechst mit dem Inhalt, `100%` fuellt den
+     * Container — aber nur, wenn der eine DEFINITE Hoehe hat.
+     */
     height?: string;
+    /**
+     * Feste Hoehe in Pixeln, wenn der Container keine definite hat.
+     *
+     * `height: '100%'` loest dann gegen null auf, und das Raster VERSCHWINDET —
+     * ohne Fehler, ohne Hinweis, einfach weg. Das trifft jede Umgebung, in der
+     * der Kalender in einer Karte oder einem Reiter sitzt.
+     *
+     * Gemessen am 15.10.2026: Der Manager fuehrt diese Logik seit je in seinem
+     * eigenen Raster (`fixedHeight`), weil der Kalender-Reiter seiner
+     * Aufgabenansicht genau in diese Falle lief.
+     */
+    fixedHeight?: number | null;
+    /**
+     * Ab `lg` die Container-Hoehe ausfuellen, darunter `fixedHeight` benutzen.
+     *
+     * Fuer Umgebungen, in denen die Hoehe erst ab der Zweispaltigkeit
+     * feststeht — eine Spalte, die ihre Hoehe von der Nachbarspalte bekommt.
+     * Gestapelt (unter `lg`) gibt es dort keine definite Hoehe.
+     *
+     * Die Grenze ist Tailwinds `lg` (1024px) und muss mit den `lg:`-Klassen des
+     * umgebenden Aufbaus zusammenpassen.
+     */
+    fillsContainerFromLg?: boolean;
     /** Erster Wochentag nach ISO-Zaehlung. 1 = Montag. */
     firstDay?: number;
     locale?: string;
@@ -80,6 +107,8 @@ export const CalendarGrid = forwardRef<CalendarGridHandle, CalendarGridProps>(fu
         weekends,
         acceptsExternalDrops = false,
         height = 'auto',
+        fixedHeight = null,
+        fillsContainerFromLg = false,
         firstDay = 1,
         locale = 'de',
         mobile = false,
@@ -102,12 +131,42 @@ export const CalendarGrid = forwardRef<CalendarGridHandle, CalendarGridProps>(fu
         return arg.event.extendedProps.entryPayload;
     }
 
+    /**
+     * Welche Hoehe gilt gerade?
+     *
+     * Ohne `fixedHeight` die uebergebene — der einfache Fall. Mit, haengt es
+     * von der Breite ab: `fillsContainerFromLg` fuellt ab 1024px den
+     * Container und faellt darunter auf die feste Hoehe zurueck, weil es
+     * gestapelt keine definite Container-Hoehe gibt.
+     *
+     * Die Grenze ist Tailwinds `lg` und muss mit den `lg:`-Klassen des
+     * umgebenden Aufbaus zusammenpassen.
+     */
+    const [breit, setBreit] = useState(() =>
+        typeof window === 'undefined' ? true : window.innerWidth >= 1024,
+    );
+
+    useEffect(() => {
+        if (fixedHeight === null || ! fillsContainerFromLg) {
+            return;
+        }
+
+        const messen = () => setBreit(window.innerWidth >= 1024);
+        window.addEventListener('resize', messen);
+        messen();
+
+        return () => window.removeEventListener('resize', messen);
+    }, [fillsContainerFromLg, fixedHeight]);
+
+    const gewaehlteHoehe =
+        fixedHeight === null ? height : fillsContainerFromLg && breit ? height : fixedHeight;
+
     return (
         <FullCalendar
             ref={calendarRef}
             {...calendarDefaults({ fullDay, weekends, mobile })}
             initialView={view}
-            height={height}
+            height={gewaehlteHoehe}
             locale={locale}
             firstDay={firstDay}
             droppable={acceptsExternalDrops}
