@@ -256,7 +256,14 @@ export function EventForm({
 
                 {!value.allDay && (
                     <>
-                        <div className="w-28">
+                        {/*
+                            `w-40` und nicht `w-28`: Seit die Uhrzeit aus zwei
+                            Listen besteht statt aus einem Feld, braucht sie
+                            rund 155px. In `w-28` (112px) lief sie ueber den
+                            Rand ihrer Spalte — gemessen am 15.10.2026 in der
+                            Verwaltung: Huelle 112, Inhalt 126.
+                        */}
+                        <div className="w-40">
                             <label className={label} htmlFor="calendar-start">{text.from}</label>
                             {(renderTime ?? zeitfeld)({
                                 id: 'calendar-start',
@@ -265,7 +272,7 @@ export function EventForm({
                             })}
                             <FieldError message={fieldErrors?.start} />
                         </div>
-                        <div className="w-28">
+                        <div className="w-40">
                             <label className={label} htmlFor="calendar-end">{text.to}</label>
                             {(renderTime ?? zeitfeld)({
                                 id: 'calendar-end',

@@ -229,6 +229,26 @@ describe('das Zeitfeld', () => {
         expect(document.querySelectorAll('[data-slot="time-field"]')).toHaveLength(0);
     });
 
+    /**
+     * jsdom rechnet kein Layout, also kann dieser Test die Breite nicht messen
+     * — nur festhalten, dass die Spalte die weite Klasse traegt. Gemessen hat
+     * es der Browser: Huelle 112px, Inhalt 126px, und die Listen standen ueber
+     * dem Rand (Verwaltung, 15.10.2026).
+     */
+    it('gibt der Uhrzeit eine Spalte, in die zwei Listen passen', () => {
+        show({ value: draft({ allDay: false, start: '09:00', end: '10:00' }) });
+
+        const spalten = [...document.querySelectorAll('[data-slot="time-field"]')].map(
+            (f) => f.parentElement?.className,
+        );
+
+        expect(spalten).toHaveLength(2);
+        for (const klasse of spalten) {
+            expect(klasse).toContain('w-40');
+            expect(klasse).not.toContain('w-28');
+        }
+    });
+
     /** Ganztaegig gibt es keine Uhrzeit — dann auch kein Feld dafuer. */
     it('faellt ganz weg, wenn der Termin ganztaegig ist', () => {
         show({ value: draft({ allDay: true }) });
