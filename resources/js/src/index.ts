@@ -1,5 +1,7 @@
 export { calendarDefaults } from './calendarDefaults';
 export type { CalendarDefaultsOptions } from './calendarDefaults';
+export { CalendarBrowser } from './CalendarBrowser';
+export type { CalendarBrowserProps } from './CalendarBrowser';
 export { CalendarGrid } from './CalendarGrid';
 export type { CalendarEntry, CalendarGridHandle, CalendarGridProps, CalendarViewName } from './CalendarGrid';
 export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';

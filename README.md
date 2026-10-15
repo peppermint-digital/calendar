@@ -410,6 +410,85 @@ children straight through: the dialog *is* the wrapper.
 `onSaveHere` — because only your app knows its route, its payload and its extra
 fields. The foreign path lives in the package because it is the same everywhere.
 
+## The page the calendar sits on
+
+`CalendarBrowser` is the arrangement: head on top, view toolbar and grid in a
+card below it, and — when the product has one — a column beside the grid for
+whatever is still to be scheduled.
+
+```tsx
+<CalendarBrowser
+    title={<h1 className="text-3xl font-bold">Kalender</h1>}
+    actions={<><Filters … /><Button>Termin erstellen</Button></>}
+    notice={overlaps > 0 ? <OverlapHint count={overlaps} /> : null}
+    toolbar={<CalendarToolbar … />}
+    grid={<CalendarGrid height="100%" fillsContainerFromLg … />}
+    aside={<PlannableList … />}       // leave out and the grid takes the width
+/>
+```
+
+### Why the arrangement is in the package and not in the product
+
+It is the part every product would write identically. Measured on 15.10.2026,
+across four systems that all already drew their grid and their toolbar from
+this package:
+
+| System     | frame        | full height | column beside |
+| ---------- | ------------ | ----------- | ------------- |
+| Manager    | one card     | `lg:flex-1` | no            |
+| CRM        | six cards    | `xl:flex-1` | yes           |
+| Verwaltung | eight cards  | `xl:flex-1` | yes           |
+| Brain      | no card      | none        | no            |
+
+Four arrangements, and the arrangement is the part you actually see. Put four
+calendars side by side and you do not see the components — you see where they
+sit and how tall they are. The Manager is the template here: it is the
+most-used system, and its version is the only one where the grid really uses
+the window height.
+
+### Who scrolls
+
+From `lg` up the frame is as tall as the window and clips. The grid gets the
+remaining height and scrolls inside it — a week from 7 to 23 fits no screen,
+but the head with "Termin erstellen" has to stay put.
+
+Below `lg` it does not: the filter row wraps so far there that no usable height
+is left for the grid. The page scrolls as a whole. Pass `fullHeight={false}`
+for a page that should scroll everywhere.
+
+### The column beside the grid is a slot, not a decision
+
+CRM and Verwaltung put a list of what is still unscheduled next to the grid and
+drag from it into the grid. Manager and Brain have nothing to put there. Both
+are right — it depends on whether schedulable things arise in that system at
+all. So the frame does not decide it; filling `aside` does, the same way
+`MailboxBrowser` handles its sidecar.
+
+Two columns only from `xl`, and that is measured rather than guessed: stacked,
+the list and the grid are never both on screen at once, and "drag it into the
+grid" then needs a scroll mid-drag. That is what the first attempt in the
+Verwaltung failed on.
+
+### Classes are text, never assembled
+
+`heightClass` and `asideWidth` take finished Tailwind classes. They are never
+composed (no `xl:w-${n}`): Tailwind reads source and sees no variables — an
+assembled class silently produces no CSS.
+
+If you pass your own value, it also has to appear as text in **your** file,
+because Tailwind scans the product's project. The defaults live in the
+package's own source and are built along with it — provided your `app.css`
+carries
+
+```css
+@source '../../node_modules/@peppermint-digital/calendar/dist';
+```
+
+Without that line, exactly those classes go missing that only the package uses,
+and silently: the page builds, the component appears, it just sits wrong. On
+15.10.2026 that line was missing in three of the four systems — and `w-28`,
+`w-44` and `text-amber-600` were in fact absent from the CRM's CSS.
+
 ## When the grid sits in a card
 
 `height: '100%'` presumes the container has a **definite** height. Without one
