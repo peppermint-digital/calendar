@@ -62,7 +62,11 @@ export type EventComposerProps = {
     labels?: Partial<EventFormLabels & EventComposerLabels>;
 
     /**
-     * Die Umhuellung der Zielwahl, vom Produkt gestellt.
+     * Die Umhuellung der ABSCHNITTE, vom Produkt gestellt.
+     *
+     * Zielwahl und Formular sind zwei Abschnitte und bekommen je eine — so, wie
+     * es in den Produkten vorher stand. Wer stattdessen den ganzen Composer in
+     * eine Karte setzt und hier auch eine reicht, bekommt Karte in Karte.
      *
      * Das Paket zeichnet bewusst mit schlichten Elementen — eine Abhaengigkeit
      * auf eine Komponentensammlung zwaenge sie jedem Verbraucher auf. Das darf
@@ -251,26 +255,28 @@ export function EventComposer({
                 </div>,
             )}
 
-            <EventForm
-                kinds={sichtbareArten}
-                categories={categories}
-                categoryMode={categoryMode}
-                multiDay={multiDay}
-                allowRecurrence={allowRecurrence}
-                renderTime={renderTime}
-                value={sichtbarerEntwurf}
-                onChange={geaendert}
-                onSubmit={speichern}
-                onCancel={onCancel}
-                // Systemeigenes nur im eigenen Kalender: Drüben gelten die
-                // Regeln des Zielsystems, und ein Feld, dessen Eingabe nirgends
-                // ankommt, ist schlechter als keines.
-                extraFields={fremdesZiel ? undefined : extraFields}
-                submitting={submitting || fremd.busy}
-                error={eigenerFehler ?? error}
-                fieldErrors={fieldErrors}
-                labels={labels}
-            />
+            {umhuellen(
+                <EventForm
+                    kinds={sichtbareArten}
+                    categories={categories}
+                    categoryMode={categoryMode}
+                    multiDay={multiDay}
+                    allowRecurrence={allowRecurrence}
+                    renderTime={renderTime}
+                    value={sichtbarerEntwurf}
+                    onChange={geaendert}
+                    onSubmit={speichern}
+                    onCancel={onCancel}
+                    // Systemeigenes nur im eigenen Kalender: Drüben gelten die
+                    // Regeln des Zielsystems, und ein Feld, dessen Eingabe
+                    // nirgends ankommt, ist schlechter als keines.
+                    extraFields={fremdesZiel ? undefined : extraFields}
+                    submitting={submitting || fremd.busy}
+                    error={eigenerFehler ?? error}
+                    fieldErrors={fieldErrors}
+                    labels={labels}
+                />,
+            )}
         </div>
     );
 }
