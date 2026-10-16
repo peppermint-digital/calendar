@@ -123,6 +123,26 @@ return [
         'defaults' => [],
     ],
 
+    /*
+    |---------------------------------------------------------------------------
+    | Feed (ICS subscription)
+    |---------------------------------------------------------------------------
+    |
+    | The only unauthenticated route of this package: whoever holds the token
+    | reads that calendar, from any calendar client. The product owns the token
+    | — it decides the column, generates the value and lets people regenerate
+    | it. The package only refuses anything shorter than 32 characters.
+    */
+    'feed' => [
+        // Where the per-user token lives on the user model.
+        'token_column' => env('CALENDAR_FEED_TOKEN_COLUMN', 'calendar_token'),
+
+        // A subscription is not an archive: old events make the first fetch
+        // slow for no gain. Forward reaches further, because people plan ahead.
+        'past_days' => env('CALENDAR_FEED_PAST_DAYS', 90),
+        'future_days' => env('CALENDAR_FEED_FUTURE_DAYS', 365),
+    ],
+
     'ics' => [
         /*
         | Identifies the software that produced the file. Clients show it when

@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Http;
 
 use Illuminate\Support\Facades\Route;
 use Peppermint\Calendar\Http\Controllers\EventSourceController;
+use Peppermint\Calendar\Http\Controllers\IcsFeedController;
 
 /**
  * Die Routen, die das Paket mitbringt — zum Legen, nicht zum Erben.
@@ -128,6 +129,27 @@ class CalendarRoutes
     {
         Route::permanentRedirect('kalender', 'calendar');
         Route::permanentRedirect('kalender/termine/neu', 'calendar/create');
+    }
+
+    /**
+     * Der ICS-Feed — die EINZIGE nicht angemeldete Route dieses Pakets.
+     *
+     * Bewusst ein eigener Aufruf und nicht Teil von `pages()`: Wer einen
+     * oeffentlichen Endpunkt aufmacht, soll das in seiner Routendatei SEHEN.
+     * Eine Zeile, die beim Ueberfliegen wie die anderen aussieht, waere genau
+     * die, die niemand hinterfragt.
+     *
+     * Sie gehoert NICHT in eine `auth`-Gruppe — ein Kalenderprogramm hat keine
+     * Sitzung. Der Token ist die Berechtigung.
+     *
+     * ```php
+     * // ausserhalb jeder auth-Gruppe:
+     * CalendarRoutes::feed();
+     * ```
+     */
+    public static function feed(string $pfad = 'calendar/feed/{token}.ics'): void
+    {
+        Route::get($pfad, IcsFeedController::class)->name('calendar.feed');
     }
 
     public static function sources(): void
