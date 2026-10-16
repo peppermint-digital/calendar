@@ -410,6 +410,42 @@ children straight through: the dialog *is* the wrapper.
 `onSaveHere` — because only your app knows its route, its payload and its extra
 fields. The foreign path lives in the package because it is the same everywhere.
 
+## One address per page
+
+```php
+Route::middleware(['web', 'auth'])->group(function () {
+    CalendarRoutes::pages(CalendarController::class);
+    CalendarRoutes::germanRedirects();   // for products that used to speak German
+});
+```
+
+| | |
+| --- | --- |
+| `calendar` | `calendar.index` |
+| `calendar/create` | `calendar.create` |
+| `calendar/agenda` | `calendar.agenda` |
+| `calendar/{event}` | `calendar.show` |
+| `calendar/{event}/edit` | `calendar.edit` |
+
+On 16.10.2026 "create an appointment" meant four different things across four
+systems: `/calendar/create`, `/calendar/neu`, and twice
+`/kalender/termine/neu`. One form, four addresses — four sets of bookmarks,
+four sets of links, and no common URL you could write down anywhere.
+
+English, because the code is. The German paths of the two older systems stay as
+permanent redirects: an address that once worked is cheap to keep and expensive
+to lose.
+
+**The controller stays with the product.** It knows this system's database, its
+permissions and its fields. Shared are the addresses and the names, not the
+behaviour behind them.
+
+`create` and `agenda` are laid *before* `{event}` — the other way round the
+placeholder swallows them, `/calendar/create` becomes an appointment with the
+id "create", and the page 404s instead of showing the form. Pass `only` to lay
+just the operations your controller actually serves; the AI Brain deletes by
+file path rather than row id, so its `destroy` does not fit the scheme.
+
 ## The page the calendar sits on
 
 `CalendarBrowser` is the arrangement: head on top, view toolbar and grid in a

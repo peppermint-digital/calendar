@@ -43,6 +43,93 @@ class CalendarRoutes
      * tragen, was ein fremdes System als Kennung benutzt — eine Einschraenkung
      * auf Ziffern haette CalDAV-Kennungen ausgeschlossen, die auf `.ics` enden.
      */
+    /**
+     * Die Seiten des Kalenders — Pfade und Namen vom Paket, Verhalten vom Produkt.
+     *
+     * ## Warum das Paket die Adressen vorgibt
+     *
+     * Am 16.10.2026 hiess „Termin anlegen" in vier Systemen vier verschiedene
+     * Dinge: `/calendar/create`, `/calendar/neu` und zweimal
+     * `/kalender/termine/neu`. Dieselbe Maske, vier Adressen — und damit vier
+     * Satz Lesezeichen, vier Satz Verweise und kein gemeinsamer Link, den man
+     * irgendwo hinschreiben koennte (#7846).
+     *
+     * Englisch, weil der Code es ist. Die deutschen Pfade der beiden aelteren
+     * Systeme bleiben als dauerhafte Weiterleitung bestehen; eine Adresse, die
+     * einmal funktioniert hat, ist billig zu erhalten und teuer zu verlieren.
+     *
+     * ## Was hier NICHT steht
+     *
+     * Der Controller. Jedes Produkt bringt seinen eigenen mit — er kennt die
+     * Datenbank, die Rechte und die Felder dieses Systems. Geteilt sind
+     * Adressen und Namen, nicht das Verhalten dahinter.
+     *
+     * ```php
+     * Route::middleware(['web', 'auth'])->group(function () {
+     *     CalendarRoutes::pages(CalendarController::class);
+     * });
+     * ```
+     *
+     * ## Die Reihenfolge ist nicht beliebig
+     *
+     * `create` und `agenda` stehen VOR `{event}`. Andersherum verschluckt der
+     * Platzhalter sie: `/calendar/create` waere dann ein Termin mit der
+     * Kennung „create", und die Seite zeigte einen 404 statt der Maske.
+     *
+     * @param  class-string  $controller  Der Controller des Produkts.
+     * @param  array<int, string>  $only   Nur diese Vorgaenge legen. Leer = alle.
+     */
+    public static function pages(string $controller, array $only = []): void
+    {
+        $nimmt = static fn (string $name): bool => $only === [] || in_array($name, $only, true);
+
+        if ($nimmt('index')) {
+            Route::get('calendar', [$controller, 'index'])->name('calendar.index');
+        }
+
+        // Vor `{event}` — sonst verschluckt der Platzhalter sie.
+        if ($nimmt('create')) {
+            Route::get('calendar/create', [$controller, 'create'])->name('calendar.create');
+        }
+
+        if ($nimmt('agenda')) {
+            Route::get('calendar/agenda', [$controller, 'agenda'])->name('calendar.agenda');
+        }
+
+        if ($nimmt('store')) {
+            Route::post('calendar', [$controller, 'store'])->name('calendar.store');
+        }
+
+        if ($nimmt('show')) {
+            Route::get('calendar/{event}', [$controller, 'show'])->name('calendar.show');
+        }
+
+        if ($nimmt('edit')) {
+            Route::get('calendar/{event}/edit', [$controller, 'edit'])->name('calendar.edit');
+        }
+
+        if ($nimmt('update')) {
+            Route::put('calendar/{event}', [$controller, 'update'])->name('calendar.update');
+        }
+
+        if ($nimmt('destroy')) {
+            Route::delete('calendar/{event}', [$controller, 'destroy'])->name('calendar.destroy');
+        }
+    }
+
+    /**
+     * Die deutschen Pfade der aelteren Systeme auf die englischen umlenken.
+     *
+     * Dauerhaft (301), nicht vorlaeufig: Diese Adressen standen in Lesezeichen,
+     * in Mails und in Verweisen anderer Seiten. Wer sie aufruft, soll ankommen
+     * und nicht auf einer 404 landen.
+     */
+    public static function germanRedirects(): void
+    {
+        Route::permanentRedirect('kalender', 'calendar');
+        Route::permanentRedirect('kalender/termine/neu', 'calendar/create');
+    }
+
     public static function sources(): void
     {
         Route::get('sources/{source}/kinds', [EventSourceController::class, 'kinds'])

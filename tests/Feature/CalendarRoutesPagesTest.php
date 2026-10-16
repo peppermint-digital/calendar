@@ -1,0 +1,87 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Peppermint\Calendar\Http\CalendarRoutes;
+
+/**
+ * Die Seitenrouten des Pakets.
+ *
+ * Am 16.10.2026 hiess „Termin anlegen" in vier Systemen vier verschiedene
+ * Dinge. Diese Tests halten die eine Fassung fest — Pfade und Namen, nicht das
+ * Verhalten dahinter (#7846).
+ */
+beforeEach(function () {
+    Route::middleware('web')->group(fn () => CalendarRoutes::pages('App\\Fake\\CalendarController'));
+    Route::getRoutes()->refreshNameLookups();
+});
+
+function routePath(string $name): ?string
+{
+    $route = Route::getRoutes()->getByName($name);
+
+    return $route?->uri();
+}
+
+it('legt alle Seiten unter einem englischen Pfad', function () {
+    expect(routePath('calendar.index'))->toBe('calendar');
+    expect(routePath('calendar.create'))->toBe('calendar/create');
+    expect(routePath('calendar.agenda'))->toBe('calendar/agenda');
+    expect(routePath('calendar.show'))->toBe('calendar/{event}');
+    expect(routePath('calendar.edit'))->toBe('calendar/{event}/edit');
+});
+
+/**
+ * Andersherum verschluckt der Platzhalter sie: `/calendar/create` waere dann
+ * ein Termin mit der Kennung „create", und die Seite zeigte einen 404 statt
+ * der Maske.
+ */
+it('legt create und agenda VOR den Platzhalter', function () {
+    $pfade = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($r) => str_starts_with($r->uri(), 'calendar') && in_array('GET', $r->methods(), true))
+        ->map(fn ($r) => $r->uri())
+        ->values();
+
+    $create = $pfade->search('calendar/create');
+    $platzhalter = $pfade->search('calendar/{event}');
+
+    expect($create)->not->toBeFalse();
+    expect($platzhalter)->not->toBeFalse();
+    expect($create)->toBeLessThan($platzhalter);
+});
+
+/**
+ * Das Brain loescht ueber einen Dateipfad statt ueber eine Zeilennummer; seine
+ * `destroy` passt nicht ins Schema. Ein Produkt muss deshalb waehlen duerfen,
+ * welche Vorgaenge es uebernimmt — sonst legt das Paket ihm eine Route, die
+ * sein Controller nicht bedienen kann.
+ */
+it('legt nur, was das Produkt auch bedient', function () {
+    Route::setRoutes(new Illuminate\Routing\RouteCollection);
+    Route::middleware('web')->group(fn () => CalendarRoutes::pages('App\\Fake\\CalendarController', ['index', 'create']));
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(routePath('calendar.index'))->toBe('calendar');
+    expect(routePath('calendar.create'))->toBe('calendar/create');
+    expect(routePath('calendar.show'))->toBeNull();
+    expect(routePath('calendar.destroy'))->toBeNull();
+});
+
+/**
+ * Geprueft wird die Route, nicht der Aufruf: Ein echter Aufruf braeuchte einen
+ * `APP_KEY`, den die Paketumgebung nicht hat — und er wuerde Laravels
+ * Weiterleitung pruefen, nicht unsere Zuordnung.
+ */
+it('lenkt die alten deutschen Pfade dauerhaft um', function () {
+    Route::setRoutes(new Illuminate\Routing\RouteCollection);
+    Route::middleware('web')->group(fn () => CalendarRoutes::germanRedirects());
+
+    $ziele = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($r) => str_starts_with($r->uri(), 'kalender'))
+        ->mapWithKeys(fn ($r) => [$r->uri() => $r->defaults]);
+
+    expect($ziele)->toHaveCount(2);
+    expect($ziele['kalender']['destination'])->toBe('calendar');
+    expect($ziele['kalender']['status'])->toBe(301);
+    expect($ziele['kalender/termine/neu']['destination'])->toBe('calendar/create');
+    expect($ziele['kalender/termine/neu']['status'])->toBe(301);
+});
