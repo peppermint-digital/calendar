@@ -316,11 +316,15 @@ export function EventComposer({
      * gebraucht werden — Art, Titel, Ort und Beschreibung kommen aus der
      * Aufgabe. Eine Maske, die beide Saetze zeigt, fragt die Haelfte umsonst.
      */
-    const [zeitraum, setZeitraum] = useState({
-        date: preset?.date ?? heute(),
-        start: preset?.start ?? '09:00',
-        end: preset?.end ?? '10:00',
-    });
+    const [zeitraum, setZeitraum] = useState(() => ({
+        // Aus dem Entwurf, nicht nur aus `preset`: Ein Produkt, das seinen
+        // Entwurf selbst haelt (`draft`), gibt die Vorgabe schon dort hinein
+        // — der markierte Zeitraum stuende sonst im Termin-Weg und fehlte im
+        // Aufgaben-Weg daneben.
+        date: entwurf.date || preset?.date || heute(),
+        start: entwurf.start || preset?.start || '09:00',
+        end: entwurf.end || preset?.end || '10:00',
+    }));
 
     const aufgabenWeg = Boolean(plannable) && ! bearbeiten;
 

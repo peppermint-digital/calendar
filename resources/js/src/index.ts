@@ -4,6 +4,9 @@ export { CalendarBrowser } from './CalendarBrowser';
 export type { CalendarBrowserProps } from './CalendarBrowser';
 export { CalendarGrid } from './CalendarGrid';
 export type { CalendarEntry, CalendarGridHandle, CalendarGridProps, CalendarViewName, EntryChange } from './CalendarGrid';
+// Die Filterleiste: Arten und Fremdquellen — was alle vier Systeme haben.
+export { CalendarFilters, SOURCE_KEY_PREFIX, isHidden, sourceKey, toggleHidden } from './CalendarFilters';
+export type { CalendarFilterEntry, CalendarFiltersProps } from './CalendarFilters';
 export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';
 export type { CalendarToolbarButton, CalendarToolbarLabels, CalendarToolbarProps } from './CalendarToolbar';
 export { AgendaList, groupByDay } from './AgendaList';

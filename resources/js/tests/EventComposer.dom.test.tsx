@@ -377,3 +377,27 @@ describe('der Aufgaben-Weg', () => {
         expect(screen.getByLabelText(/Titel/)).toBeTruthy();
     });
 });
+
+/**
+ * Ein Produkt, das seinen Entwurf selbst hält, gibt die Vorgabe dort hinein —
+ * nicht als `preset`. Der markierte Zeitraum stünde sonst im Termin-Weg und
+ * fehlte im Aufgaben-Weg daneben (Brain, 16.10.2026).
+ */
+it('nimmt den Zeitraum auch aus einem gesteuerten Entwurf', async () => {
+    const eingeplant = vi.fn();
+
+    render(
+        <EventComposer
+            kinds={EIGENE}
+            draft={{ ...emptyDraft(), kind: 'crm_termin', date: '2026-04-01', start: '11:00', end: '12:00' }}
+            onDraftChange={() => {}}
+            onSaveHere={() => {}}
+            plannable={{ search: () => Promise.resolve([{ id: 3, title: 'Aus dem Entwurf' }]), onSchedule: eingeplant }}
+        />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+    fireEvent.click(await screen.findByText('Aus dem Entwurf'));
+
+    expect(eingeplant).toHaveBeenCalledWith(3, { date: '2026-04-01', start: '11:00', end: '12:00' });
+});

@@ -25,6 +25,15 @@ export type EventKind = {
      * hereinreicht.
      */
     creatable?: boolean;
+    /**
+     * Die Farbe, in der das Raster diese Art zeichnet.
+     *
+     * Freigestellt, weil die Farbtafel im Produkt liegt — der Manager hält
+     * sie im Frontend, die Verwaltung im Controller. Steht sie hier, kann die
+     * Filterleiste die Marke zeigen, ohne dass das Produkt die Tafel ein
+     * zweites Mal hereinreicht.
+     */
+    colour?: string | null;
 };
 
 /** Die Wochentagskuerzel, wie RFC 5545 und das PHP-Paket sie schreiben. */
