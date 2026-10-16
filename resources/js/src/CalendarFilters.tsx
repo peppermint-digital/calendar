@@ -27,9 +27,20 @@ export function sourceKey(key: string): string {
  * Brain der Fall: Die Leiste kannte `source:`, der Filter für eigene Termine
  * nicht.
  */
-export function isHidden(hidden: readonly string[], kind: string, source?: string | null): boolean {
+export function isHidden(
+    hidden: readonly string[],
+    // Freigestellt, weil ein FREMDER Termin keine eigene Art hat: Er haengt an
+    // seiner Quelle, und die Art drueben ist ein Begriff des anderen Systems.
+    // `isHidden(hidden, null, 'manager')` liest sich wie es gemeint ist.
+    kind?: string | null,
+    source?: string | null,
+): boolean {
     if (source !== undefined && source !== null && source !== '') {
         return hidden.includes(sourceKey(source));
+    }
+
+    if (kind === undefined || kind === null || kind === '') {
+        return false;
     }
 
     return hidden.includes(kind);

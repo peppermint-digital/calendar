@@ -134,3 +134,14 @@ describe('die Regel zum Aussieben', () => {
         expect(sourceKey('manager')).toBe('source:manager');
     });
 });
+
+/**
+ * Ein FREMDER Termin hat keine eigene Art — er hängt an seiner Quelle, und
+ * die Art drüben ist ein Begriff des anderen Systems. Im Brain stand genau
+ * dafür ein zweiter, handgeschriebener Filter (16.10.2026).
+ */
+it('siebt einen fremden Termin auch ohne Art', () => {
+    expect(isHidden(['source:manager'], null, 'manager')).toBe(true);
+    expect(isHidden(['source:crm'], null, 'manager')).toBe(false);
+    expect(isHidden([], undefined, undefined)).toBe(false);
+});
