@@ -3,9 +3,11 @@
 namespace Peppermint\Calendar\Http\Controllers;
 
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Response;
 use Peppermint\Calendar\Ics\IcsExporter;
 use Peppermint\Calendar\Models\CalendarEvent;
+use Peppermint\Calendar\Sources\EventSourceRegistry;
 use Peppermint\Calendar\Support\FeedToken;
 
 /**
@@ -40,9 +42,21 @@ use Peppermint\Calendar\Support\FeedToken;
  * Teilnahme — dasselbe, was diese Person in ihrem Kalender sieht. Nicht mehr:
  * Ein Feed ist keine Gelegenheit, Rechte neu zu erfinden.
  *
- * **Keine fremden Kalender.** Termine aus anderen Systemen bleiben draussen.
- * Sie liegen dort, sind dort abonnierbar, und ein Feed, der bei jedem Abruf
- * drei Fremdsysteme befragt, ist langsam und fällt mit ihnen aus.
+ * **Fremde Kalender nur, wo das System der Knoten ist.** Standardmässig bleiben
+ * Termine aus anderen Systemen draussen: Sie liegen dort, sind dort
+ * abonnierbar, und ein Feed, der bei jedem Abruf drei Fremdsysteme befragt,
+ * ist langsam und fällt mit ihnen aus.
+ *
+ * Für EIN System stimmt das aber nicht — den Knoten. Das AI Brain sammelt über
+ * das Fähigkeiten-Register alle angebundenen Produkte ein und ist damit der
+ * Hauptkalender; sein Feed ohne die fremden Termine wäre ein Hauptkalender
+ * ohne Hauptinhalt. Deshalb ist es eine Entscheidung des Produkts
+ * (`calendar.feed.include_sources`) und kein Gesetz des Pakets.
+ *
+ * Die erste Fassung hatte es als Gesetz. Das war aus Sicht einer Speiche
+ * richtig und aus Sicht der Nabe falsch — aufgefallen erst, als die Frage
+ * „gehört CalDAV nicht ins Brain?" den Unterschied sichtbar machte
+ * (16.10.2026).
  */
 class IcsFeedController
 {
@@ -62,7 +76,13 @@ class IcsFeedController
             ->get();
 
         return response(
-            $exporter->calendar($termine, (string) config('app.name')),
+            $exporter->calendar(
+                $termine,
+                (string) config('app.name'),
+                foreign: (bool) config('calendar.feed.include_sources', false)
+                    ? $this->fremde((int) $person->getKey(), $von, $bis)
+                    : [],
+            ),
             200,
             [
                 'Content-Type' => 'text/calendar; charset=utf-8',
@@ -105,6 +125,25 @@ class IcsFeedController
         $spalte = config('calendar.feed.token_column', 'calendar_token');
 
         return $modell::query()->where($spalte, $token)->first();
+    }
+
+    /**
+     * Die Termine der angebundenen Systeme — nur beim Knoten.
+     *
+     * Ein Fremdsystem, das gerade nicht antwortet, darf den Feed NICHT
+     * mitreissen: Lieber ein Abonnement ohne die Termine des einen Systems als
+     * ein Kalenderprogramm, das eine Fehlermeldung bekommt und beim nächsten
+     * Versuch auch nichts hat. Der Registrierung ist das bekannt — sie faengt
+     * den Ausfall einer Quelle ab und liefert die uebrigen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function fremde(int $userId, CarbonInterface $von, CarbonInterface $bis): array
+    {
+        return array_map(
+            fn ($termin) => is_array($termin) ? $termin : $termin->toArray(),
+            app(EventSourceRegistry::class)->collect($userId, $von, $bis),
+        );
     }
 
     /**

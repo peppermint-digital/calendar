@@ -141,6 +141,20 @@ return [
         // slow for no gain. Forward reaches further, because people plan ahead.
         'past_days' => env('CALENDAR_FEED_PAST_DAYS', 90),
         'future_days' => env('CALENDAR_FEED_FUTURE_DAYS', 365),
+
+        /*
+        | Whether the feed also carries events from connected systems.
+        |
+        | Off for a spoke: those events live in the other system and are
+        | subscribable there, and a feed that queries three remote systems on
+        | every fetch is slow and fails with them.
+        |
+        | On for the HUB — the one system that aggregates the others (here: AI
+        | Brain, which turns every connected product offering
+        | `calendar.events.list` into a source). Its feed without the foreign
+        | events would be a main calendar without its main content.
+        */
+        'include_sources' => env('CALENDAR_FEED_INCLUDE_SOURCES', false),
     ],
 
     'ics' => [

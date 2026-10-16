@@ -30,7 +30,7 @@ class IcsExporter
     /**
      * @param  iterable<CalendarEvent>  $events
      */
-    public function calendar(iterable $events, ?string $name = null, string $method = 'PUBLISH'): string
+    public function calendar(iterable $events, ?string $name = null, string $method = 'PUBLISH', array $foreign = []): string
     {
         $calendar = IcsCalendar::create($name ?? '')
             ->productIdentifier((string) config('calendar.ics.prodid'))
@@ -47,7 +47,53 @@ class IcsExporter
             $calendar->event($this->component($event));
         }
 
+        foreach ($foreign as $event) {
+            $calendar->event($this->foreignComponent($event));
+        }
+
         return $calendar->get();
+    }
+
+    /**
+     * Ein Termin aus einem ANDEREN System als Baustein.
+     *
+     * Bewusst knapp: Was drueben an Feldern haengt — Kategorien, Teilnehmer,
+     * Serienregeln — gehoert dort hin und ist hier nicht zuverlaessig bekannt.
+     * Ein Abonnement soll zeigen, WANN jemand nicht kann; es ist keine Kopie
+     * des fremden Kalenders.
+     *
+     * Die Kennung traegt das Vorzeichen der Quelle (`manager:42@…`), damit ein
+     * fremder Termin nie die Kennung eines eigenen trifft. Ohne das
+     * ueberschreiben sich im Kalenderprogramm zwei Termine gegenseitig, sobald
+     * zwei Systeme dieselbe Zahl vergeben — und das tun sie, denn beide zaehlen
+     * ab eins.
+     *
+     * @param  array<string, mixed>  $daten  die Form von `ExternalEvent::toArray()`
+     */
+    public function foreignComponent(array $daten): IcsEvent
+    {
+        $start = CarbonImmutable::parse($daten['starts_at']);
+        $end = isset($daten['ends_at']) && $daten['ends_at'] !== null
+            ? CarbonImmutable::parse($daten['ends_at'])
+            : $start;
+
+        $allDay = (bool) ($daten['all_day'] ?? false);
+
+        $component = IcsEvent::create()
+            ->uniqueIdentifier(((string) ($daten['id'] ?? '')).'@'.config('calendar.ics.uid_domain'))
+            ->name((string) ($daten['title'] ?? ''))
+            ->startsAt($allDay ? $start->startOfDay() : $start->utc())
+            ->endsAt($allDay ? $end->startOfDay()->addDay() : $end->utc());
+
+        if ($allDay) {
+            $component->fullDay();
+        }
+
+        if (filled($daten['location'] ?? null)) {
+            $component->address((string) $daten['location']);
+        }
+
+        return $component;
     }
 
     /** Ein einzelner Termin als vollstaendige Datei — fuer Mail-Anhaenge. */

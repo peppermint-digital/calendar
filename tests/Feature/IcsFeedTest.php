@@ -195,15 +195,46 @@ describe('was im Feed steht', function () {
     });
 
     /**
-     * Fremde Kalender bleiben draussen. Sie liegen dort, sind dort
-     * abonnierbar, und ein Feed, der bei jedem Abruf drei Fremdsysteme
-     * befragt, ist langsam und fällt mit ihnen aus.
+     * Fremde Kalender bleiben draussen — bei einer SPEICHE. Sie liegen dort,
+     * sind dort abonnierbar, und ein Feed, der bei jedem Abruf drei
+     * Fremdsysteme befragt, ist langsam und fällt mit ihnen aus.
      */
-    it('befragt keine fremden Systeme', function () {
+    it('befragt standardmaessig keine fremden Systeme', function () {
         feedPerson();
 
         expect($this->get('/calendar/feed/'.feedToken().'.ics')->getContent())
             ->not->toContain('Meeting elsewhere');
+    });
+
+    /**
+     * Beim KNOTEN stimmt das nicht.
+     *
+     * Das AI Brain sammelt über das Fähigkeiten-Register alle angebundenen
+     * Produkte ein und ist damit der Hauptkalender; sein Feed ohne die fremden
+     * Termine wäre ein Hauptkalender ohne Hauptinhalt. Deshalb eine
+     * Entscheidung des Produkts und kein Gesetz des Pakets (16.10.2026).
+     */
+    it('nimmt sie mit, wo das System der Knoten ist', function () {
+        config()->set('calendar.feed.include_sources', true);
+
+        feedPerson();
+
+        expect($this->get('/calendar/feed/'.feedToken().'.ics')->getContent())
+            ->toContain('Meeting elsewhere');
+    });
+
+    /**
+     * Die Kennung trägt das Vorzeichen der Quelle, sonst überschreiben sich im
+     * Kalenderprogramm zwei Termine gegenseitig, sobald zwei Systeme dieselbe
+     * Zahl vergeben — und das tun sie, denn beide zählen ab eins.
+     */
+    it('gibt einem fremden Termin eine eigene Kennung', function () {
+        config()->set('calendar.feed.include_sources', true);
+
+        feedPerson();
+
+        expect($this->get('/calendar/feed/'.feedToken().'.ics')->getContent())
+            ->toContain('UID:demo:42@');
     });
 
     /** Die Spalte heisst nicht überall gleich. */
@@ -257,4 +288,26 @@ describe('der Token', function () {
         expect($this->get('/calendar/feed/'.$token.'.ics')->getContent())
             ->toContain('Mit frischem Token');
     });
+});
+
+/**
+ * Ein Fremdsystem, das gerade nicht antwortet, darf den Feed nicht mitreissen.
+ *
+ * Lieber ein Abonnement ohne die Termine des einen Systems als ein
+ * Kalenderprogramm, das eine Fehlermeldung bekommt und beim nächsten Versuch
+ * auch nichts hat. Geprüft statt angenommen — im Kommentar stand die Zusage,
+ * bevor diese Prüfung sie belegt hat.
+ */
+it('liefert weiter, wenn ein fremdes System ausfaellt', function () {
+    config()->set('calendar.feed.include_sources', true);
+    DemoSource::$throws = true;
+
+    $person = feedPerson();
+    feedTermin($person, ['title' => 'Mein eigener Termin']);
+
+    $antwort = $this->get('/calendar/feed/'.feedToken().'.ics');
+
+    $antwort->assertOk();
+    expect($antwort->getContent())->toContain('Mein eigener Termin')
+        ->and($antwort->getContent())->not->toContain('Meeting elsewhere');
 });
