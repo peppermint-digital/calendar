@@ -9,6 +9,8 @@ export type { CalendarToolbarButton, CalendarToolbarLabels, CalendarToolbarProps
 export { AgendaList, groupByDay } from './AgendaList';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
 export { PlannableList, PLANNABLE_ATTRIBUTE } from './PlannableList';
+export { PlannableSearch } from './PlannableSearch';
+export type { Plannable, PlannableSearchProps } from './PlannableSearch';
 export type { PlannableEntry, PlannableListProps } from './PlannableList';
 export { useRemoteTarget, remoteMoment } from './useRemoteTarget';
 export type { RemoteDraft, RemoteKind, RemoteSource, UseRemoteTargetOptions } from './useRemoteTarget';

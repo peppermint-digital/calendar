@@ -572,6 +572,33 @@ page load. Without it a rejected move stays on screen while the server holds
 the old time — which is worse than an error, because it looks like success.
 Over Inertia you do not need it: the entries come back fresh anyway.
 
+### Planning something that already exists
+
+```tsx
+<PlannableSearch
+    search={(term) => fetch(`/api/calendar/plannable-tasks?q=${term}`).then((r) => r.json()).then((d) => d.tasks)}
+    onPick={(id) => scheduleIt(id)}
+/>
+```
+
+"Plan an existing task" is not a task operation as far as the calendar is
+concerned — it is a `PlannedBlockKind`: an entry carrying a `subject_type` and
+`subject_id`. The calendar models that already; what it lacked was a way to
+*find* the subject.
+
+Creating a *new* task does not belong here. Title, priority and project are
+vocabulary of the task system, and a form for them in this package would mean
+the calendar knowing about someone else's database. Link out instead, with the
+time range in the query.
+
+`search` is a function, not a path. Every system asks its own endpoint — the AI
+Brain `/api/calendar/plannable-tasks`, the Verwaltung its open tickets. A fixed
+path would have forced all of them to build the same endpoint.
+
+**Pass no `search` and the whole route disappears.** That is the modularity:
+with no task system plugged in there is nothing to plan, and the form does not
+ask.
+
 ### The stylesheet
 
 ```css
