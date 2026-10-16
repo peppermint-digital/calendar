@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EventComposer } from '../src/EventComposer';
-import type { EventKind } from '../src/types';
+import { emptyDraft, type EventKind } from '../src/types';
 import type { RemoteSource } from '../src/useRemoteTarget';
 
 /**
@@ -272,5 +272,108 @@ describe('speichern', () => {
         const anlegen = anfragen.find((a) => a.url.endsWith('/sources/manager/events'));
         expect(anlegen).toBeTruthy();
         expect(JSON.parse(String(anlegen?.init?.body)).title).toBe('Abstimmung');
+    });
+});
+
+/**
+ * Der zweite Weg: eine bestehende Aufgabe einplanen.
+ *
+ * Er ist der Grund, warum der Moduswechsel im Paket steht und nicht in den
+ * vier Produkten: „Neuer Termin" fragt überall dasselbe (#7846).
+ */
+describe('der Aufgaben-Weg', () => {
+    const offen = [{ id: 7, title: 'Abgabe vorbereiten' }];
+
+    /** Ohne angestecktes Aufgabensystem gibt es nichts einzuplanen. */
+    it('erscheint nicht, wenn das Produkt keine Suche mitgibt', () => {
+        render(<EventComposer kinds={EIGENE} value={null} onSaveHere={() => {}} />);
+
+        expect(screen.queryByText('Aufgabe einplanen')).toBeNull();
+    });
+
+    it('bietet beide Wege, sobald eine Suche da ist', () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={() => {}}
+                plannable={{ search: () => Promise.resolve(offen), onSchedule: () => {} }}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: 'Termin' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Aufgabe einplanen' })).toBeTruthy();
+    });
+
+    /**
+     * Beim Bearbeiten steht schon fest, was der Eintrag ist — dieselbe
+     * Begründung wie bei der Zielwahl darüber.
+     */
+    it('fehlt beim Bearbeiten', () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={{ ...emptyDraft(), kind: 'termin', title: 'Steht schon' }}
+                onSaveHere={() => {}}
+                plannable={{ search: () => Promise.resolve(offen), onSchedule: () => {} }}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: 'Aufgabe einplanen' })).toBeNull();
+    });
+
+    it('gibt den Zeitraum mit, nicht nur die Aufgabe', async () => {
+        const eingeplant = vi.fn();
+
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                preset={{ date: '2026-03-12', start: '14:00', end: '15:30' }}
+                onSaveHere={() => {}}
+                plannable={{ search: () => Promise.resolve(offen), onSchedule: eingeplant }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(await screen.findByText('Abgabe vorbereiten'));
+
+        expect(eingeplant).toHaveBeenCalledWith(7, { date: '2026-03-12', start: '14:00', end: '15:30' });
+    });
+
+    /** Eine neue Aufgabe anzulegen gehört dem Aufgabensystem — mit dem Zeitraum. */
+    it('nimmt den Zeitraum in den Weg hinaus mit', () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                preset={{ date: '2026-03-12', start: '14:00', end: '15:30' }}
+                onSaveHere={() => {}}
+                plannable={{
+                    search: () => Promise.resolve(offen),
+                    onSchedule: () => {},
+                    newHref: '/tasks/create',
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+
+        const hinaus = screen.getByText('Neue Aufgabe anlegen') as HTMLAnchorElement;
+        expect(hinaus.getAttribute('href')).toBe('/tasks/create?date=2026-03-12&start=14:00&end=15:30');
+    });
+
+    /** Im Termin-Weg bleibt die Maske, wie sie war. */
+    it('zeigt die Felder weiter, solange „Termin" gewaehlt ist', () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={() => {}}
+                plannable={{ search: () => Promise.resolve(offen), onSchedule: () => {} }}
+            />,
+        );
+
+        expect(screen.getByLabelText(/Titel/)).toBeTruthy();
     });
 });

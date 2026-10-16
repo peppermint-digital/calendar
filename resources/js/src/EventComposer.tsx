@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { DateField } from './DateField';
 import { EventForm, type EventFormErrors, type EventFormLabels } from './EventForm';
+import { PlannableSearch, type Plannable } from './PlannableSearch';
+import { TimeField } from './TimeField';
 import { emptyDraft, type EventCategory, type EventDraft, type EventKind } from './types';
 import { useRemoteTarget, type RemoteSource } from './useRemoteTarget';
 
@@ -10,6 +13,15 @@ export type EventComposerLabels = {
     ownCalendar: string;
     /** Erklärung unter der Zielwahl. `{system}` wird ersetzt. */
     targetHint: string;
+    /** Die beiden Wege ueber der Maske. */
+    modeEvent: string;
+    modePlannable: string;
+    /** Ueber dem Zeitraum im Aufgaben-Weg. */
+    plannableSlot: string;
+    /** Ueber der Suche. */
+    plannablePick: string;
+    /** Der Weg hinaus, wenn es die Aufgabe noch nicht gibt. */
+    plannableNew: string;
 };
 
 const COMPOSER_DEFAULTS: EventComposerLabels = {
@@ -18,6 +30,11 @@ const COMPOSER_DEFAULTS: EventComposerLabels = {
     targetHint:
         'Der Termin entsteht in {system} und gehört dort hin. Terminart und Felder kommen von dort — ' +
         'hier erscheint er danach als fremder Termin, angezeigt und nicht kopiert.',
+    modeEvent: 'Termin',
+    modePlannable: 'Aufgabe einplanen',
+    plannableSlot: 'Wann',
+    plannablePick: 'Was',
+    plannableNew: 'Neue Aufgabe anlegen',
 };
 
 export type EventComposerProps = {
@@ -100,6 +117,27 @@ export type EventComposerProps = {
      */
     renderSection?: (children: ReactNode) => ReactNode;
     /** Wo die Routen des Pakets liegen. */
+    /**
+     * Der zweite Weg: eine BESTEHENDE Aufgabe einplanen.
+     *
+     * Ohne diese Angabe gibt es den Weg nicht — kein Moduswechsel, keine
+     * Suche. Das ist die Modularitaet: Wo kein Aufgabensystem angesteckt ist,
+     * gibt es nichts einzuplanen, und die Maske fragt nicht danach.
+     *
+     * `search` fragt die Stelle des Produkts (siehe {@link PlannableSearch}),
+     * `onSchedule` legt den Block an und bekommt den Zeitraum dazu — denn der
+     * steht hier und nicht im Entwurf der Maske.
+     *
+     * `newHref` ist der Weg hinaus, wenn es die Aufgabe noch nicht gibt: Eine
+     * NEUE Aufgabe anzulegen gehoert dem Aufgabensystem, nicht dem Kalender.
+     */
+    plannable?: {
+        search: (begriff: string) => Promise<Plannable[]>;
+        onSchedule: (id: number | string, slot: { date: string; start: string; end: string }) => void;
+        newHref?: string;
+        busy?: boolean;
+    };
+
     basePath?: string;
     /** Kopfzeilen für die Aufrufe ins andere System — CSRF und dergleichen. */
     headers?: () => Record<string, string>;
@@ -169,6 +207,7 @@ export function EventComposer({
     error = null,
     fieldErrors,
     labels,
+    plannable,
     renderSection,
     basePath,
     headers,
@@ -260,6 +299,31 @@ export function EventComposer({
 
     const zielname = targets.find((ziel) => ziel.key === fremd.target)?.label ?? '';
 
+    /**
+     * Welcher der beiden Wege gerade offen ist.
+     *
+     * Beim Bearbeiten gibt es die Wahl nicht: Da steht schon fest, was der
+     * Eintrag ist. Ihn von einem Termin in eine eingeplante Aufgabe zu
+     * verwandeln waere ein anderer Vorgang als ihn zu aendern — dieselbe
+     * Begruendung wie bei der Zielwahl darueber.
+     */
+    const [weg, setWeg] = useState<'termin' | 'aufgabe'>('termin');
+
+    /**
+     * Der Zeitraum fuer den Aufgaben-Weg.
+     *
+     * Eigener Zustand neben dem Entwurf der Maske, weil hier nur drei Felder
+     * gebraucht werden — Art, Titel, Ort und Beschreibung kommen aus der
+     * Aufgabe. Eine Maske, die beide Saetze zeigt, fragt die Haelfte umsonst.
+     */
+    const [zeitraum, setZeitraum] = useState({
+        date: preset?.date ?? heute(),
+        start: preset?.start ?? '09:00',
+        end: preset?.end ?? '10:00',
+    });
+
+    const aufgabenWeg = Boolean(plannable) && ! bearbeiten;
+
     /** Die Umhuellung des Produkts — oder ein schlichter Rahmen. */
     const umhuellen = (kinder: ReactNode): ReactNode =>
         renderSection ? renderSection(kinder) : <div className="rounded-lg border p-4">{kinder}</div>;
@@ -304,7 +368,78 @@ export function EventComposer({
                 </div>,
             )}
 
-            {umhuellen(
+            {/*
+                Die Wahl steht VOR den Feldern, weil sie bestimmt, welche
+                gebraucht werden. Zwei Knoepfe, kein Dialog: Ein Dialog davor
+                waere ein Klick mehr fuer den haeufigeren der beiden Wege.
+            */}
+            {aufgabenWeg && umhuellen(
+                <div className="flex gap-2">
+                    {(['termin', 'aufgabe'] as const).map((eintrag) => (
+                        <button
+                            key={eintrag}
+                            type="button"
+                            onClick={() => setWeg(eintrag)}
+                            aria-pressed={weg === eintrag}
+                            className={
+                                weg === eintrag
+                                    ? 'h-9 flex-1 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground'
+                                    : 'h-9 flex-1 rounded-md border px-3 text-sm font-medium hover:bg-muted'
+                            }
+                        >
+                            {eintrag === 'termin' ? beschriftung.modeEvent : beschriftung.modePlannable}
+                        </button>
+                    ))}
+                </div>,
+            )}
+
+            {aufgabenWeg && weg === 'aufgabe'
+                ? umhuellen(
+                      <div className="space-y-4">
+                          <div className="space-y-2">
+                              <p className="text-sm font-medium">{beschriftung.plannableSlot}</p>
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                  <DateField
+                                      value={zeitraum.date}
+                                      onChange={(datum) => setZeitraum((bisher) => ({ ...bisher, date: datum }))}
+                                      className="sm:w-40"
+                                  />
+                                  <TimeField
+                                      value={zeitraum.start}
+                                      onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, start: zeit }))}
+                                  />
+                                  <TimeField
+                                      value={zeitraum.end}
+                                      onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, end: zeit }))}
+                                  />
+                              </div>
+                          </div>
+
+                          <div className="space-y-2">
+                              <p className="text-sm font-medium">{beschriftung.plannablePick}</p>
+                              <PlannableSearch
+                                  search={plannable!.search}
+                                  onPick={(kennung) => plannable!.onSchedule(kennung, zeitraum)}
+                              />
+                          </div>
+
+                          {/*
+                              Eine NEUE Aufgabe anzulegen gehoert nicht hierher:
+                              Titel, Prioritaet und Projekt sind Begriffe des
+                              Aufgabensystems. Der Zeitraum reist in der Adresse
+                              mit, damit er beim Zurueckkommen nicht fehlt.
+                          */}
+                          {plannable!.newHref && (
+                              <a
+                                  href={`${plannable!.newHref}${plannable!.newHref.includes('?') ? '&' : '?'}date=${zeitraum.date}&start=${zeitraum.start}&end=${zeitraum.end}`}
+                                  className="inline-flex text-sm underline underline-offset-4"
+                              >
+                                  {beschriftung.plannableNew}
+                              </a>
+                          )}
+                      </div>,
+                  )
+                : umhuellen(
                 <EventForm
                     kinds={sichtbareArten}
                     categories={categories}
@@ -328,4 +463,15 @@ export function EventComposer({
             )}
         </div>
     );
+}
+
+/** Heute als `YYYY-MM-DD` — in der Zeitzone des Geraets, nicht in UTC. */
+function heute(): string {
+    const jetzt = new Date();
+
+    return [
+        jetzt.getFullYear(),
+        String(jetzt.getMonth() + 1).padStart(2, '0'),
+        String(jetzt.getDate()).padStart(2, '0'),
+    ].join('-');
 }
