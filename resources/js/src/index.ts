@@ -4,6 +4,10 @@ export { CalendarBrowser } from './CalendarBrowser';
 export type { CalendarBrowserProps } from './CalendarBrowser';
 export { CalendarGrid } from './CalendarGrid';
 export type { CalendarEntry, CalendarGridHandle, CalendarGridProps, CalendarViewName, EntryChange } from './CalendarGrid';
+// Die Filtertafel: ein Knopf, dahinter ALLE Filter dieses Kalenders. Aussehen
+// aus dem Paket, Inhalt als Daten vom Produkt.
+export { CalendarFilterPanel } from './CalendarFilterPanel';
+export type { CalendarFilterPanelLabels, CalendarFilterPanelProps, FilterGroup, FilterOption, FilterToggle } from './CalendarFilterPanel';
 // Die Filterleiste: Arten und Fremdquellen — was alle vier Systeme haben.
 export { CalendarFilters, SOURCE_KEY_PREFIX, isHidden, sourceKey, toggleHidden } from './CalendarFilters';
 export type { CalendarFilterEntry, CalendarFiltersProps } from './CalendarFilters';
