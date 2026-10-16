@@ -273,7 +273,22 @@ export function CalendarFilterPanel({
                     <div
                         ref={tafelRef}
                         data-slot="calendar-filter-panel-body"
-                        className="absolute top-full left-0 z-50 mt-2 w-80 rounded-lg border bg-background shadow-lg md:right-0 md:left-auto"
+                        /*
+                            Immer LINKSBUENDIG zum Knopf, nicht rechtsbuendig
+                            ab `md`.
+
+                            Die rechtsbuendige Fassung stammte aus dem Manager,
+                            wo die Tafel oben RECHTS in der Kopfzeile sass —
+                            dort war es richtig. In der Filterleiste steht der
+                            Knopf aber links, und `right-0` schiebt die Tafel
+                            von dort nach links aus dem Bild: Im Browser
+                            gesehen, die Beschriftungen waren abgeschnitten
+                            (16.10.2026).
+
+                            `max-w-[calc(100vw-2rem)]` dazu, damit sie auf
+                            einem schmalen Telefon nicht rechts hinausragt.
+                        */
+                        className="absolute top-full left-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border bg-background shadow-lg"
                     >
                         <div className="max-h-[70vh] space-y-4 overflow-y-auto p-4">
                             <div className="flex items-center justify-between">
