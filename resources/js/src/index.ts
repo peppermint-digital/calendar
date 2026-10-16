@@ -21,6 +21,10 @@ export { DateField } from './DateField';
 export type { DateFieldProps } from './DateField';
 export { TimeField } from './TimeField';
 export type { TimeFieldProps } from './TimeField';
+// Einen Termin ansehen, nicht aendern — dieselben Felder in derselben
+// Reihenfolge, ob im Dialog oder auf eigener Seite.
+export { EventDetail } from './EventDetail';
+export type { EventDetailData, EventDetailLabels, EventDetailProps } from './EventDetail';
 export { EventForm } from './EventForm';
 // Die vollstaendige Maske: Zielwahl, Felder, Speichern — damit ein Produkt den
 // Vorgang nicht zum fuenften Mal selbst zusammensetzt (#7765).
