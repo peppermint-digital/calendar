@@ -125,6 +125,23 @@ return [
         'manage_ability' => null,
 
         /*
+        | Where the maintained list comes from — a callable, not a path.
+        |
+        | Maintained in one place (the AI Brain, because that is the hub); the
+        | products pull with `calendar:pull-categories`. Each keeps its OWN
+        | table: the package has to stay usable without a hub, and a calendar
+        | that knows no categories while the hub is down is worse than one
+        | that knows a slightly old list.
+        |
+        |     'source' => fn () => AiBrain::call('list-calendar-categories')['categories'] ?? [],
+        |
+        | A fixed target here would have forced every consumer to have the
+        | same hub. Unset means this system maintains its own list — not an
+        | error, just a different arrangement.
+        */
+        'source' => null,
+
+        /*
         | Seeded once by CategoryRegistry::seed(), idempotent by slug. Not read
         | afterwards: a label renamed in the database must not fall back on the
         | next boot.
