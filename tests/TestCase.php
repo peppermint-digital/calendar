@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Peppermint\Calendar\CalendarServiceProvider;
 use Peppermint\Calendar\Tests\Fixtures\BusinessKind;
+use Peppermint\Calendar\Tests\Fixtures\CategorisedKind;
 use Peppermint\Calendar\Tests\Fixtures\PrivateKind;
 
 abstract class TestCase extends Orchestra
@@ -24,6 +25,11 @@ abstract class TestCase extends Orchestra
         $app['config']->set('calendar.kinds', [
             BusinessKind::class,
             PrivateKind::class,
+            // Eine Art, deren Kategorien je Termin verschieden sind — fuer die
+            // Auswertung. Hier und nicht per `config()->set` im Test: Das
+            // Register entsteht beim Hochfahren, eine spaetere Aenderung an der
+            // Konfiguration erreicht es nicht mehr.
+            CategorisedKind::class,
         ]);
     }
 
