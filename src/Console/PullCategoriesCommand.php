@@ -47,9 +47,9 @@ class PullCategoriesCommand extends Command
 
     public function handle(CategorySync $sync): int
     {
-        $quelle = config('calendar.categories.source');
+        $quelle = $this->quelle();
 
-        if (! is_callable($quelle)) {
+        if ($quelle === null) {
             $this->components->info(
                 'Keine Quelle konfiguriert (calendar.categories.source) — dieses System '
                 .'pflegt seine Kategorien selbst. Nichts getan.',
@@ -90,5 +90,34 @@ class PullCategoriesCommand extends Command
         ));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Die Quelle aus der Konfiguration — als KLASSENNAME oder als Aufrufbares.
+     *
+     * Der Klassenname ist der Weg, den ein Produkt nehmen muss: Eine Closure
+     * in einer Konfigurationsdatei laesst `config:cache` scheitern —
+     *
+     *     LogicException: Your configuration files could not be serialized
+     *     because the value at "calendar.categories.source" is non-serializable
+     *
+     * — und `config:cache` laeuft bei jedem Deploy. Die erste Fassung dieses
+     * Befehls nahm nur ein Aufrufbares, und genau daran waere jeder Deploy
+     * der drei Produkte gestorben, bevor irgendetwas abgeglichen worden waere.
+     *
+     * Ein Aufrufbares bleibt zulaessig, weil es in Tests und in einem
+     * Dienstanbieter das Bequemere ist. Dort wird nichts gecacht.
+     */
+    private function quelle(): ?callable
+    {
+        $quelle = config('calendar.categories.source');
+
+        if (is_string($quelle) && $quelle !== '' && class_exists($quelle)) {
+            $aufloesung = app($quelle);
+
+            return is_callable($aufloesung) ? $aufloesung : null;
+        }
+
+        return is_callable($quelle) ? $quelle : null;
     }
 }

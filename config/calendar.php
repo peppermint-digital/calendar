@@ -133,7 +133,14 @@ return [
         | that knows no categories while the hub is down is worse than one
         | that knows a slightly old list.
         |
-        |     'source' => fn () => AiBrain::call('list-calendar-categories')['categories'] ?? [],
+        | Give it the NAME of an invokable class, not a closure: a closure in a
+        | config file makes `config:cache` fail, and that runs on every
+        | deployment.
+        |
+        |     'source' => \App\Kalender\KategorienAusDemBrain::class,
+        |
+        | A callable is still accepted — in tests and in a service provider it
+        | is the more convenient form, and nothing is cached there.
         |
         | A fixed target here would have forced every consumer to have the
         | same hub. Unset means this system maintains its own list — not an

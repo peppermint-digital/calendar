@@ -216,3 +216,44 @@ it('syncs what the configured source hands it', function () {
 
     expect(CalendarCategory::count())->toBe(2);
 });
+
+/**
+ * A closure in a config file makes `config:cache` fail — and that runs on
+ * every deployment:
+ *
+ *     LogicException: Your configuration files could not be serialized
+ *     because the value at "calendar.categories.source" is non-serializable
+ *
+ * So the config carries the NAME of an invokable class. Measured before this
+ * was fixed: `php artisan config:cache` in the CRM threw exactly that.
+ */
+it('accepts the name of an invokable class as its source', function () {
+    config()->set('calendar.categories.source', QuelleAlsKlasse::class);
+
+    $this->artisan('calendar:pull-categories')
+        ->expectsOutputToContain('Angelegt: 1')
+        ->assertSuccessful();
+
+    expect(CalendarCategory::query()->where(CalendarCategory::column('slug'), 'kundentermin')->exists())->toBeTrue();
+});
+
+it('treats a class that is not invokable as no source at all', function () {
+    config()->set('calendar.categories.source', QuelleOhneAufruf::class);
+
+    $this->artisan('calendar:pull-categories')
+        ->expectsOutputToContain('Keine Quelle konfiguriert')
+        ->assertSuccessful();
+});
+
+class QuelleAlsKlasse
+{
+    /** @return array<int, array<string, mixed>> */
+    public function __invoke(): array
+    {
+        return [['slug' => 'kundentermin', 'label' => 'Kundentermin']];
+    }
+}
+
+class QuelleOhneAufruf
+{
+}
