@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Categories;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Peppermint\Calendar\Enums\CategoryMode;
 use Peppermint\Calendar\Exceptions\CategoryNotAllowed;
@@ -19,6 +20,9 @@ use Peppermint\Calendar\Models\CalendarCategory;
  */
 class CategoryRegistry
 {
+    /** Gemerkt je Anfrage — siehe {@see assignmentsAvailable()}. */
+    private static ?bool $assignmentsAvailable = null;
+
     public function enabled(): bool
     {
         return (bool) config('calendar.categories.enabled', false);
@@ -186,6 +190,36 @@ class CategoryRegistry
             // sichtbar — und der Sinn der Eingrenzung dahin.
             CalendarCategory::column('kind') => $kind,
         ]);
+    }
+
+    /**
+     * Haelt dieses System die Zuordnung Termin -> Kategorie des Pakets?
+     *
+     * Die Pruefung ist noetig und nicht vorsichtshalber: Der Manager bejaht
+     * bei `business` seit Dezember 2025 `usesCategories()`, und seine
+     * Zuordnungstabelle gibt es erst, wenn er die Wanderung veroeffentlicht.
+     * Ohne diese Frage wuerde ein Paket-Update dort beim ersten Termin in eine
+     * fehlende Tabelle laufen — ein Update, das additiv sein soll, waere ein
+     * Ausfall.
+     *
+     * Einmal je Anfrage gefragt und gemerkt: `Schema::hasTable` ist eine
+     * Abfrage, und die Agenda fragt je Termin.
+     */
+    public function assignmentsAvailable(): bool
+    {
+        if (self::$assignmentsAvailable !== null) {
+            return self::$assignmentsAvailable;
+        }
+
+        return self::$assignmentsAvailable = Schema::hasTable(
+            config('calendar.tables.event_categories', 'calendar_event_categories'),
+        );
+    }
+
+    /** Nur fuer Tests: das Gemerkte vergessen. */
+    public static function forgetAvailability(): void
+    {
+        self::$assignmentsAvailable = null;
     }
 
     public function slug(string $label): string

@@ -2,6 +2,8 @@
 
 namespace Peppermint\Calendar\Kinds;
 
+use Peppermint\Calendar\Categories\CategoryRegistry;
+use Peppermint\Calendar\Models\CalendarCategory;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Sources\ExternalKind;
 
@@ -86,16 +88,42 @@ abstract class EventKind
      * Free-text labels for this event's `CATEGORIES` line, in the order they
      * should appear. Empty means the line is left out entirely.
      *
-     * The kind answers this because only it knows where its categories live —
-     * in its profile, in an adopted column, or nowhere. Strings, not finished
+     * A kind may still override this when its categories live somewhere of its
+     * own — in its profile or in a column it adopted. Strings, not finished
      * iCalendar: escaping, separators and folding stay in the package, or they
      * end up built a second time and wrong.
+     *
+     * What changed in v0.61.0, and why: before, the default was an empty array
+     * and every kind had to build its own storage. Measured across the four
+     * products on 18.10.2026, the result was that categories worked *nowhere* —
+     * one kind said yes without having anywhere to put them, another had the
+     * column and said no. So the package now keeps the assignment itself, and
+     * a kind only has to agree to carry categories.
+     *
+     * Ordering comes from the category list, not from the order someone
+     * assigned them: the maintained list has a `sort_order`, and a report whose
+     * rows move depending on who clicked first is not a report.
      *
      * @return array<int, string>
      */
     public function categories(CalendarEvent $event): array
     {
-        return [];
+        if (! $this->usesCategories()) {
+            return [];
+        }
+
+        // Ohne die Zuordnungstabelle gibt es nichts zu lesen — und die Frage
+        // zu stellen waere ein Fehler, nicht eine leere Antwort. Siehe
+        // CategoryRegistry::assignmentsAvailable().
+        if (! app(CategoryRegistry::class)->assignmentsAvailable()) {
+            return [];
+        }
+
+        return $event->assignedCategories
+            ->map(fn (CalendarCategory $category) => (string) $category->field('label'))
+            ->filter(fn (string $label) => $label !== '')
+            ->values()
+            ->all();
     }
 
     /**

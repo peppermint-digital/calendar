@@ -6,6 +6,7 @@ use Peppermint\Calendar\Exceptions\ProfileFieldsWithoutProfile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -386,6 +387,29 @@ class CalendarEvent extends Model
     {
         return $query->where(static::column('subject_type'), $subjectType)
             ->whereIn(static::column('subject_id'), (array) $subjectIds);
+    }
+
+    /**
+     * Die Kategorien dieses Termins.
+     *
+     * `assignedCategories` und nicht `categories`, weil `categories()` an der
+     * Terminart schon etwas anderes heisst: dort die fertigen Etiketten fuer
+     * die `CATEGORIES`-Zeile. Zwei gleich benannte Dinge mit verschiedener
+     * Bedeutung sind die Verwechslung, die niemand im Review sieht.
+     *
+     * Eine Beziehung und nicht nur eine Abfrage, damit die Aufrufer sie
+     * vorladen koennen: Die Agenda und die Auswertung laufen ueber viele
+     * Termine, und ohne Vorladen ist das eine Abfrage je Termin.
+     */
+    public function assignedCategories(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            CalendarCategory::class,
+            config('calendar.tables.event_categories', 'calendar_event_categories'),
+            'event_id',
+            'category_id',
+        )->orderBy(CalendarCategory::column('sort_order'))
+            ->orderBy(CalendarCategory::column('label'));
     }
 
     public function attendees(): HasMany

@@ -3,6 +3,7 @@
 namespace Peppermint\Calendar\Services;
 
 use DateTimeInterface;
+use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Recurrence\Occurrence;
 use Peppermint\Calendar\Recurrence\OccurrenceExpander;
@@ -58,6 +59,10 @@ final class CategoryReportAssembler
                 // beginnt, hat ihre Vorkommen MITTEN im Fenster. Wer nur
                 // `inRange` fragt, verliert genau die Serien, um die es geht.
                 ->where(CalendarEvent::column('starts_at'), '<', $to)
+                // Vorladen, sonst fragt der Rueckfall in
+                // `EventKind::categories()` je Termin einzeln — und die
+                // Auswertung laeuft ueber ein Jahr.
+                ->with($this->mitKategorien())
                 ->get(),
             $from,
             $to,
@@ -140,5 +145,19 @@ final class CategoryReportAssembler
     private function mitStunden(array $zeile): array
     {
         return [...$zeile, 'hours' => round($zeile['minutes'] / 60, 2)];
+    }
+
+    /**
+     * @return array<int, string>
+     *
+     * @see AgendaAssembler::mitKategorien() — dieselbe Begruendung.
+     */
+    private function mitKategorien(): array
+    {
+        $registry = app(CategoryRegistry::class);
+
+        return $registry->enabled() && $registry->assignmentsAvailable()
+            ? ['assignedCategories']
+            : [];
     }
 }

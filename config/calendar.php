@@ -36,6 +36,7 @@ return [
         'events' => 'calendar_events',
         'attendees' => 'calendar_event_attendees',
         'categories' => 'calendar_categories',
+        'event_categories' => 'calendar_event_categories',
     ],
 
     /*

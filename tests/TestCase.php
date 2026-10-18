@@ -6,12 +6,25 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Peppermint\Calendar\CalendarServiceProvider;
+use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Tests\Fixtures\BusinessKind;
 use Peppermint\Calendar\Tests\Fixtures\CategorisedKind;
+use Peppermint\Calendar\Tests\Fixtures\PlainCategorisedKind;
 use Peppermint\Calendar\Tests\Fixtures\PrivateKind;
 
 abstract class TestCase extends Orchestra
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Das Gemerkte aus `CategoryRegistry::assignmentsAvailable()` darf
+        // nicht zwischen Tests durchschlagen: Ein Test, der die
+        // Zuordnungstabelle entfernt, haette sonst den naechsten mit seiner
+        // Antwort versorgt — und der waere dann aus dem falschen Grund gruen.
+        CategoryRegistry::forgetAvailability();
+    }
+
     protected function getPackageProviders($app): array
     {
         return [CalendarServiceProvider::class];
@@ -30,6 +43,9 @@ abstract class TestCase extends Orchestra
             // Register entsteht beim Hochfahren, eine spaetere Aenderung an der
             // Konfiguration erreicht es nicht mehr.
             CategorisedKind::class,
+            // Eine Art, die Kategorien nur zustimmt — fuer den Rueckfall
+            // auf die Zuordnung, die das Paket selbst haelt.
+            PlainCategorisedKind::class,
         ]);
     }
 

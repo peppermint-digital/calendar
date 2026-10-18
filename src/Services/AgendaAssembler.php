@@ -5,6 +5,7 @@ namespace Peppermint\Calendar\Services;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Sources\EventSourceRegistry;
 
@@ -69,6 +70,10 @@ final class AgendaAssembler
             ->visibleTo($userId)
             ->inRange($from, $to)
             ->orderBy(CalendarEvent::column('starts_at'))
+            // Die Kategorien mitladen, wenn es sie gibt: Ohne das fragt der
+            // Rueckfall in `EventKind::categories()` je Termin einzeln, und
+            // hier laufen viele durch.
+            ->with($this->mitKategorien())
             ->get()
             ->reject(fn (CalendarEvent $event) => in_array($event->kind, $hidden, true))
             ->map(fn (CalendarEvent $event) => $this->row($event))
@@ -186,5 +191,23 @@ final class AgendaAssembler
             'dimmed' => $event->ends_at !== null && $event->ends_at->isPast(),
             'categories' => $art->categories($event),
         ];
+    }
+
+    /**
+     * Was vorgeladen wird — leer, wenn dieses System keine Zuordnung haelt.
+     *
+     * `with('assignedCategories')` auf einem System ohne die Tabelle waere
+     * keine leere Antwort, sondern ein Fehler. Siehe
+     * {@see CategoryRegistry::assignmentsAvailable()}.
+     *
+     * @return array<int, string>
+     */
+    private function mitKategorien(): array
+    {
+        $registry = app(CategoryRegistry::class);
+
+        return $registry->enabled() && $registry->assignmentsAvailable()
+            ? ['assignedCategories']
+            : [];
     }
 }

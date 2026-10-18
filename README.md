@@ -63,7 +63,7 @@ calendar ends up with two half-working ways to say the same thing.
 | Word | What it is | Where it lives | Who creates one |
 | --- | --- | --- | --- |
 | **Kind** | What an event *is*. Decides which extra fields exist, how deletion behaves, what is required. | A class, registered in config | A developer, in a release |
-| **Category** | A label *within* a kind — the `kind` column says which kind offers it, empty means every kind. Optional feature; a product without categories has none. | Rows in a table | Anyone, at runtime |
+| **Category** | A label *within* a kind — the `kind` column says which kind offers it, empty means every kind. The package keeps the assignment, so a kind only has to agree to carry them. Optional feature; a product without categories has none. | Rows in a table | Anyone, at runtime |
 | **Profile** | The kind's own table, one row per event. | A table per kind | A developer |
 | **Source** | Another system's calendar, shown here and owned there. | A class, registered in config | A developer |
 | **Subject** | What the event is *about* when the core cannot know: a task, a shift, a booking. | Two columns, `subject_type` / `subject_id` | — |
