@@ -3,6 +3,7 @@
 namespace Peppermint\Calendar\Http;
 
 use Illuminate\Support\Facades\Route;
+use Peppermint\Calendar\Http\Controllers\CategoryAdminController;
 use Peppermint\Calendar\Http\Controllers\EventSourceController;
 use Peppermint\Calendar\Http\Controllers\IcsFeedController;
 
@@ -150,6 +151,37 @@ class CalendarRoutes
     public static function feed(string $pfad = 'calendar/feed/{token}.ics'): void
     {
         Route::get($pfad, IcsFeedController::class)->name('calendar.feed');
+    }
+
+    /**
+     * Die Pflege der Kategorienliste.
+     *
+     * Vom Produkt dort aufgerufen, wo seine Einstellungen schon stehen — im
+     * AI Brain in dessen Einstellungsmenue, in einem Produkt ohne Brain in
+     * seinem eigenen:
+     *
+     * ```php
+     * Route::middleware(['web', 'auth'])->prefix('api/calendar')->group(function () {
+     *     CalendarRoutes::categories();
+     * });
+     * ```
+     *
+     * Die Namen `calendar.categories.*` gehoeren zum Vertrag: Die Maske aus
+     * dem Paket ruft sie auf. Ein Produkt, das sie umbenennt, kann die Maske
+     * nicht mehr benutzen.
+     */
+    public static function categories(): void
+    {
+        Route::get('categories', [CategoryAdminController::class, 'index'])
+            ->name('calendar.categories.index');
+        Route::post('categories', [CategoryAdminController::class, 'store'])
+            ->name('calendar.categories.store');
+        Route::patch('categories/{category}', [CategoryAdminController::class, 'update'])
+            ->whereNumber('category')
+            ->name('calendar.categories.update');
+        Route::delete('categories/{category}', [CategoryAdminController::class, 'destroy'])
+            ->whereNumber('category')
+            ->name('calendar.categories.destroy');
     }
 
     public static function sources(): void

@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -111,6 +112,25 @@ class CalendarCategory extends Model
         $vorhanden = Schema::getColumnListing((new static)->getTable());
 
         return array_intersect_key($werte, array_flip($vorhanden));
+    }
+
+    /**
+     * Die Termine, die diese Kategorie tragen.
+     *
+     * Nur die ueber die Zuordnungstabelle des Pakets. Haelt eine Terminart
+     * ihre Kategorie woanders — wie `BusinessKind` im Manager, der sie im
+     * Profil fuehrt —, dann weiss das nur sie. Diese Beziehung ist deshalb
+     * eine UNTERGRENZE, und wer darauf eine Loeschung stuetzt, verweigert
+     * besser bei jedem Treffer als abzuwaegen.
+     */
+    public function events(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            CalendarEvent::class,
+            config('calendar.tables.event_categories', 'calendar_event_categories'),
+            'category_id',
+            'event_id',
+        );
     }
 
     /** Gemeinsame Kategorien und die eigenen dieser Person — nichts von anderen. */

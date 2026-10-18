@@ -115,6 +115,16 @@ return [
         'create_ability' => null,
 
         /*
+        | Ability für die Pflegemaske (CalendarRoutes::categories()).
+        |
+        | Same contract as `create_ability`: the package knows the NAME, not
+        | the meaning. Unset means no check — a package inventing its own
+        | permissions would be worse than one checking none. Who may maintain
+        | a shared list is a question only the application can answer.
+        */
+        'manage_ability' => null,
+
+        /*
         | Seeded once by CategoryRegistry::seed(), idempotent by slug. Not read
         | afterwards: a label renamed in the database must not fall back on the
         | next boot.

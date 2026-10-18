@@ -9,6 +9,8 @@ export type { CalendarEntry, CalendarGridHandle, CalendarGridProps, CalendarView
 export { CalendarFilterPanel } from './CalendarFilterPanel';
 export type { CalendarFilterPanelLabels, CalendarFilterPanelProps, FilterGroup, FilterOption, FilterToggle } from './CalendarFilterPanel';
 // Die Filterleiste: Arten und Fremdquellen — was alle vier Systeme haben.
+export { CategoryAdmin, defaultCategoryAdminLabels } from './CategoryAdmin';
+export type { AdminCategory, CategoryAdminLabels, CategoryAdminProps } from './CategoryAdmin';
 export { CalendarFilters, SOURCE_KEY_PREFIX, isHidden, sourceKey, toggleHidden } from './CalendarFilters';
 export type { CalendarFilterEntry, CalendarFiltersProps } from './CalendarFilters';
 export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';
