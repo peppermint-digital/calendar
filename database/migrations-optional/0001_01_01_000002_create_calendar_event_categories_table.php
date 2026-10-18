@@ -11,19 +11,38 @@ use Illuminate\Support\Facades\Schema;
  *
  * Bis v0.60.0 hiess es: Die Anwendung entscheidet, wo ihre Zuordnung liegt —
  * im Profil ihrer Terminart oder in einer eigenen Spalte. Gemessen am
- * 18.10.2026 war das Ergebnis, dass sie **nirgends** funktionierte:
+ * 18.10.2026 ueber alle vier Produkte sah das so aus:
  *
+ *     Manager     funktioniert — `BusinessKind` ueberschreibt `categories()`
+ *                 und liest `profile_business.category_id`; 206 von 359
+ *                 Terminen tragen eine Kategorie (199 „Peppermint",
+ *                 7 „CrewTex")
  *     Brain       7 Kategorien, 0 Verwendungen
  *                 profile_private.category_id — 31 Zeilen, keine belegt
  *                 PrivateEventKind::usesCategories() = false
- *     Manager     business bejaht usesCategories() — ohne Spalte dafuer
  *     CRM         aus
  *     Verwaltung  aus
  *
- * Einer bejaht die Funktion ohne Ablage, einer hat die Ablage und bejaht sie
- * nicht. Vier Produkte mal je Terminart eine eigene Spalte waere genau die
- * Zersplitterung, die hier abgebaut wird — und jede dieser Spalten waere die,
- * die beim naechsten Produkt fehlt.
+ * ## Eine Korrektur, die hierher gehoert
+ *
+ * In der ersten Fassung dieses Kommentars stand, die Funktion habe NIRGENDS
+ * funktioniert und der Manager bejahe sie „ohne Spalte dafuer". Das war
+ * falsch, und der Fehler ist lehrreich: Gemessen war eine lokale
+ * Entwicklungsdatenbank, in der die Spalte fehlte und die Tabelle leer war.
+ * In Produktion gibt es beides, und 206 Termine haengen daran. Eine
+ * Begruendung, die auf Dev gemessen und als Produktion aufgeschrieben wird,
+ * ist eine falsche Begruendung — auch wenn die Entscheidung am Ende richtig
+ * bleibt.
+ *
+ * Richtig bleibt sie, weil drei von vier Produkten die Zuordnung nicht hatten
+ * und jedes von ihnen sonst seine eigene Spalte gebraucht haette. Jede dieser
+ * Spalten waere die, die beim naechsten Produkt fehlt.
+ *
+ * Der Manager behaelt seine Ablage: Eine Art, die `categories()`
+ * ueberschreibt, liest weiter ihr eigenes Feld, und der Rueckfall auf diese
+ * Tabelle greift dort nie. Genau dafuer ist das Ueberschreiben da — ohne es
+ * waeren die 206 Zuordnungen nach einem Update unsichtbar geworden. Nicht
+ * verloren, aber unsichtbar, und das ist kaum besser.
  *
  * ## Warum eine Verknuepfungstabelle und keine Spalte
  *
