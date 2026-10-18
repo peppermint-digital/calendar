@@ -5,6 +5,7 @@ namespace Peppermint\Calendar;
 use Illuminate\Support\ServiceProvider;
 use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Console\PurgeTrashedEventsCommand;
+use Peppermint\Calendar\Console\SeedWorkCategoriesCommand;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
 use Peppermint\Calendar\Sources\EventSource;
@@ -97,6 +98,7 @@ class CalendarServiceProvider extends ServiceProvider
 
             $this->commands([
                 PurgeTrashedEventsCommand::class,
+                SeedWorkCategoriesCommand::class,
             ]);
         }
     }
