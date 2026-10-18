@@ -142,7 +142,9 @@ class CategoryRegistry
                 continue;
             }
 
-            CalendarCategory::query()->create([
+            // Durch `onlyExistingColumns()`, weil `seed()` auch aus alten
+            // Wanderungen gerufen wird — siehe die Begruendung dort.
+            CalendarCategory::query()->create(CalendarCategory::onlyExistingColumns([
                 CalendarCategory::column('slug') => $slug,
                 CalendarCategory::column('label') => $label,
                 CalendarCategory::column('colour') => $entry['colour'] ?? null,
@@ -150,7 +152,7 @@ class CategoryRegistry
                 CalendarCategory::column('is_active') => true,
                 CalendarCategory::column('owner_id') => null,
                 CalendarCategory::column('kind') => $entry['kind'] ?? null,
-            ]);
+            ]));
 
             $created++;
         }
@@ -176,7 +178,7 @@ class CategoryRegistry
             throw CategoryNotAllowed::notPermitted($label);
         }
 
-        return CalendarCategory::query()->create([
+        return CalendarCategory::query()->create(CalendarCategory::onlyExistingColumns([
             CalendarCategory::column('slug') => $slug,
             CalendarCategory::column('label') => $label,
             CalendarCategory::column('is_active') => true,
@@ -189,7 +191,7 @@ class CategoryRegistry
             // das waere jede frei getippte Kategorie sofort in allen Arten
             // sichtbar — und der Sinn der Eingrenzung dahin.
             CalendarCategory::column('kind') => $kind,
-        ]);
+        ]));
     }
 
     /**

@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Ein Etikett innerhalb einer Terminart.
@@ -70,6 +71,46 @@ class CalendarCategory extends Model
     public function field(string $name): mixed
     {
         return $this->getAttribute(static::column($name));
+    }
+
+    /**
+     * Nur die Felder behalten, die diese Tabelle JETZT hat.
+     *
+     * ## Warum das noetig ist
+     *
+     * Eine Wanderung aus dem September 2026 im AI Brain ruft
+     * {@see \Peppermint\Calendar\Categories\CategoryRegistry::seed()} auf.
+     * Als sie geschrieben wurde, gab es die Spalte `kind` nicht — und an ihrer
+     * Stelle in der Reihenfolge gibt es sie auch heute nicht, denn die
+     * Wanderung, die sie anlegt, kommt spaeter. In einem frischen Aufbau
+     * (Tests, Neuinstallation, neuer Server) brach deshalb jeder Lauf mit
+     *
+     *     table calendar_categories has no column named kind
+     *
+     * und zwar beim AUFBAU, nicht in einem Test — 57 Tests mit null
+     * Zusicherungen, und der Fehler zeigte auf eine Datei, die seit einem
+     * Monat unveraendert ist.
+     *
+     * Die Wanderung ist in der Zeit eingefroren, der Dienst nicht. Weil das
+     * Paket die Spalte eingefuehrt hat, gehoert die Ruecksicht hierher und
+     * nicht in die Wanderung jedes Produkts.
+     *
+     * ## Warum das nichts verschluckt
+     *
+     * Im normalen Betrieb sind alle Spalten da, der Filter ist dann ein
+     * Durchlauf. Er greift ausschliesslich waehrend einer Wanderung, die
+     * mitten in der eigenen Entwicklungsgeschichte steht — und dort ist ein
+     * fehlendes `kind` die richtige Antwort, denn leer heisst „fuer jede
+     * Terminart".
+     *
+     * @param  array<string, mixed>  $werte
+     * @return array<string, mixed>
+     */
+    public static function onlyExistingColumns(array $werte): array
+    {
+        $vorhanden = Schema::getColumnListing((new static)->getTable());
+
+        return array_intersect_key($werte, array_flip($vorhanden));
     }
 
     /** Gemeinsame Kategorien und die eigenen dieser Person — nichts von anderen. */
