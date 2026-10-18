@@ -21,7 +21,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('calendar.tables.categories', 'calendar_categories'), function (Blueprint $table) {
+        $tabelle = config('calendar.tables.categories', 'calendar_categories');
+
+        // Wer seine Liste schon fuehrt, bekommt sie nicht zweimal.
+        //
+        // Gemessen am 18.10.2026: Der Manager fuehrt `event_categories` seit
+        // Dezember 2025, das AI Brain `calendar_categories` mit sieben
+        // Eintraegen. Beide haben die Tabelle laengst — ohne diese Frage
+        // scheitert das Veroeffentlichen dort an einer Tabelle, die es
+        // bereits gibt, und die Zusatzfunktion ist nur fuer frische Systeme
+        // benutzbar.
+        if (Schema::hasTable($tabelle)) {
+            return;
+        }
+
+        Schema::create($tabelle, function (Blueprint $table) {
             $table->id();
 
             // Der Vergleichsschluessel. „Sport", „sport" und „Sport " sind
