@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Console;
 
 use Illuminate\Console\Command;
 use Peppermint\Calendar\Categories\CategoryRegistry;
+use Peppermint\Calendar\Categories\WorkCategories;
 
 /**
  * Legt die gemeinsamen Arbeitskategorien an.
@@ -18,12 +19,9 @@ use Peppermint\Calendar\Categories\CategoryRegistry;
  * `wartung_betrieb` und im anderen `wartung-betrieb` heisst, ist einfach
  * nicht dabei.
  *
- * ## Warum die Liste hier steht und nicht in der Konfiguration
- *
- * Die Konfiguration hat schon `categories.defaults`, und die gehoert dem
- * Produkt: Dort darf jedes System eigene Kategorien nachlegen. Dieser
- * Grundstock ist das Gegenteil davon — er ist die Einigung. Steht er in vier
- * Konfigurationen, ist er keine.
+ * Die Liste selbst steht in {@see WorkCategories} — sie hat zwei Aufrufer:
+ * diesen Befehl fuer den Lauf von Hand und eine Wanderung im Produkt, damit
+ * sie auch in Produktion und in jeder neuen Umgebung entsteht.
  *
  * ## Mehrfach ausfuehrbar
  *
@@ -38,29 +36,6 @@ class SeedWorkCategoriesCommand extends Command
 
     protected $description = 'Legt die gemeinsamen Arbeitskategorien an (idempotent)';
 
-    /**
-     * Die Einigung vom 18.10.2026.
-     *
-     * Die Slugs tragen UNTERSTRICHE, nicht Bindestriche — das ist die Form,
-     * die `CategoryRegistry::slug()` erzeugt (`Str::slug($label, '_')`). Mit
-     * Bindestrichen wuerde eine spaeter aus demselben Etikett abgeleitete
-     * Kategorie nicht gefunden und ein zweites Mal angelegt.
-     *
-     * Ohne `kind`: Diese sechs gelten fuer jede Terminart, die Kategorien
-     * traegt. Nur die privaten Lebensbereiche im AI Brain sind auf `private`
-     * eingegrenzt — und die gehoeren nicht zu dieser Liste.
-     *
-     * @var array<int, array<string, mixed>>
-     */
-    private const KATEGORIEN = [
-        ['slug' => 'kundentermin', 'label' => 'Kundentermin', 'colour' => '#f59e0b', 'sort_order' => 10],
-        ['slug' => 'projektarbeit', 'label' => 'Projektarbeit', 'colour' => '#3b82f6', 'sort_order' => 20],
-        ['slug' => 'wartung_betrieb', 'label' => 'Wartung & Betrieb', 'colour' => '#64748b', 'sort_order' => 30],
-        ['slug' => 'vertrieb', 'label' => 'Vertrieb', 'colour' => '#10b981', 'sort_order' => 40],
-        ['slug' => 'intern_orga', 'label' => 'Intern & Orga', 'colour' => '#a855f7', 'sort_order' => 50],
-        ['slug' => 'abwesenheit', 'label' => 'Abwesenheit', 'colour' => '#ef4444', 'sort_order' => 60],
-    ];
-
     public function handle(CategoryRegistry $registry): int
     {
         if (! $registry->enabled()) {
@@ -72,12 +47,12 @@ class SeedWorkCategoriesCommand extends Command
             return self::FAILURE;
         }
 
-        $angelegt = $registry->seed(self::KATEGORIEN);
+        $angelegt = $registry->seed(WorkCategories::alle());
 
         $this->components->info(
             $angelegt === 0
                 ? 'Alle sechs Arbeitskategorien waren schon da.'
-                : "Angelegt: {$angelegt} von ".count(self::KATEGORIEN).'.',
+                : "Angelegt: {$angelegt} von ".count(WorkCategories::alle()).'.',
         );
 
         foreach ($registry->forKind(null, null) as $kategorie) {
