@@ -38,12 +38,27 @@ return new class extends Migration
             // Firmenliste und dem Wust, und er kostet genau eine Spalte.
             $table->unsignedBigInteger('owner_id')->nullable();
 
+            // Fuer welche Terminart diese Kategorie angeboten wird.
+            //
+            // Leer = fuer jede. Das ist der Rueckfall und bleibt es: Wer die
+            // Spalte nicht benutzt, merkt nichts von ihr.
+            //
+            // Gesetzt grenzt ein, und erst damit laesst sich beides in EINER
+            // Liste halten: Im AI Brain tragen die privaten Kategorien
+            // (Sport, Reise) die Art `private`, die Arbeitskategorien die
+            // Arbeitsarten. Ohne diese Spalte stuenden beim Anlegen eines
+            // Kundentermins auch „Sport" und „Reise" in der Auswahl — und die
+            // Alternative waere eine zweite Liste gewesen, also zwei Orte, an
+            // denen dasselbe gepflegt wird.
+            $table->string('kind', 100)->nullable();
+
             $table->timestamps();
 
             // Eindeutig je Eigentuemer: Die gemeinsame „Sport" und die private
             // „Sport" einer Person duerfen nebeneinander stehen, zweimal
             // dieselbe fuer denselben Eigentuemer nicht.
             $table->unique(['owner_id', 'slug'], 'cal_categories_owner_slug_unique');
+            $table->index(['kind', 'is_active', 'sort_order'], 'cal_categories_kind_active_order_idx');
             $table->index(['is_active', 'sort_order'], 'cal_categories_active_order_idx');
         });
     }

@@ -47,6 +47,22 @@ class CalendarCategory extends Model
      */
     public static function column(string $field): string
     {
+        // `kind` nimmt die gemeinsame Abbildung NICHT.
+        //
+        // Flach bedeutet `kind` die Terminart AM TERMIN. Hier bedeutet es, fuer
+        // welche Art diese Kategorie angeboten wird — zwei verschiedene Dinge
+        // mit demselben Namen. Wer seine Termine auf `event_type` abbildet,
+        // haette damit auch die Kategorienspalte umbenannt, und die Abfrage
+        // suchte eine Spalte, die es nicht gibt.
+        //
+        // Dieselbe Falle wie bei `owner_id`, nur eine Stufe schaerfer: Dort
+        // KANN die gemeinsame Abbildung zufaellig passen, hier nie. Und weil
+        // die Spalte neu ist, kann sich keine bestehende Konfiguration auf den
+        // Rueckfall verlassen — ihn abzuschneiden bricht also nichts.
+        if ($field === 'kind') {
+            return config('calendar.columns.categories.kind', 'kind');
+        }
+
         return config("calendar.columns.categories.{$field}")
             ?? config("calendar.columns.{$field}", $field);
     }
@@ -71,5 +87,34 @@ class CalendarCategory extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where(static::column('is_active'), true);
+    }
+
+    /**
+     * Die Kategorien, die diese Terminart anbietet.
+     *
+     * Eine Kategorie ohne Art gilt fuer jede — das ist der Rueckfall und der
+     * Zustand jeder Zeile, die vor der Spalte entstanden ist. Eine Kategorie
+     * MIT Art gilt nur dort.
+     *
+     * Ohne Art in der Frage (`null`) wird nicht eingegrenzt: Die Pflegemaske
+     * und die Auswertung wollen die ganze Liste sehen, nicht den Ausschnitt
+     * einer Art.
+     *
+     * Das ist der Unterschied, der beides in einer Liste haelt: Im AI Brain
+     * bietet `private` seine sieben Lebensbereiche an, ein Kundentermin die
+     * sechs Arbeitskategorien — und im CRM gibt es die Art `private` gar
+     * nicht, dort bleiben also nur die sechs. Keine Ausnahme je Produkt,
+     * dieselbe Regel.
+     */
+    public function scopeForKind(Builder $query, ?string $kind): Builder
+    {
+        if ($kind === null) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $inner) use ($kind) {
+            $inner->whereNull(static::column('kind'))
+                ->orWhere(static::column('kind'), $kind);
+        });
     }
 }

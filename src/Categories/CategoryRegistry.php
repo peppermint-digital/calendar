@@ -39,12 +39,32 @@ class CategoryRegistry
      */
     public function forUser(?int $userId): Collection
     {
+        return $this->forKind(null, $userId);
+    }
+
+    /**
+     * Was diese Person bei DIESER Terminart auswaehlen kann.
+     *
+     * Der Unterschied zu {@see forUser()} ist die Eingrenzung auf die Art —
+     * und sie ist der Grund, warum es nur eine Liste braucht statt einer je
+     * Bereich. Ohne sie stuenden beim Anlegen eines Kundentermins im AI Brain
+     * auch „Sport" und „Reise" zur Wahl.
+     *
+     * `null` grenzt nicht ein: Die Pflegemaske und die Auswertung wollen die
+     * ganze Liste. Deshalb ruft `forUser()` genau das auf — ein Aufrufer, der
+     * die Art nicht kennt, bekommt dasselbe wie vorher.
+     *
+     * @return Collection<int, CalendarCategory>
+     */
+    public function forKind(?string $kind, ?int $userId): Collection
+    {
         if (! $this->enabled()) {
             return new Collection;
         }
 
         return CalendarCategory::query()
             ->visibleTo($userId)
+            ->forKind($kind)
             ->active()
             ->orderBy(CalendarCategory::column('sort_order'))
             ->orderBy(CalendarCategory::column('label'))
@@ -58,8 +78,14 @@ class CategoryRegistry
      * Verglichen wird ueber den Slug, nicht ueber das Etikett: Wer „Sport "
      * tippt, meint „Sport", und eine Liste, die beides fuehrt, ist der Anfang
      * vom Wust.
+     *
+     * Die Terminart wirkt beim ANLEGEN, nicht beim Suchen. Ein Slug meint
+     * systemweit eine Kategorie — daran haengt, dass sich ueber die Systeme
+     * hinweg nach ihr filtern laesst. Wuerde die Suche nach Art eingrenzen,
+     * versuchte sie bei einem Treffer in einer anderen Art ein zweites Mal
+     * denselben Slug anzulegen und liefe in den Eindeutigkeitsindex.
      */
-    public function resolve(string $label, ?int $userId): CalendarCategory
+    public function resolve(string $label, ?int $userId, ?string $kind = null): CalendarCategory
     {
         if (! $this->enabled()) {
             throw CategoryNotAllowed::disabled();
@@ -81,7 +107,7 @@ class CategoryRegistry
             return $existing;
         }
 
-        return $this->create($label, $slug, $userId);
+        return $this->create($label, $slug, $userId, $kind);
     }
 
     /**
@@ -119,6 +145,7 @@ class CategoryRegistry
                 CalendarCategory::column('sort_order') => $entry['sort_order'] ?? 0,
                 CalendarCategory::column('is_active') => true,
                 CalendarCategory::column('owner_id') => null,
+                CalendarCategory::column('kind') => $entry['kind'] ?? null,
             ]);
 
             $created++;
@@ -127,7 +154,7 @@ class CategoryRegistry
         return $created;
     }
 
-    protected function create(string $label, string $slug, ?int $userId): CalendarCategory
+    protected function create(string $label, string $slug, ?int $userId, ?string $kind = null): CalendarCategory
     {
         $mode = $this->mode();
 
@@ -154,6 +181,10 @@ class CategoryRegistry
             // Genau das haelt die gemeinsame Liste sauber, ohne jemandem das
             // Etikettieren zu verbieten.
             CalendarCategory::column('owner_id') => $mode === CategoryMode::Personal ? $userId : null,
+            // Eine bei einer Art entstandene Kategorie gehoert zu ihr. Ohne
+            // das waere jede frei getippte Kategorie sofort in allen Arten
+            // sichtbar — und der Sinn der Eingrenzung dahin.
+            CalendarCategory::column('kind') => $kind,
         ]);
     }
 

@@ -171,3 +171,90 @@ it('maskiert den Backslash zuerst, sonst frisst er die eigene Maskierung', funct
     expect(IcsCategories::property(['a\\b;c'])->getValue())->toBe('a\\\\b\;c')
         ->and(IcsCategories::property(["Zeile\nUmbruch"])->getValue())->toBe('Zeile\\nUmbruch');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Categories per kind
+|--------------------------------------------------------------------------
+|
+| One list, scoped per kind. Without this, a shared installation has to
+| choose: either every kind offers every category — so creating a client
+| meeting offers "Sport" — or every area keeps its own list, and then the
+| same thing is maintained in two places.
+|
+| An empty kind means "every kind". That is what applied before the column
+| existed, so every row written back then keeps working untouched.
+*/
+
+it('offers a category without a kind to every kind', function () {
+    category(['slug' => 'intern', 'label' => 'Intern']);
+
+    expect(registry()->forKind('private', null)->pluck('slug')->all())->toBe(['intern'])
+        ->and(registry()->forKind('business', null)->pluck('slug')->all())->toBe(['intern']);
+});
+
+it('offers a category with a kind only to that kind', function () {
+    category(['slug' => 'sport', 'label' => 'Sport', 'kind' => 'private']);
+    category(['slug' => 'kundentermin', 'label' => 'Kundentermin', 'kind' => 'business']);
+
+    expect(registry()->forKind('private', null)->pluck('slug')->all())->toBe(['sport'])
+        ->and(registry()->forKind('business', null)->pluck('slug')->all())->toBe(['kundentermin']);
+});
+
+/**
+ * The maintenance screen and the report want the whole list, not one kind's
+ * slice — so asking without a kind must not narrow anything. This is also
+ * why `forUser()` keeps returning what it always did.
+ */
+it('narrows nothing when no kind is given', function () {
+    category(['slug' => 'sport', 'label' => 'Sport', 'kind' => 'private']);
+    category(['slug' => 'kundentermin', 'label' => 'Kundentermin', 'kind' => 'business']);
+    category(['slug' => 'intern', 'label' => 'Intern']);
+
+    expect(registry()->forKind(null, null)->pluck('slug')->all())
+        ->toEqualCanonicalizing(['sport', 'kundentermin', 'intern'])
+        ->and(registry()->forUser(null)->pluck('slug')->all())
+        ->toEqualCanonicalizing(['sport', 'kundentermin', 'intern']);
+});
+
+it('still hides another person’s own category, kind or not', function () {
+    category(['slug' => 'theirs', 'label' => 'Theirs', 'owner_id' => 2, 'kind' => 'private']);
+
+    expect(registry()->forKind('private', 1)->pluck('slug')->all())->toBe([]);
+});
+
+it('attaches the kind to a category it creates', function () {
+    $category = registry()->resolve('Werkstatt', 1, 'business');
+
+    expect($category->field('kind'))->toBe('business');
+});
+
+/**
+ * A slug means one category system-wide — that is what makes filtering by it
+ * work across the four systems. So the lookup must find an existing slug even
+ * when it belongs to another kind; narrowing here would try to write the same
+ * slug twice and hit the unique index.
+ */
+it('finds an existing slug even when it belongs to another kind', function () {
+    $existing = category(['slug' => 'sport', 'label' => 'Sport', 'kind' => 'private']);
+
+    expect(registry()->resolve('Sport', null, 'business')->id)->toBe($existing->id)
+        ->and(CalendarCategory::count())->toBe(1);
+});
+
+/**
+ * `kind` means two different things depending on the table: at the event it is
+ * the event's kind, here it is which kind offers this category. So the shared
+ * column mapping must not reach it — an application that renames the event's
+ * column would otherwise rename this one too, and the query would look for a
+ * column that does not exist.
+ */
+it('keeps the category kind out of the shared column mapping', function () {
+    config()->set('calendar.columns.kind', 'event_type');
+
+    expect(CalendarCategory::column('kind'))->toBe('kind');
+
+    config()->set('calendar.columns.categories.kind', 'offered_for');
+
+    expect(CalendarCategory::column('kind'))->toBe('offered_for');
+});
