@@ -38,6 +38,7 @@ class RecurrenceCalculator
             Frequency::Weekly => $this->onWeekdays($first, $last, $rule, everyOtherWeek: false),
             Frequency::Biweekly => $this->onWeekdays($first, $last, $rule, everyOtherWeek: true),
             Frequency::Monthly => $this->everyMonth($first, $last, $rule),
+            Frequency::Yearly => $this->everyYear($first, $last, $rule),
         };
     }
 
@@ -117,6 +118,63 @@ class RecurrenceCalculator
             }
 
             $out[] = $day;
+
+            if (count($out) >= self::MAX_OCCURRENCES) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Jahr fuer Jahr, am selben Tag im selben Monat.
+     *
+     * Wie {@see everyMonth()} in Schritten der Einheit und nicht Tag fuer Tag:
+     * Ein Geburtstag ueber zehn Jahre sind zehn Schritte, nicht 3652.
+     *
+     * ## Der 29. Februar
+     *
+     * Ein am 29.02. geborener Mensch hat in drei von vier Jahren kein
+     * Geburtsdatum im Kalender. Geregelt wird das von derselben Einstellung
+     * wie der 31. in einem kurzen Monat:
+     *
+     *   - `Skip`  — nur in Schaltjahren. Formal richtig, und in einem
+     *               Geburtstagskalender die falsche Antwort: Der Mensch hat
+     *               auch 2027 Geburtstag.
+     *   - `Clamp` — der 28. Februar. Ein Tag, den niemand gewaehlt hat, aber
+     *               der Hinweis kommt im richtigen Jahr.
+     *
+     * Die Vorgabe des Pakets bleibt, was sie bei `monthly` ist — die
+     * Anwendung entscheidet, weil nur sie weiss, wofuer ihre Serien stehen.
+     * Eine Terminart „Geburtstag" setzt `Clamp`.
+     *
+     * @return array<int, CarbonImmutable>
+     */
+    protected function everyYear(CarbonImmutable $first, CarbonImmutable $last, RecurrenceRule $rule): array
+    {
+        $out = [];
+
+        for ($jahr = $first; $jahr->lessThanOrEqualTo($last); $jahr = $jahr->addYear()) {
+            // `addYear()` auf dem 29.02. landet in Carbon selbst schon auf dem
+            // 28.02. des Folgejahres — und wuerde den 29. danach fuer immer
+            // verlieren. Deshalb wird jedes Vorkommen aus Monat und Tag des
+            // ERSTEN Termins neu gebildet, nicht aus dem vorigen fortgezaehlt.
+            $monat = $jahr->setMonth($first->month)->startOfMonth();
+            $tageImMonat = $monat->daysInMonth;
+
+            if ($first->day > $tageImMonat && $rule->monthDayOverflow === MonthDayOverflow::Skip) {
+                continue;
+            }
+
+            $tag = $monat->setDay(min($first->day, $tageImMonat))
+                ->setTime($first->hour, $first->minute, $first->second);
+
+            if ($tag->lessThan($first) || $tag->greaterThan($last)) {
+                continue;
+            }
+
+            $out[] = $tag;
 
             if (count($out) >= self::MAX_OCCURRENCES) {
                 break;

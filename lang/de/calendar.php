@@ -12,6 +12,7 @@ return [
         'weekly' => 'Wöchentlich',
         'biweekly' => 'Alle zwei Wochen',
         'monthly' => 'Monatlich',
+        'yearly' => 'Jährlich',
     ],
 
     'weekday_short' => [
@@ -21,7 +22,7 @@ return [
 
     'recurrence' => [
         'until' => 'bis :date',
-        'invalid_frequency' => 'Unbekannte Wiederholung [:given]. Erwartet: daily, weekly, biweekly oder monthly.',
+        'invalid_frequency' => 'Unbekannte Wiederholung [:given]. Erwartet: daily, weekly, biweekly, monthly oder yearly.',
         'missing_weekdays' => 'Eine wöchentliche Serie braucht mindestens einen Wochentag.',
         'invalid_weekday' => 'Unbekannter Wochentag [:given]. Erwartet: MO, TU, WE, TH, FR, SA oder SU.',
         'invalid_month_day' => 'Monatstag [:given] liegt außerhalb des Bereichs. Erwartet: 1 bis 31.',

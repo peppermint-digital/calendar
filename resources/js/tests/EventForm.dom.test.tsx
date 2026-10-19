@@ -302,3 +302,40 @@ describe('das Datumsfeld', () => {
         expect(screen.queryByText('Das Ende liegt vor dem Anfang.')).toBeNull();
     });
 });
+
+/**
+ * Jährlich — für Geburtstage und Jahrestage (19.10.2026).
+ *
+ * Die Auswahl baut sich aus den Beschriftungen, ein fehlender Eintrag wäre
+ * also eine Frequenz, die der Server kennt und die Maske nicht anbietet.
+ */
+it('bietet jaehrlich als Wiederholung an', () => {
+    render(
+        <EventForm
+            kinds={[kind()]}
+            value={draft({ recurrence: { ...emptyRecurrence(), frequency: 'weekly', byDay: ['MO'] } })}
+            onChange={() => {}}
+            onSubmit={() => {}}
+        />,
+    );
+
+    const auswahl = screen.getByLabelText('Frequenz') as HTMLSelectElement;
+    const werte = Array.from(auswahl.options).map((option) => option.value);
+
+    expect(werte).toContain('yearly');
+    expect(Array.from(auswahl.options).find((o) => o.value === 'yearly')?.text).toBe('jährlich');
+});
+
+/** Eine Jahresserie braucht keine Wochentage — das Feld gehört nicht dazu. */
+it('verlangt bei jaehrlich keine Wochentage', () => {
+    render(
+        <EventForm
+            kinds={[kind()]}
+            value={draft({ recurrence: { ...emptyRecurrence(), frequency: 'yearly' } })}
+            onChange={() => {}}
+            onSubmit={() => {}}
+        />,
+    );
+
+    expect(screen.queryByText('An diesen Tagen')).toBeNull();
+});

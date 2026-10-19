@@ -58,6 +58,7 @@ const DEFAULTS: EventFormLabels = {
         weekly: 'wöchentlich',
         biweekly: 'alle zwei Wochen',
         monthly: 'monatlich',
+        yearly: 'jährlich',
     },
     submit: 'Speichern',
     cancel: 'Abbrechen',

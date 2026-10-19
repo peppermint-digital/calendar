@@ -98,7 +98,7 @@ it('stops at the maximum number of occurrences', function () {
 
 it('rejects an unknown frequency and says what is expected', function () {
     expect(fn () => RecurrenceRule::fromArray(['frequency' => 'hourly']))
-        ->toThrow(InvalidRecurrenceRule::class, 'Expected daily, weekly, biweekly or monthly');
+        ->toThrow(InvalidRecurrenceRule::class, 'Expected daily, weekly, biweekly, monthly or yearly');
 });
 
 it('rejects a weekly series without weekdays', function () {
@@ -126,4 +126,60 @@ it('survives the round trip through an array', function () {
     $rules = ['frequency' => 'monthly', 'byMonthDay' => 15, 'monthDayOverflow' => 'clamp'];
 
     expect(RecurrenceRule::fromArray($rules)->toArray())->toBe($rules);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Yearly — birthdays, anniversaries
+|--------------------------------------------------------------------------
+|
+| Added on 19.10.2026 for a birthday kind. Without it, a birthday is an
+| appointment somebody re-enters every year — which is the thing a series
+| exists to avoid.
+*/
+
+it('repeats once a year, on the same day', function () {
+    expect(expand(['frequency' => 'yearly'], '2026-03-14 00:00', '2029-12-31'))
+        ->toBe(['2026-03-14 00:00', '2027-03-14 00:00', '2028-03-14 00:00', '2029-03-14 00:00']);
+});
+
+/**
+ * Der Fall, an dem sich eine Jahresserie entscheidet.
+ *
+ * `addYear()` auf dem 29.02. landet in Carbon selbst auf dem 28.02. des
+ * Folgejahres — und würde den 29. danach für immer verlieren. Jedes Vorkommen
+ * wird deshalb aus Monat und Tag des ERSTEN Termins neu gebildet, nicht aus
+ * dem vorigen fortgezählt. Ohne das stünde 2032 der 28. statt des 29.
+ */
+it('haelt den 29. Februar fest, statt ihn fortzuzaehlen', function () {
+    $tage = array_map(
+        fn (string $wert) => substr($wert, 0, 10),
+        expand(['frequency' => 'yearly', 'monthDayOverflow' => 'clamp'], '2024-02-29 00:00', '2032-12-31'),
+    );
+
+    expect($tage)->toBe(['2024-02-29', '2025-02-28', '2026-02-28', '2027-02-28', '2028-02-29',
+        '2029-02-28', '2030-02-28', '2031-02-28', '2032-02-29']);
+});
+
+/** `skip` ist formal richtig und für einen Geburtstag die falsche Antwort. */
+it('laesst den 29. Februar aus, wenn die Anwendung das so will', function () {
+    $tage = array_map(
+        fn (string $wert) => substr($wert, 0, 10),
+        expand(['frequency' => 'yearly', 'monthDayOverflow' => 'skip'], '2024-02-29 00:00', '2032-12-31'),
+    );
+
+    expect($tage)->toBe(['2024-02-29', '2028-02-29', '2032-02-29']);
+});
+
+it('nennt die Jahresserie auf Deutsch', function () {
+    app()->setLocale('de');
+
+    expect(app(RecurrenceCalculator::class)->describe(RecurrenceRule::fromArray(['frequency' => 'yearly'])))
+        ->toContain('Jährlich');
+});
+
+/** Eine Jahresserie braucht keine Wochentage. */
+it('verlangt fuer jaehrlich keine Wochentage', function () {
+    expect(fn () => RecurrenceRule::fromArray(['frequency' => 'yearly']))
+        ->not->toThrow(Throwable::class);
 });

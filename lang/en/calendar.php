@@ -12,6 +12,7 @@ return [
         'weekly' => 'Weekly',
         'biweekly' => 'Every two weeks',
         'monthly' => 'Monthly',
+        'yearly' => 'Yearly',
     ],
 
     'weekday_short' => [
@@ -21,7 +22,7 @@ return [
 
     'recurrence' => [
         'until' => 'until :date',
-        'invalid_frequency' => 'Unknown recurrence frequency [:given]. Expected daily, weekly, biweekly or monthly.',
+        'invalid_frequency' => 'Unknown recurrence frequency [:given]. Expected daily, weekly, biweekly, monthly or yearly.',
         'missing_weekdays' => 'A weekly or biweekly series needs at least one weekday.',
         'invalid_weekday' => 'Unknown weekday [:given]. Expected MO, TU, WE, TH, FR, SA or SU.',
         'invalid_month_day' => 'Day of month [:given] is out of range. Expected 1 to 31.',

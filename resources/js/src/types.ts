@@ -42,7 +42,7 @@ export const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
 
 /** Die Frequenzen aus `Peppermint\Calendar\Enums\Frequency`. */
-export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 
 /**
  * Eine Serie in genau der Form, die `RecurrenceRule::fromArray()` entgegennimmt.
