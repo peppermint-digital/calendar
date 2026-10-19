@@ -42,28 +42,42 @@ final class EventDetailPresenter
     {
         $art = $event->kindDefinition();
 
-        $ende = $event->ends_at;
-        $mehrtaegig = $ende !== null && ! $ende->isSameDay($event->starts_at);
+        // Alles ueber `field()` und NICHT ueber `$event->starts_at`.
+        //
+        // Die Spalten heissen nicht in jedem Produkt gleich: Im Manager steht
+        // `start_datetime`, `end_datetime`, `user_id`. Der direkte Zugriff gab
+        // dort `null` zurueck, und die Einzelansicht lief auf einen 500er —
+        // waehrend sie in CRM, Verwaltung und AI Brain lief, weil die Spalten
+        // dort zufaellig so heissen wie im Paket.
+        //
+        // Gefunden am 19.10.2026 beim Umstellen der Manager-Einzelansicht
+        // (#8307). Genau dafuer gibt es `field()`, und genau deshalb steht in
+        // seinem Docblock „package code can say `$event->field('starts_at')`
+        // without knowing".
+        $beginn = $event->field('starts_at');
+        $ende = $event->field('ends_at');
+        $ganztags = (bool) $event->field('all_day');
+        $mehrtaegig = $ende !== null && ! $ende->isSameDay($beginn);
 
         return [
-            'id' => $event->id,
-            'title' => (string) $event->title,
-            'date' => $event->starts_at->toDateString(),
+            'id' => $event->getKey(),
+            'title' => (string) $event->field('title'),
+            'date' => $beginn->toDateString(),
             // Nur bei mehrtägigen gesetzt: Ein `endDate`, das immer dem Beginn
             // gleicht, lässt die Ansicht jeden Termin als Zeitraum schreiben.
             'endDate' => $mehrtaegig ? $ende->toDateString() : null,
-            'start' => $event->all_day ? null : $event->starts_at->format('H:i'),
-            'end' => $event->all_day || $ende === null ? null : $ende->format('H:i'),
-            'allDay' => (bool) $event->all_day,
-            'location' => $event->location,
-            'description' => $event->description,
+            'start' => $ganztags ? null : $beginn->format('H:i'),
+            'end' => $ganztags || $ende === null ? null : $ende->format('H:i'),
+            'allDay' => $ganztags,
+            'location' => $event->field('location'),
+            'description' => $event->field('description'),
             'kindLabel' => $art->label(),
             // KEINE Farbe: Die Farbtafel liegt im Produkt — dieselbe
             // Entscheidung wie beim `AgendaAssembler`. Eine zweite Tafel hier
             // wäre die, die irgendwann abweicht.
             'colour' => null,
-            'kind' => $event->kind,
-            'recurring' => $event->rrule !== null,
+            'kind' => $event->field('kind'),
+            'recurring' => $event->field('recurrence_rules') !== null,
             // Privat heisst: nur fuer die eigene Person sichtbar. Abgeleitet
             // aus `visibility`, weil das die Spalte ist, auf die sich auch der
             // ICS-Export stuetzt — zwei Quellen fuer dieselbe Aussage waeren

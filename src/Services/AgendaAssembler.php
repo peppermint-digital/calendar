@@ -184,7 +184,11 @@ final class AgendaAssembler
             // die, die irgendwann abweicht.
             'colour' => null,
             'badge' => $art->label(),
-            'recurring' => $event->rrule !== null,
+            // `$event->rrule` stand hier bis zum 19.10.2026 — und die
+            // Eigenschaft gibt es am Modell GAR NICHT. Der Wert war also immer
+            // `false`, in allen vier Produkten, seit es das Feld gibt. Kein
+            // Test hat es gemerkt, weil `false` eine plausible Antwort ist.
+            'recurring' => $event->field('recurrence_rules') !== null,
             'kind' => $event->kind,
             // Vorbei ist abgeblendet. Was sonst noch abgeblendet gehört —
             // abgesagt, erledigt — weiss das Produkt und setzt es nach.

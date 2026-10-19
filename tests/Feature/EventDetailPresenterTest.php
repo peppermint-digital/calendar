@@ -153,3 +153,29 @@ it('zaehlt auch „confidential" als privat — dieselbe Spalte wie im ICS-Expor
 it('meldet einen gewoehnlichen Termin NICHT als privat', function () {
     expect(app(EventDetailPresenter::class)->present(detailTermin())['private'])->toBeFalse();
 });
+
+/*
+|--------------------------------------------------------------------------
+| Serienhinweis (#8307)
+|--------------------------------------------------------------------------
+|
+| `recurring` las bis zum 19.10.2026 `$event->rrule` — eine Eigenschaft, die es
+| am Modell gar nicht gibt. Der Wert war also IMMER `false`, in allen vier
+| Produkten, seit es das Feld gibt. Kein Test hat es gemerkt, weil `false` eine
+| plausible Antwort ist: Die meisten Termine sind keine Serie.
+|
+| Gefunden beim Umstellen der Manager-Einzelansicht, und zwar nur deshalb, weil
+| dort ueberhaupt jemand auf den Hinweis geschaut hat.
+*/
+
+it('meldet einen Serientermin als Serie', function () {
+    $daten = app(EventDetailPresenter::class)->present(detailTermin([
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['TU']],
+    ]));
+
+    expect($daten['recurring'])->toBeTrue();
+});
+
+it('meldet einen Einzeltermin NICHT als Serie', function () {
+    expect(app(EventDetailPresenter::class)->present(detailTermin())['recurring'])->toBeFalse();
+});
