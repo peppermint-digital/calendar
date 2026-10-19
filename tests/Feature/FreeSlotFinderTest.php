@@ -175,3 +175,77 @@ it('kommt ohne Personen aus, ohne zu werfen', function () {
 
     expect($raster[0]['slots'][0]['total'])->toBe(0);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Serien (#8307)
+|--------------------------------------------------------------------------
+|
+| Bis zum 19.10.2026 nahm der Finder `starts_at` direkt. Eine woechentliche
+| Besprechung blockierte damit genau eine Stunde statt jeder Woche — und eine
+| Serie, die VOR dem Fenster beginnt, fand er ueberhaupt nicht.
+|
+| Das ist der schlimmste Fehler, den ein Planer machen kann: Er bietet eine
+| Zeit an, in der die halbe Runde schon sitzt, und sieht dabei plausibel aus.
+*/
+
+it('belegt jede Woche einer woechentlichen Serie, nicht nur die erste', function () {
+    slotTermin(1, '2026-09-07 10:00', '2026-09-07 11:00', [
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+    ]);
+
+    $raster = app(FreeSlotFinder::class)->grid(
+        [1],
+        CarbonImmutable::parse('2026-09-07'),
+        CarbonImmutable::parse('2026-09-21'),
+    );
+
+    // Der 07.09., 14.09. und 21.09.2026 sind alle Montage.
+    expect(scheibe($raster, '2026-09-07', '10:00')['free'])->toBeFalse()
+        ->and(scheibe($raster, '2026-09-14', '10:00')['free'])->toBeFalse()
+        ->and(scheibe($raster, '2026-09-21', '10:00')['free'])->toBeFalse();
+});
+
+it('findet eine Serie, die vor dem Fenster beginnt', function () {
+    // Beginnt zwei Wochen vor dem Fenster — mit `inRange` war sie unsichtbar.
+    slotTermin(1, '2026-08-24 10:00', '2026-08-24 11:00', [
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+    ]);
+
+    $raster = app(FreeSlotFinder::class)->grid(
+        [1],
+        CarbonImmutable::parse('2026-09-07'),
+        CarbonImmutable::parse('2026-09-07'),
+    );
+
+    expect(scheibe($raster, '2026-09-07', '10:00')['free'])->toBeFalse();
+});
+
+it('laesst die Scheibe daneben frei, auch bei einer Serie', function () {
+    slotTermin(1, '2026-09-07 10:00', '2026-09-07 11:00', [
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+    ]);
+
+    $raster = app(FreeSlotFinder::class)->grid(
+        [1],
+        CarbonImmutable::parse('2026-09-07'),
+        CarbonImmutable::parse('2026-09-14'),
+    );
+
+    // Eine Serie darf nicht den ganzen Tag sperren — nur ihre Stunde.
+    expect(scheibe($raster, '2026-09-14', '11:00')['free'])->toBeTrue();
+});
+
+it('laesst einen Dienstag frei, wenn die Serie montags liegt', function () {
+    slotTermin(1, '2026-09-07 10:00', '2026-09-07 11:00', [
+        'recurrence_rules' => ['frequency' => 'weekly', 'byDay' => ['MO']],
+    ]);
+
+    $raster = app(FreeSlotFinder::class)->grid(
+        [1],
+        CarbonImmutable::parse('2026-09-07'),
+        CarbonImmutable::parse('2026-09-08'),
+    );
+
+    expect(scheibe($raster, '2026-09-08', '10:00')['free'])->toBeTrue();
+});

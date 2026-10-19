@@ -6,6 +6,8 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Carbon\CarbonPeriod;
 use Peppermint\Calendar\Models\CalendarEvent;
+use Peppermint\Calendar\Recurrence\Occurrence;
+use Peppermint\Calendar\Recurrence\OccurrenceExpander;
 
 /**
  * Wann sind alle frei? — die Terminfindung.
@@ -38,6 +40,10 @@ use Peppermint\Calendar\Models\CalendarEvent;
  */
 final class FreeSlotFinder
 {
+    public function __construct(
+        private readonly OccurrenceExpander $expander,
+    ) {}
+
     /**
      * Eine Belegung: wer, von wann bis wann.
      *
@@ -134,7 +140,19 @@ final class FreeSlotFinder
         }
 
         $termine = CalendarEvent::query()
-            ->inRange($from, $to)
+            // Grosszuegiger abfragen als das Fenster, dann entfalten.
+            //
+            // `inRange` stand hier bis zum 19.10.2026 — und das war falsch,
+            // gleich doppelt: Eine Serie, die VOR dem Fenster beginnt, wurde
+            // gar nicht gefunden, und eine gefundene zaehlte nur mit ihrem
+            // ersten Termin. Eine woechentliche Besprechung blockierte also
+            // genau eine Stunde statt jeder Woche.
+            //
+            // Das ist der schlimmste Fehler, den ein Planer machen kann: Er
+            // bietet eine Zeit an, in der die halbe Runde schon sitzt, und
+            // sieht dabei vollkommen plausibel aus. Dieselbe Begruendung wie
+            // im `CategoryReportAssembler`, wo es seit v0.59.0 so steht.
+            ->where(CalendarEvent::column('starts_at'), '<', $to)
             ->where(function ($abfrage) use ($userIds) {
                 $abfrage->whereIn(CalendarEvent::column('owner_id'), $userIds)
                     ->orWhereHas('attendees', fn ($a) => $a->whereIn('user_id', $userIds));
@@ -144,7 +162,10 @@ final class FreeSlotFinder
 
         $belegt = [];
 
-        foreach ($termine as $termin) {
+        foreach ($this->expander->expand($termine, $from, $to) as $vorkommen) {
+            /** @var Occurrence $vorkommen */
+            $termin = $vorkommen->event;
+
             // Eine Belegung je betroffener Person: Der Eigentümer und jeder
             // Teilnehmer, der in der Frage vorkommt.
             $betroffene = collect([$termin->owner_id])
@@ -157,8 +178,9 @@ final class FreeSlotFinder
             foreach ($betroffene as $userId) {
                 $belegt[] = [
                     'user' => $userId,
-                    'start' => $termin->starts_at,
-                    'end' => $termin->ends_at ?? $termin->starts_at,
+                    // Die Zeiten des VORKOMMENS, nicht die der Regel.
+                    'start' => $vorkommen->startsAt,
+                    'end' => $vorkommen->endsAt,
                     'allDay' => (bool) $termin->all_day,
                 ];
             }
