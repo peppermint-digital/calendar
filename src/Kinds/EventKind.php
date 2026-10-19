@@ -78,17 +78,28 @@ abstract class EventKind
      *
      * Categories are an extra, and the kind decides — the default is no.
      *
-     * This used to read "a time block on a task does not need one, and
-     * offering an empty select next to it is worse than offering nothing".
-     * The second half still holds and is why the default stays false. The
-     * first half was written when no product had a maintained list; measured
-     * in the Manager on 19.10.2026, 483 of 1211 events are time blocks on a
-     * task — 40 percent of the calendar, all of it landing under "no
-     * category" in the report. A block that cannot be labelled is not a
-     * simplification, it is a hole in the report.
+     * The original wording held: "a time block on a task does not need one,
+     * and offering an empty select next to it is worse than offering
+     * nothing." On 19.10.2026 I overrode the first half, reasoning that 483
+     * of 1211 Manager events are task blocks and all of that time lands under
+     * "no category" in the report. That was the wrong way round, and the user
+     * said so in one sentence: a block already points AT something.
      *
-     * So a planned block MAY carry categories now. The kind still has to say
-     * so, and the screen only offers the choice when the list is non-empty.
+     * The subject carries the purpose, and more precisely than a six-item
+     * list ever could — "task #4711 in project X for customer Y" against
+     * "project work". Putting a coarser label next to a precise one adds
+     * nothing. And nobody drags 483 blocks into a calendar and then clicks a
+     * category onto each: the gap in the report would have stayed exactly
+     * where it was, with more code around it.
+     *
+     * The lesson is about the direction of the argument. I started from the
+     * empty row in the report instead of from what the person using it gains.
+     * A hole in a report is a reason to ask what should fill it — not a
+     * licence to invent a field.
+     *
+     * Where block time belongs in the report is through its SUBJECT, which
+     * every block has by construction ({@see PlannedBlockKind}) — derived from
+     * real data and nothing to click.
      */
     public function usesCategories(): bool
     {
