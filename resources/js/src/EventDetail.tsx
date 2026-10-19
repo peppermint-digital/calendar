@@ -26,6 +26,8 @@ export type EventDetailData = {
     recurring?: boolean;
     attendees?: { name: string; status?: string | null }[];
     categories?: string[];
+    /** Die Slugs dazu — nötig, um umzuschalten. Ein Etikett ist kein Schlüssel. */
+    categorySlugs?: string[];
 };
 
 export type EventDetailLabels = {
@@ -64,6 +66,22 @@ export interface EventDetailProps {
     formatDate?: (iso: string) => string;
     labels?: Partial<EventDetailLabels>;
     className?: string;
+    /**
+     * Die Kategorien, die DIESE Terminart anbietet — vom Produkt gereicht,
+     * weil nur es weiss, wer fragt.
+     *
+     * Zusammen mit `onCategoriesChange` wird die Kategorienzeile waehlbar.
+     * Ohne beides bleibt sie eine Anzeige, und ohne Eintraege verschwindet
+     * sie: Ein leerer Auswahlbereich ist schlimmer als keiner.
+     */
+    availableCategories?: Array<{ slug: string; label: string }>;
+    /**
+     * Wird mit der NEUEN vollstaendigen Liste gerufen, nicht mit der
+     * Aenderung. Eine Maske schickt den Zustand, den sie anzeigt — wer
+     * „hinzugefuegt"/„entfernt" schickt, muss beim Empfaenger zusammenrechnen,
+     * und zwei Rechnungen laufen auseinander.
+     */
+    onCategoriesChange?: (slugs: string[]) => void;
 }
 
 /** `2026-09-08` → `Di., 08. September 2026`. */
@@ -107,6 +125,8 @@ export function EventDetail({
     formatDate = deutschesDatum,
     labels,
     className = '',
+    availableCategories,
+    onCategoriesChange,
 }: EventDetailProps) {
     const beschriftung = { ...DETAIL_DEFAULTS, ...labels };
 
@@ -199,18 +219,64 @@ export function EventDetail({
                     </div>
                 )}
 
-                {event.categories !== undefined && event.categories.length > 0 && (
-                    <div>
-                        <dt className="text-xs font-medium text-muted-foreground">{beschriftung.categories}</dt>
-                        <dd className="flex flex-wrap gap-1.5">
-                            {event.categories.map((etikett) => (
-                                <span key={etikett} className="rounded-md border px-1.5 py-0.5 text-xs">
-                                    {etikett}
-                                </span>
-                            ))}
-                        </dd>
-                    </div>
-                )}
+                {/*
+                    Kategorien: anzeigen, und bei `onCategoriesChange` auch
+                    waehlbar.
+
+                    Waehlbar auch dann, wenn der Termin noch KEINE trägt — das
+                    ist der ganze Punkt. Gemessen im Manager am 19.10.2026:
+                    483 von 1211 Terminen sind Zeitblöcke an einer Aufgabe, und
+                    keiner konnte eine Kategorie tragen. Ein Block entsteht
+                    durch Ziehen, es gibt also keinen Dialog, in dem man sie
+                    mitwählen könnte; hier ist die Stelle.
+                */}
+                {onCategoriesChange !== undefined && availableCategories !== undefined
+                    ? availableCategories.length > 0 && (
+                        <div>
+                            <dt className="text-xs font-medium text-muted-foreground">{beschriftung.categories}</dt>
+                            <dd className="flex flex-wrap gap-1.5">
+                                {availableCategories.map((kategorie) => {
+                                    const gewaehlt = (event.categorySlugs ?? []).includes(kategorie.slug);
+
+                                    return (
+                                        <button
+                                            key={kategorie.slug}
+                                            type="button"
+                                            aria-pressed={gewaehlt}
+                                            onClick={() => {
+                                                const jetzt = event.categorySlugs ?? [];
+
+                                                onCategoriesChange(
+                                                    gewaehlt
+                                                        ? jetzt.filter((slug) => slug !== kategorie.slug)
+                                                        : [...jetzt, kategorie.slug],
+                                                );
+                                            }}
+                                            className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
+                                                gewaehlt
+                                                    ? 'border-primary bg-primary/10 font-medium'
+                                                    : 'text-muted-foreground hover:border-foreground/40'
+                                            }`}
+                                        >
+                                            {kategorie.label}
+                                        </button>
+                                    );
+                                })}
+                            </dd>
+                        </div>
+                    )
+                    : event.categories !== undefined && event.categories.length > 0 && (
+                        <div>
+                            <dt className="text-xs font-medium text-muted-foreground">{beschriftung.categories}</dt>
+                            <dd className="flex flex-wrap gap-1.5">
+                                {event.categories.map((etikett) => (
+                                    <span key={etikett} className="rounded-md border px-1.5 py-0.5 text-xs">
+                                        {etikett}
+                                    </span>
+                                ))}
+                            </dd>
+                        </div>
+                    )}
 
                 {extra}
             </dl>

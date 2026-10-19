@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Http;
 
 use Illuminate\Support\Facades\Route;
 use Peppermint\Calendar\Http\Controllers\CategoryAdminController;
+use Peppermint\Calendar\Http\Controllers\EventCategoryAssignmentController;
 use Peppermint\Calendar\Http\Controllers\EventSourceController;
 use Peppermint\Calendar\Http\Controllers\IcsFeedController;
 
@@ -190,6 +191,28 @@ class CalendarRoutes
         Route::delete('categories/{category}', [CategoryAdminController::class, 'destroy'])
             ->whereNumber('category')
             ->name('calendar.categories.destroy');
+    }
+
+    /**
+     * Die Kategorien eines einzelnen Termins setzen.
+     *
+     * Getrennt von {@see pages()}, weil es kein Seitenaufruf ist, sondern ein
+     * kleiner Schreibweg aus der Detailansicht heraus — und weil ein Produkt
+     * ihn weglassen kann, ohne auf die Seiten zu verzichten.
+     *
+     * ```php
+     * Route::middleware(['web', 'auth'])->group(function () {
+     *     CalendarRoutes::eventCategories();
+     * });
+     * ```
+     *
+     * Der Name `calendar.event.categories.update` gehoert zum Vertrag: Die
+     * Detailansicht aus dem Paket ruft ihn auf.
+     */
+    public static function eventCategories(): void
+    {
+        Route::patch('calendar/{event}/categories', [EventCategoryAssignmentController::class, 'update'])
+            ->name('calendar.event.categories.update');
     }
 
     public static function sources(): void

@@ -2,6 +2,9 @@
 
 namespace Peppermint\Calendar\Services;
 
+use Peppermint\Calendar\Categories\CategoryRegistry;
+use Peppermint\Calendar\Categories\EventCategories;
+use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Models\CalendarEventAttendee;
 
@@ -63,6 +66,10 @@ final class EventDetailPresenter
             'recurring' => $event->rrule !== null,
             'attendees' => $this->attendees($event),
             'categories' => $art->categories($event),
+            // Die Slugs dazu, nicht nur die Etiketten: Die Detailansicht
+            // kann eine Kategorie nur umschalten, wenn sie ihren Schluessel
+            // kennt — und ein Etikett ist keiner, es darf umbenannt werden.
+            'categorySlugs' => $this->slugs($event, $art),
         ];
     }
 
@@ -76,6 +83,32 @@ final class EventDetailPresenter
      *
      * @return array<int, array<string, string|null>>
      */
+    /**
+     * Die Slugs der Kategorien dieses Termins.
+     *
+     * Zwei Riegel, nicht einer: Eine Art, die keine Kategorien traegt, hat
+     * keine — und ein System ohne die Zuordnungstabelle des Pakets wuerde beim
+     * Fragen in eine fehlende Tabelle laufen. Dieselbe Ruecksicht wie in
+     * {@see \Peppermint\Calendar\Kinds\EventKind::categories()}; sie macht
+     * den Unterschied zwischen einem additiven Update und einem Ausfall.
+     *
+     * @return array<int, string>
+     */
+    private function slugs(CalendarEvent $event, EventKind $art): array
+    {
+        if (! $art->usesCategories()) {
+            return [];
+        }
+
+        $registry = app(CategoryRegistry::class);
+
+        if (! $registry->enabled() || ! $registry->assignmentsAvailable()) {
+            return [];
+        }
+
+        return app(EventCategories::class)->slugsOf($event);
+    }
+
     private function attendees(CalendarEvent $event): array
     {
         return $event->attendees()

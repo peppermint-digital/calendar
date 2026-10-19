@@ -76,8 +76,19 @@ abstract class EventKind
     /**
      * Does this kind carry categories at all?
      *
-     * Categories are an extra. A time block on a task does not need one, and
-     * offering an empty select next to it is worse than offering nothing.
+     * Categories are an extra, and the kind decides — the default is no.
+     *
+     * This used to read "a time block on a task does not need one, and
+     * offering an empty select next to it is worse than offering nothing".
+     * The second half still holds and is why the default stays false. The
+     * first half was written when no product had a maintained list; measured
+     * in the Manager on 19.10.2026, 483 of 1211 events are time blocks on a
+     * task — 40 percent of the calendar, all of it landing under "no
+     * category" in the report. A block that cannot be labelled is not a
+     * simplification, it is a hole in the report.
+     *
+     * So a planned block MAY carry categories now. The kind still has to say
+     * so, and the screen only offers the choice when the list is non-empty.
      */
     public function usesCategories(): bool
     {

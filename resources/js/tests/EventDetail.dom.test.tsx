@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EventDetail, type EventDetailData } from '../src/EventDetail';
@@ -159,5 +159,108 @@ describe('die produkteigenen Teile', () => {
         const { container } = render(<EventDetail event={TERMIN} />);
 
         expect(container.querySelector('.border-t')).toBeNull();
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Kategorien wählen (#7846)
+|--------------------------------------------------------------------------
+|
+| Gemessen im Manager am 19.10.2026: 483 von 1211 Terminen sind Zeitblöcke an
+| einer Aufgabe, und keiner konnte eine Kategorie tragen — damit fiel dieser
+| Teil in der Auswertung komplett unter „ohne Kategorie". Ein Block entsteht
+| durch Ziehen, es gibt also keinen Dialog, in dem man sie mitwählen könnte.
+| Deshalb hier.
+*/
+
+const kategorien = [
+    { slug: 'kundentermin', label: 'Kundentermin' },
+    { slug: 'vertrieb', label: 'Vertrieb' },
+];
+
+describe('EventDetail — Kategorien wählen', () => {
+    it('bleibt eine Anzeige, wenn nichts zum Ändern übergeben wird', () => {
+        render(
+            <EventDetail
+                event={{ ...TERMIN, categories: ['Kundentermin'], categorySlugs: ['kundentermin'] }}
+            />,
+        );
+
+        expect(screen.getByText('Kundentermin')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Kundentermin' })).toBeNull();
+    });
+
+    /** Der ganze Punkt: wählbar auch dann, wenn der Termin noch keine trägt. */
+    it('bietet die Wahl auch bei einem Termin ohne Kategorie', () => {
+        render(
+            <EventDetail
+                event={{ ...TERMIN, categories: [], categorySlugs: [] }}
+                availableCategories={kategorien}
+                onCategoriesChange={() => {}}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: 'Kundentermin' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Vertrieb' })).toBeTruthy();
+    });
+
+    it('zeigt, was gewählt ist', () => {
+        render(
+            <EventDetail
+                event={{ ...TERMIN, categorySlugs: ['vertrieb'] }}
+                availableCategories={kategorien}
+                onCategoriesChange={() => {}}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: 'Vertrieb' }).getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByRole('button', { name: 'Kundentermin' }).getAttribute('aria-pressed')).toBe('false');
+    });
+
+    /** Die VOLLSTÄNDIGE neue Liste, nicht die Änderung — sonst muss der Empfänger rechnen. */
+    it('meldet die neue vollstaendige Liste beim Hinzufuegen', () => {
+        const gemeldet: string[][] = [];
+
+        render(
+            <EventDetail
+                event={{ ...TERMIN, categorySlugs: ['kundentermin'] }}
+                availableCategories={kategorien}
+                onCategoriesChange={(slugs) => gemeldet.push(slugs)}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Vertrieb' }));
+
+        expect(gemeldet).toEqual([['kundentermin', 'vertrieb']]);
+    });
+
+    it('meldet die neue vollstaendige Liste beim Abwaehlen', () => {
+        const gemeldet: string[][] = [];
+
+        render(
+            <EventDetail
+                event={{ ...TERMIN, categorySlugs: ['kundentermin', 'vertrieb'] }}
+                availableCategories={kategorien}
+                onCategoriesChange={(slugs) => gemeldet.push(slugs)}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Kundentermin' }));
+
+        expect(gemeldet).toEqual([['vertrieb']]);
+    });
+
+    /** Ein leerer Auswahlbereich ist schlimmer als keiner. */
+    it('zeigt nichts, wenn die Terminart keine Kategorien anbietet', () => {
+        render(
+            <EventDetail
+                event={{ ...TERMIN, categories: [], categorySlugs: [] }}
+                availableCategories={[]}
+                onCategoriesChange={() => {}}
+            />,
+        );
+
+        expect(screen.queryByText('Kategorien')).toBeNull();
     });
 });
