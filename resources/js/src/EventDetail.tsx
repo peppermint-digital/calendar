@@ -34,7 +34,19 @@ export type EventDetailData = {
      * gestellt sein, und ein Geburtstag ist es immer.
      */
     private?: boolean;
-    attendees?: { name: string; status?: string | null }[];
+    attendees?: {
+        name: string;
+        status?: string | null;
+        /**
+         * Die Mailadresse, wenn das Produkt eine kennt.
+         *
+         * Steht NEBEN dem Namen, nicht an seiner Stelle: Bei einem externen
+         * Gast ist die Adresse oft das Einzige, was es gibt — dann rückt sie
+         * schon als `name` ein. Bei einer Kollegin ist sie die Zusatzangabe,
+         * mit der man sie anschreibt, ohne die Teilnehmerliste zu verlassen.
+         */
+        email?: string | null;
+    }[];
     categories?: string[];
     /** Die Slugs dazu — nötig, um umzuschalten. Ein Etikett ist kein Schlüssel. */
     categorySlugs?: string[];
@@ -286,8 +298,22 @@ export function EventDetail({
                                 <span
                                     key={person.name}
                                     className="rounded-md border px-1.5 py-0.5 text-xs"
+                                    title={person.email ?? undefined}
                                 >
                                     {person.name}
+                                    {/*
+                                        Die Adresse nur, wenn sie etwas NEUES
+                                        sagt. Bei einem externen Gast ohne Namen
+                                        ist sie schon der Name — sie ein zweites
+                                        Mal danebenzusetzen sähe aus wie ein
+                                        Fehler.
+                                    */}
+                                    {person.email !== null &&
+                                        person.email !== undefined &&
+                                        person.email !== '' &&
+                                        person.email !== person.name && (
+                                            <span className="ml-1 text-muted-foreground">{person.email}</span>
+                                        )}
                                     {person.status !== null && person.status !== undefined && person.status !== '' && (
                                         <span className="ml-1 text-muted-foreground">{person.status}</span>
                                     )}

@@ -332,3 +332,46 @@ describe('Dauer und Privat (#8307)', () => {
         expect(screen.queryByTestId('event-detail-private')).toBeNull();
     });
 });
+
+describe('Mailadresse der Teilnehmer (#8307)', () => {
+    it('zeigt sie neben dem Namen', () => {
+        render(
+            <EventDetail
+                event={{
+                    title: 'Abstimmung',
+                    date: '2026-10-19',
+                    attendees: [{ name: 'Anna Beispiel', email: 'anna@example.test' }],
+                }}
+            />,
+        );
+
+        expect(screen.getByText('anna@example.test')).toBeTruthy();
+        expect(screen.getByText('Anna Beispiel')).toBeTruthy();
+    });
+
+    it('laesst sie weg, wenn sie schon der Name ist', () => {
+        // Bei einem externen Gast ohne Namen ruecken Name und Adresse gleich
+        // ein. Sie zweimal zu zeigen saehe aus wie ein Fehler.
+        render(
+            <EventDetail
+                event={{
+                    title: 'Abstimmung',
+                    date: '2026-10-19',
+                    attendees: [{ name: 'gast@example.test', email: 'gast@example.test' }],
+                }}
+            />,
+        );
+
+        expect(screen.getAllByText('gast@example.test')).toHaveLength(1);
+    });
+
+    it('kommt ohne Adresse aus', () => {
+        render(
+            <EventDetail
+                event={{ title: 'Abstimmung', date: '2026-10-19', attendees: [{ name: 'Anna Beispiel' }] }}
+            />,
+        );
+
+        expect(screen.getByText('Anna Beispiel')).toBeTruthy();
+    });
+});

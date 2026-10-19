@@ -147,6 +147,11 @@ final class EventDetailPresenter
                 'status' => in_array($person->status, ['accepted', 'declined', 'tentative'], true)
                     ? $person->status
                     : null,
+                // Die Adresse zum Namen. Beim externen Gast ist sie haeufig
+                // das Einzige, was es gibt — dann steht sie schon oben als
+                // `name`, und die Darstellung laesst sie hier weg, statt sie
+                // zweimal zu zeigen.
+                'email' => $person->user?->email ?? $person->email,
             ])
             ->reject(fn (array $person) => $person['name'] === '')
             ->values()

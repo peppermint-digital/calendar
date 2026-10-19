@@ -97,7 +97,7 @@ describe('die Teilnehmer', function () {
 
         $daten = app(EventDetailPresenter::class)->present($termin);
 
-        expect($daten['attendees'])->toBe([['name' => 'Anna Neu', 'status' => 'accepted']]);
+        expect($daten['attendees'])->toBe([['name' => 'Anna Neu', 'status' => 'accepted', 'email' => null]]);
     });
 
     it('nimmt die Spalte, wenn es kein Konto gibt', function () {
@@ -105,7 +105,7 @@ describe('die Teilnehmer', function () {
         $termin->attendees()->create(['user_id' => null, 'name' => 'Anna Extern', 'status' => 'accepted']);
 
         expect(app(EventDetailPresenter::class)->present($termin)['attendees'])
-            ->toBe([['name' => 'Anna Extern', 'status' => 'accepted']]);
+            ->toBe([['name' => 'Anna Extern', 'status' => 'accepted', 'email' => null]]);
     });
 
     /** Externe Gäste haben kein Konto — dann bleibt die Adresse. */
@@ -114,7 +114,7 @@ describe('die Teilnehmer', function () {
         $termin->attendees()->create(['user_id' => null, 'email' => 'gast@example.com']);
 
         expect(app(EventDetailPresenter::class)->present($termin)['attendees'])
-            ->toBe([['name' => 'gast@example.com', 'status' => null]]);
+            ->toBe([['name' => 'gast@example.com', 'status' => null, 'email' => 'gast@example.com']]);
     });
 
     /**
@@ -178,4 +178,13 @@ it('meldet einen Serientermin als Serie', function () {
 
 it('meldet einen Einzeltermin NICHT als Serie', function () {
     expect(app(EventDetailPresenter::class)->present(detailTermin())['recurring'])->toBeFalse();
+});
+
+it('liefert die Mailadresse zum Teilnehmer', function () {
+    $termin = detailTermin();
+    $termin->attendees()->create(['user_id' => null, 'name' => 'Gast', 'email' => 'gast@example.test']);
+
+    $daten = app(EventDetailPresenter::class)->present($termin);
+
+    expect($daten['attendees'][0]['email'])->toBe('gast@example.test');
 });
