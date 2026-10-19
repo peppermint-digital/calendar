@@ -10,6 +10,8 @@ export { CalendarFilterPanel } from './CalendarFilterPanel';
 export type { CalendarFilterPanelLabels, CalendarFilterPanelProps, FilterGroup, FilterOption, FilterToggle } from './CalendarFilterPanel';
 // Die Filterleiste: Arten und Fremdquellen — was alle vier Systeme haben.
 export { CategoryAdmin, defaultCategoryAdminLabels } from './CategoryAdmin';
+export { CategoryPicker } from './CategoryPicker';
+export type { CategoryPickerProps, PickableCategory } from './CategoryPicker';
 export { CategoryReport, defaultCategoryReportLabels, formatDuration } from './CategoryReport';
 export type { CategoryReportData, CategoryReportLabels, CategoryReportProps, CategoryReportRow } from './CategoryReport';
 export type { AdminCategory, CategoryAdminLabels, CategoryAdminProps } from './CategoryAdmin';

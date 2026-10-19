@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { CategoryPicker, type PickableCategory } from './CategoryPicker';
+
 /**
  * Ein Termin, wie man ihn ansieht — nicht wie man ihn ändert.
  *
@@ -74,7 +76,7 @@ export interface EventDetailProps {
      * Ohne beides bleibt sie eine Anzeige, und ohne Eintraege verschwindet
      * sie: Ein leerer Auswahlbereich ist schlimmer als keiner.
      */
-    availableCategories?: Array<{ slug: string; label: string }>;
+    availableCategories?: PickableCategory[];
     /**
      * Wird mit der NEUEN vollstaendigen Liste gerufen, nicht mit der
      * Aenderung. Eine Maske schickt den Zustand, den sie anzeigt — wer
@@ -234,34 +236,12 @@ export function EventDetail({
                     ? availableCategories.length > 0 && (
                         <div>
                             <dt className="text-xs font-medium text-muted-foreground">{beschriftung.categories}</dt>
-                            <dd className="flex flex-wrap gap-1.5">
-                                {availableCategories.map((kategorie) => {
-                                    const gewaehlt = (event.categorySlugs ?? []).includes(kategorie.slug);
-
-                                    return (
-                                        <button
-                                            key={kategorie.slug}
-                                            type="button"
-                                            aria-pressed={gewaehlt}
-                                            onClick={() => {
-                                                const jetzt = event.categorySlugs ?? [];
-
-                                                onCategoriesChange(
-                                                    gewaehlt
-                                                        ? jetzt.filter((slug) => slug !== kategorie.slug)
-                                                        : [...jetzt, kategorie.slug],
-                                                );
-                                            }}
-                                            className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
-                                                gewaehlt
-                                                    ? 'border-primary bg-primary/10 font-medium'
-                                                    : 'text-muted-foreground hover:border-foreground/40'
-                                            }`}
-                                        >
-                                            {kategorie.label}
-                                        </button>
-                                    );
-                                })}
+                            <dd>
+                                <CategoryPicker
+                                    available={availableCategories}
+                                    selected={event.categorySlugs ?? []}
+                                    onChange={onCategoriesChange}
+                                />
                             </dd>
                         </div>
                     )
