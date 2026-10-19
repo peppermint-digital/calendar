@@ -137,3 +137,19 @@ describe('die Teilnehmer', function () {
         expect(app(EventDetailPresenter::class)->present($termin)['attendees'])->toBe([]);
     });
 });
+
+it('meldet einen privaten Termin als privat', function () {
+    $daten = app(EventDetailPresenter::class)->present(detailTermin(['visibility' => 'private']));
+
+    expect($daten['private'])->toBeTrue();
+});
+
+it('zaehlt auch „confidential" als privat — dieselbe Spalte wie im ICS-Export', function () {
+    $daten = app(EventDetailPresenter::class)->present(detailTermin(['visibility' => 'confidential']));
+
+    expect($daten['private'])->toBeTrue();
+});
+
+it('meldet einen gewoehnlichen Termin NICHT als privat', function () {
+    expect(app(EventDetailPresenter::class)->present(detailTermin())['private'])->toBeFalse();
+});

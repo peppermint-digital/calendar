@@ -64,6 +64,14 @@ final class EventDetailPresenter
             'colour' => null,
             'kind' => $event->kind,
             'recurring' => $event->rrule !== null,
+            // Privat heisst: nur fuer die eigene Person sichtbar. Abgeleitet
+            // aus `visibility`, weil das die Spalte ist, auf die sich auch der
+            // ICS-Export stuetzt — zwei Quellen fuer dieselbe Aussage waeren
+            // zwei Gelegenheiten, sie verschieden zu beantworten.
+            //
+            // Ein Produkt mit einem eigenen Schalter (der Manager hat
+            // `is_private`) ueberschreibt den Wert beim Zusammensetzen.
+            'private' => in_array($event->field('visibility'), ['private', 'confidential'], true),
             'attendees' => $this->attendees($event),
             'categories' => $art->categories($event),
             // Die Slugs dazu, nicht nur die Etiketten: Die Detailansicht
