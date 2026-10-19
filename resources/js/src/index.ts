@@ -22,6 +22,10 @@ export type { CalendarFilterEntry, CalendarFiltersProps } from './CalendarFilter
 export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';
 export type { CalendarToolbarButton, CalendarToolbarLabels, CalendarToolbarProps } from './CalendarToolbar';
 export { AgendaList, groupByDay } from './AgendaList';
+export { SlotFinder, defaultSlotFinderLabels } from './SlotFinder';
+export type { FinderDay, FinderSlot, SlotFinderLabels, SlotFinderProps } from './SlotFinder';
+export { AttendeePicker, defaultAttendeePickerLabels } from './AttendeePicker';
+export type { AttendeePickerLabels, AttendeePickerProps, PickableAttendee } from './AttendeePicker';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
 export { PlannableList, PLANNABLE_ATTRIBUTE } from './PlannableList';
 export { PlannableSearch } from './PlannableSearch';
