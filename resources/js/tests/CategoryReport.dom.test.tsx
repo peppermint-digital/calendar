@@ -134,3 +134,61 @@ describe('CategoryReport — die Aufschlüsselung ohne Kategorie', () => {
         expect(screen.getByText('Kundentermin')).toBeTruthy();
     });
 });
+
+describe('Gesamtzeit (#8307)', () => {
+    it('stellt sie gross voran, damit sie in allen vier Produkten gleich steht', () => {
+        render(<CategoryReport report={bericht()} />);
+
+        const block = screen.getByTestId('category-report-total');
+
+        expect(block.textContent).toContain('Gesamtzeit');
+        expect(block.textContent).toContain('2 h');
+        expect(block.textContent).toContain('2 Termine');
+    });
+
+    it('sagt „Termin" im Singular', () => {
+        render(<CategoryReport report={bericht({ total: zeile('total', 60, 1) })} />);
+
+        expect(screen.getByTestId('category-report-total').textContent).toContain('1 Termin');
+    });
+});
+
+describe('Nach Terminart (#8307)', () => {
+    const mitArten = () =>
+        bericht({
+            kinds: [
+                { ...zeile('Zeitblock', 300, 4), categories: [] },
+                { ...zeile('Termin', 120, 2), categories: [zeile('Kundentermin', 120, 2)] },
+            ],
+        });
+
+    it('zeigt jede Art mit Dauer und Anzahl', () => {
+        render(<CategoryReport report={mitArten()} />);
+
+        const abschnitt = screen.getByTestId('category-report-kinds');
+
+        expect(abschnitt.textContent).toContain('Zeitblock');
+        expect(abschnitt.textContent).toContain('5 h · 4×');
+    });
+
+    it('rueckt die Kategorien unter ihrer Art ein, statt sie als zweite Liste zu zeigen', () => {
+        render(<CategoryReport report={mitArten()} />);
+
+        // „Kundentermin" steht zweimal auf der Seite: einmal als Kategorie,
+        // einmal unter seiner Art. Genau das ist gewollt — die beiden
+        // Abschnitte zaehlen verschieden.
+        expect(screen.getAllByText('Kundentermin').length).toBe(2);
+    });
+
+    it('laesst den Abschnitt weg, wenn das Produkt keine Arten liefert', () => {
+        render(<CategoryReport report={bericht()} />);
+
+        expect(screen.queryByTestId('category-report-kinds')).toBeNull();
+    });
+
+    it('laesst ihn auch bei leerer Liste weg, statt eine leere Ueberschrift zu zeigen', () => {
+        render(<CategoryReport report={bericht({ kinds: [] })} />);
+
+        expect(screen.queryByTestId('category-report-kinds')).toBeNull();
+    });
+});

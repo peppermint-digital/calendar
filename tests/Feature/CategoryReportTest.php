@@ -230,3 +230,70 @@ it('schluesselt einen Termin mit Kategorie nicht zusaetzlich auf', function () {
 
     expect($bericht['groups'])->toBe([]);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Nach Terminart (#8307)
+|--------------------------------------------------------------------------
+|
+| Diese Aufschluesselung gab es bis zum 19.10.2026 nur im Manager, und weil
+| sie im Paket fehlte, konnte der Manager seine eigene Seite nicht gegen die
+| geteilte tauschen, ohne seinen Nutzern etwas wegzunehmen.
+|
+| Der Unterschied zu `categories` steckt im Zaehlen: Ein Termin hat GENAU EINE
+| Art, aber null bis viele Kategorien. Ueber die Arten summiert kommt deshalb
+| die Gesamtzeit heraus — ueber die Kategorien summiert nicht.
+*/
+
+it('schluesselt nach Terminart auf', function () {
+    berichtTermin(['title' => 'A', 'starts_at' => '2026-09-08 09:00', 'ends_at' => '2026-09-08 10:00'], ['Kundentermin']);
+    blockTermin('Block', 90);
+
+    $arten = collect(bericht()['kinds'])->keyBy('label');
+
+    expect($arten)->toHaveCount(2)
+        ->and($arten['Mit Kategorien']['minutes'])->toBe(60)
+        ->and($arten['Mit Kategorien']['count'])->toBe(1)
+        ->and($arten['Zeitblock mit Gruppe']['minutes'])->toBe(90);
+});
+
+it('zaehlt einen Termin mit zwei Kategorien bei seiner Art nur einmal', function () {
+    berichtTermin(['title' => 'Doppelt'], ['Kundentermin', 'Vertrieb']);
+
+    $ergebnis = bericht();
+    $art = collect($ergebnis['kinds'])->firstWhere('label', 'Mit Kategorien');
+
+    // Die Art einmal, die Kategorien beide voll — das ist der ganze
+    // Unterschied zwischen den zwei Abschnitten.
+    expect($art['count'])->toBe(1)
+        ->and($art['minutes'])->toBe(60)
+        ->and($art['categories'])->toHaveCount(2)
+        ->and(collect($ergebnis['categories'])->sum('minutes'))->toBe(120);
+});
+
+it('ergibt ueber alle Arten summiert die Gesamtzeit', function () {
+    berichtTermin(['title' => 'Eins'], ['Kundentermin', 'Vertrieb']);
+    berichtTermin(['title' => 'Zwei', 'starts_at' => '2026-09-09 09:00', 'ends_at' => '2026-09-09 11:00'], []);
+    blockTermin('Block', 30);
+
+    $ergebnis = bericht();
+
+    expect(collect($ergebnis['kinds'])->sum('minutes'))->toBe($ergebnis['total']['minutes'])
+        ->and(collect($ergebnis['kinds'])->sum('count'))->toBe($ergebnis['total']['count']);
+});
+
+it('fuehrt eine Art ohne Kategorie mit leerer Unterliste', function () {
+    blockTermin('Block', 45);
+
+    $art = collect(bericht()['kinds'])->firstWhere('label', 'Zeitblock mit Gruppe');
+
+    expect($art['minutes'])->toBe(45)
+        ->and($art['categories'])->toBe([]);
+});
+
+it('stellt die laengste Art nach vorn', function () {
+    berichtTermin(['title' => 'Kurz'], ['Kundentermin']);
+    blockTermin('Lang', 300);
+
+    expect(bericht()['kinds'][0]['label'])->toBe('Zeitblock mit Gruppe');
+});

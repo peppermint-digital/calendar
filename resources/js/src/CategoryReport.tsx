@@ -17,8 +17,22 @@ export type CategoryReportData = {
      * lügenden Berichts.
      */
     groups?: CategoryReportRow[];
+    /**
+     * Nach Terminart, mit den Kategorien je Art darunter.
+     *
+     * Eigener Abschnitt und nicht neben den Kategorien, weil hier ANDERS
+     * gezaehlt wird: Ein Termin hat genau eine Art, aber null bis viele
+     * Kategorien. Ueber die Arten summiert kommt die Gesamtzeit heraus,
+     * ueber die Kategorien summiert nicht.
+     */
+    kinds?: CategoryReportKindRow[];
     uncategorized: CategoryReportRow;
     total: CategoryReportRow;
+};
+
+/** Eine Terminart mit ihren Kategorien darunter. */
+export type CategoryReportKindRow = CategoryReportRow & {
+    categories: CategoryReportRow[];
 };
 
 export type CategoryReportLabels = {
@@ -26,6 +40,9 @@ export type CategoryReportLabels = {
     uncategorized: string;
     groupsTitle: string;
     groupsHint: string;
+    kindsTitle: string;
+    kindsHint: string;
+    totalTitle: string;
     multipleHint: string;
     /** 135 → „2:15 h". */
     duration: (minuten: number) => string;
@@ -47,6 +64,9 @@ export const defaultCategoryReportLabels: CategoryReportLabels = {
     uncategorized: 'Ohne Kategorie',
     groupsTitle: 'Davon ohne Kategorie, nach Herkunft',
     groupsHint: 'Abgeleitet aus dem Vorgang, an dem der Termin hängt — nicht von Hand gewählt.',
+    kindsTitle: 'Nach Terminart',
+    kindsHint: 'Jeder Termin zählt bei genau einer Art — die Summe hier ist die Gesamtzeit.',
+    totalTitle: 'Gesamtzeit',
     multipleHint:
         'Ein Termin mit mehreren Kategorien zählt bei jeder voll — die Summe der Kategorien ist deshalb größer als die Gesamtzeit.',
     duration: formatDuration,
@@ -92,6 +112,23 @@ export function CategoryReport({ report, labels }: CategoryReportProps) {
 
     return (
         <div className="space-y-4" data-testid="category-report">
+            {/*
+                Die Gesamtzeit zuerst, und gross.
+
+                Sie stand bisher in drei von vier Produkten klein in der
+                Unterzeile der Ueberschrift und im vierten (Manager) gross in
+                einer eigenen Karte. Hier ist sie EINMAL, damit die Seite
+                ueberall dieselbe Antwort an derselben Stelle gibt — und weil
+                es die Zahl ist, wegen der jemand die Seite aufmacht.
+            */}
+            <div data-testid="category-report-total">
+                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t.totalTitle}</p>
+                <p className="text-3xl font-bold tabular-nums">{t.duration(report.total.minutes)}</p>
+                <p className="text-muted-foreground text-sm">
+                    {report.total.count} {report.total.count === 1 ? 'Termin' : 'Termine'}
+                </p>
+            </div>
+
             {report.categories.length === 0 ? (
                 <p className="text-muted-foreground text-sm">{t.empty}</p>
             ) : (
@@ -152,6 +189,50 @@ export function CategoryReport({ report, labels }: CategoryReportProps) {
                         <span className="text-muted-foreground tabular-nums">
                             {t.duration(report.uncategorized.minutes)} · {report.uncategorized.count}×
                         </span>
+                    </div>
+                </div>
+            )}
+
+            {/*
+                Nach Terminart. Steht UNTER den Kategorien, weil es die
+                groebere Frage ist: erst „wofuer", dann „was fuer Eintraege".
+
+                Die Kategorien je Art stehen eingerueckt darunter und nicht als
+                eigene Tabelle — sonst liest man sie als zweite, widersprechende
+                Kategorienliste.
+            */}
+            {report.kinds !== undefined && report.kinds.length > 0 && (
+                <div className="border-t pt-3" data-testid="category-report-kinds">
+                    <p className="text-xs font-medium text-muted-foreground">{t.kindsTitle}</p>
+                    <p className="text-muted-foreground mb-2 text-xs">{t.kindsHint}</p>
+
+                    <div className="space-y-2">
+                        {report.kinds.map((art) => (
+                            <div key={art.label ?? 'ohne'}>
+                                <div className="flex items-baseline justify-between gap-3 text-sm">
+                                    <span className="font-medium">{art.label}</span>
+                                    <span className="text-muted-foreground tabular-nums">
+                                        {t.duration(art.minutes)} · {art.count}×
+                                    </span>
+                                </div>
+
+                                {art.categories.length > 0 && (
+                                    <div className="mt-0.5 space-y-0.5 border-l pl-3">
+                                        {art.categories.map((zeile) => (
+                                            <div
+                                                key={zeile.label ?? 'ohne'}
+                                                className="text-muted-foreground flex items-baseline justify-between gap-3 text-xs"
+                                            >
+                                                <span>{zeile.label}</span>
+                                                <span className="tabular-nums">
+                                                    {t.duration(zeile.minutes)} · {zeile.count}×
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

@@ -76,9 +76,51 @@ final class CategoryReportAssembler
         /** @var array<string, array{label: string, count: int, minutes: int}> $nachGruppe */
         $nachGruppe = [];
 
+        /**
+         * Nach Terminart, mit den Kategorien je Art darunter.
+         *
+         * Diese Aufschluesselung beantwortet eine andere Frage als
+         * `categories`: nicht „wofuer ging die Zeit drauf", sondern „welche
+         * Art von Eintrag frisst sie". Im Manager gab es sie seit jeher und
+         * in den anderen drei Systemen nicht — und weil sie dort fehlte,
+         * konnte der Manager seine Seite nicht gegen die geteilte tauschen,
+         * ohne seinen Nutzern etwas wegzunehmen (#8307).
+         *
+         * @var array<string, array{label: string, count: int, minutes: int, categories: array<string, array{label: string, count: int, minutes: int}>}>
+         */
+        $nachArt = [];
+
         foreach ($vorkommen as $eintrag) {
             $minuten = $this->minuten($eintrag);
-            $etiketten = $eintrag->event->kindDefinition()->categories($eintrag->event);
+            $art = $eintrag->event->kindDefinition();
+            $etiketten = $art->categories($eintrag->event);
+
+            // Die Art zaehlt IMMER und genau einmal — auch bei einem Termin
+            // ohne Kategorie und auch bei einem mit mehreren. Deshalb steht
+            // sie hier oben und nicht in einem der beiden Zweige: Ein Termin
+            // hat eine Art, aber null bis viele Kategorien.
+            $artSchluessel = $art->label();
+
+            $nachArt[$artSchluessel] ??= [
+                'label' => $artSchluessel,
+                'count' => 0,
+                'minutes' => 0,
+                'categories' => [],
+            ];
+            $nachArt[$artSchluessel]['count']++;
+            $nachArt[$artSchluessel]['minutes'] += $minuten;
+
+            foreach ($etiketten as $etikettDerArt) {
+                $unter = (string) $etikettDerArt;
+
+                $nachArt[$artSchluessel]['categories'][$unter] ??= [
+                    'label' => $unter,
+                    'count' => 0,
+                    'minutes' => 0,
+                ];
+                $nachArt[$artSchluessel]['categories'][$unter]['count']++;
+                $nachArt[$artSchluessel]['categories'][$unter]['minutes'] += $minuten;
+            }
 
             if ($etiketten === []) {
                 $ohne['count']++;
@@ -99,7 +141,7 @@ final class CategoryReportAssembler
                 // Deshalb eine EIGENE Liste und keine Zeile zwischen den
                 // Kategorien — sonst steht Gewaehltes neben Abgeleitetem und
                 // sieht gleich aus.
-                $gruppe = $eintrag->event->kindDefinition()->reportGroup($eintrag->event);
+                $gruppe = $art->reportGroup($eintrag->event);
 
                 if ($gruppe !== null && $gruppe !== '') {
                     $nachGruppe[$gruppe] ??= ['label' => $gruppe, 'count' => 0, 'minutes' => 0];
@@ -141,6 +183,19 @@ final class CategoryReportAssembler
 
         usort($gruppen, fn (array $a, array $b) => $b['minutes'] <=> $a['minutes']);
 
+        $arten = array_values(array_map(function (array $zeile): array {
+            $unter = array_values($zeile['categories']);
+
+            usort($unter, fn (array $a, array $b) => $b['minutes'] <=> $a['minutes']);
+
+            return [
+                ...$this->mitStunden($zeile),
+                'categories' => array_map($this->mitStunden(...), $unter),
+            ];
+        }, $nachArt));
+
+        usort($arten, fn (array $a, array $b) => $b['minutes'] <=> $a['minutes']);
+
         return [
             'categories' => array_map($this->mitStunden(...), $kategorien),
             // Die Aufschluesselung dessen, was ohne Kategorie bleibt. Ihre
@@ -148,6 +203,10 @@ final class CategoryReportAssembler
             // genau das prueft ein Test: Ein Termin ohne Kategorie zaehlt
             // hier EINMAL, nicht in mehreren Gruppen.
             'groups' => array_map($this->mitStunden(...), $gruppen),
+            // Nach Terminart. Jede Art zaehlt jeden ihrer Termine einmal, die
+            // Summe ueber alle Arten ist deshalb `total` — anders als bei
+            // `categories`, wo ein Termin mit zwei Kategorien zweimal steht.
+            'kinds' => $arten,
             'uncategorized' => $this->mitStunden([
                 'label' => null,
                 'count' => $ohne['count'],
