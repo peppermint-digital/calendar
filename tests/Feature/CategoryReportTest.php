@@ -16,6 +16,7 @@ use Peppermint\Calendar\Tests\Fixtures\GroupedBlockKind;
 beforeEach(function () {
     CategorisedKind::$nachTitel = [];
     CategorisedKind::$vorgangNachTitel = [];
+    GroupedBlockKind::$zielNachTitel = [];
 });
 
 /**
@@ -356,4 +357,21 @@ it('stellt den groessten Vorgang nach vorn', function () {
     blockTermin('Gross', 240);
 
     expect(bericht()['subjects'][0]['label'])->toBe('Projekt Süd');
+});
+
+it('fuehrt das Sprungziel eines Vorgangs mit, wenn die Art eines nennt', function () {
+    GroupedBlockKind::$nachTitel = ['Block' => 'Projekt Nord'];
+    GroupedBlockKind::$zielNachTitel = ['Block' => '/projects/7'];
+
+    blockTermin('Block', 60);
+
+    expect(bericht()['subjects'][0]['url'])->toBe('/projects/7');
+});
+
+it('laesst das Ziel null, wenn die Art keines nennt', function () {
+    GroupedBlockKind::$nachTitel = ['Block' => 'Projekt Nord'];
+
+    blockTermin('Block', 60);
+
+    expect(bericht()['subjects'][0]['url'])->toBeNull();
 });

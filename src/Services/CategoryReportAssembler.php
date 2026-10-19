@@ -130,7 +130,15 @@ final class CategoryReportAssembler
             $vorgang = $art->reportGroup($eintrag->event);
 
             if ($vorgang !== null && $vorgang !== '') {
-                $nachVorgang[$vorgang] ??= ['label' => $vorgang, 'count' => 0, 'minutes' => 0];
+                $nachVorgang[$vorgang] ??= [
+                    'label' => $vorgang,
+                    // Das Sprungziel, wenn die Art eines nennt. Einmal je
+                    // Gruppe gesetzt und nicht je Termin: Zwei Termine
+                    // desselben Vorgangs zeigen auf dasselbe.
+                    'url' => $art->reportGroupUrl($eintrag->event),
+                    'count' => 0,
+                    'minutes' => 0,
+                ];
                 $nachVorgang[$vorgang]['count']++;
                 $nachVorgang[$vorgang]['minutes'] += $minuten;
             }

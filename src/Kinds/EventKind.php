@@ -178,6 +178,23 @@ abstract class EventKind
     }
 
     /**
+     * Where the report group points — the project, the ticket, the task.
+     *
+     * Optional, and deliberately separate from {@see reportGroup()}: a label
+     * without a link is still a useful row, a link without a label is not.
+     * Returning null leaves the row as plain text.
+     *
+     * The URL is the product's to give, for the same reason the label is: only
+     * the application knows its own routes. A package that built the path
+     * itself would guess, and a wrong link is worse than none — it looks like
+     * it works.
+     */
+    public function reportGroupUrl(CalendarEvent $event): ?string
+    {
+        return null;
+    }
+
+    /**
      * Validation rules for this kind's extra fields. The core does not apply
      * them itself — the application pulls them into its own requests.
      *

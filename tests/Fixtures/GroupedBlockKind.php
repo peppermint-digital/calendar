@@ -32,4 +32,12 @@ class GroupedBlockKind extends EventKind
     {
         return self::$nachTitel[(string) $event->title] ?? null;
     }
+
+    /** @var array<string, string> Titel des Termins → Sprungziel */
+    public static array $zielNachTitel = [];
+
+    public function reportGroupUrl(CalendarEvent $event): ?string
+    {
+        return self::$zielNachTitel[(string) $event->title] ?? null;
+    }
 }

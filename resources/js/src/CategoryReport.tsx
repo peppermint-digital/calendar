@@ -4,6 +4,13 @@ export type CategoryReportRow = {
     count: number;
     minutes: number;
     hours: number;
+    /**
+     * Sprungziel, wenn die Terminart eines nennt (`reportGroupUrl()`).
+     *
+     * Nur bei `subjects` gefüllt: Eine Kategorie ist ein Etikett und führt
+     * nirgendwohin, ein Vorgang ist ein Ding mit einer eigenen Seite.
+     */
+    url?: string | null;
 };
 
 export type CategoryReportData = {
@@ -181,7 +188,20 @@ export function CategoryReport({ report, labels }: CategoryReportProps) {
                                 key={zeile.label ?? 'ohne'}
                                 className="text-muted-foreground flex items-baseline justify-between gap-3 text-sm"
                             >
-                                <span>{zeile.label}</span>
+                                {/*
+                                    Ein Vorgang mit Sprungziel wird ein Link.
+                                    Ein `<a>` und kein Produkt-Link-Baustein:
+                                    Das Paket kennt den Router des Produkts
+                                    nicht, und fuer einen Sprung auf eine
+                                    eigene Seite reicht er.
+                                */}
+                                {zeile.url !== null && zeile.url !== undefined && zeile.url !== '' ? (
+                                    <a href={zeile.url} className="hover:text-foreground hover:underline">
+                                        {zeile.label}
+                                    </a>
+                                ) : (
+                                    <span>{zeile.label}</span>
+                                )}
                                 <span className="tabular-nums">
                                     {t.duration(zeile.minutes)} · {zeile.count}×
                                 </span>

@@ -226,3 +226,24 @@ describe('Nach Vorgang (#8307)', () => {
         expect(screen.queryByTestId('category-report-subjects')).toBeNull();
     });
 });
+
+describe('Sprungziel eines Vorgangs (#8307)', () => {
+    it('macht einen Vorgang mit Ziel zum Link', () => {
+        render(<CategoryReport report={bericht({ subjects: [{ ...zeile('Projekt Nord', 60), url: '/projects/7' }] })} />);
+
+        expect(screen.getByRole('link', { name: 'Projekt Nord' }).getAttribute('href')).toBe('/projects/7');
+    });
+
+    it('laesst ihn ohne Ziel Text bleiben, statt auf nichts zu zeigen', () => {
+        render(<CategoryReport report={bericht({ subjects: [zeile('Projekt Nord', 60)] })} />);
+
+        expect(screen.queryByRole('link', { name: 'Projekt Nord' })).toBeNull();
+        expect(screen.getByTestId('category-report-subjects').textContent).toContain('Projekt Nord');
+    });
+
+    it('behandelt ein leeres Ziel wie keines', () => {
+        render(<CategoryReport report={bericht({ subjects: [{ ...zeile('Projekt Nord', 60), url: '' }] })} />);
+
+        expect(screen.queryByRole('link', { name: 'Projekt Nord' })).toBeNull();
+    });
+});
