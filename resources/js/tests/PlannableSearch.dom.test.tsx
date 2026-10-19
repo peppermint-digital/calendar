@@ -99,3 +99,32 @@ describe('die Suche selbst', () => {
         expect(screen.getByPlaceholderText('Ticket suchen')).toBeTruthy();
     });
 });
+
+describe('Ladezustand (#8307)', () => {
+    it('zeigt „nichts gefunden" NICHT, solange die erste Antwort aussteht', async () => {
+        // Eine Suche, die haengt: Vorher stand hier sofort „Nichts Offenes
+        // gefunden" — ein Ergebnis, wo noch keines vorlag. Wer klickt und
+        // schnell liest, haelt das fuer die Antwort.
+        render(<PlannableSearch search={() => new Promise(() => {})} onPick={vi.fn()} />);
+
+        expect(screen.queryByTestId('plannable-empty')).toBeNull();
+    });
+
+    it('zeigt sie, sobald die Antwort leer zurueckkommt', async () => {
+        render(<PlannableSearch search={async () => []} onPick={vi.fn()} />);
+
+        expect(await screen.findByTestId('plannable-empty')).toBeTruthy();
+    });
+
+    it('zeigt sie nicht, wenn die Antwort Treffer enthaelt', async () => {
+        render(
+            <PlannableSearch
+                search={async () => [{ id: 1, title: 'Serverumzug vorbereiten' }]}
+                onPick={vi.fn()}
+            />,
+        );
+
+        expect(await screen.findByText('Serverumzug vorbereiten')).toBeTruthy();
+        expect(screen.queryByTestId('plannable-empty')).toBeNull();
+    });
+});

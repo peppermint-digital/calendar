@@ -72,6 +72,16 @@ export function PlannableSearch({
 }: PlannableSearchProps) {
     const [begriff, setBegriff] = useState('');
     const [treffer, setTreffer] = useState<Plannable[]>([]);
+    /**
+     * Ist ueberhaupt schon eine Antwort da?
+     *
+     * Ohne das stand waehrend der ersten Abfrage „Nichts Offenes gefunden" —
+     * also ein ERGEBNIS, wo noch gar keines vorlag. Wer klickt und schnell
+     * liest, haelt das fuer die Antwort und sucht den Fehler woanders. Am
+     * 19.10.2026 ist genau das passiert, mir selbst, beim Durchklicken der
+     * Ablaeufe (#8307).
+     */
+    const [geantwortet, setGeantwortet] = useState(false);
 
     useEffect(() => {
         let aktiv = true;
@@ -80,6 +90,7 @@ export function PlannableSearch({
             .then((gefunden) => {
                 if (aktiv) {
                     setTreffer(gefunden);
+                    setGeantwortet(true);
                 }
             })
             .catch(() => {
@@ -89,6 +100,7 @@ export function PlannableSearch({
                 // mit, in dem die Suche steht.
                 if (aktiv) {
                     setTreffer([]);
+                    setGeantwortet(true);
                 }
             });
 
@@ -128,7 +140,15 @@ export function PlannableSearch({
                     </button>
                 ))}
 
-                {treffer.length === 0 && <p className="text-muted-foreground p-2 text-sm">{emptyText}</p>}
+                {/*
+                    Die Meldung erst, wenn eine Antwort da IST. Vorher waere
+                    sie eine Behauptung ueber etwas, das noch laeuft.
+                */}
+                {geantwortet && treffer.length === 0 && (
+                    <p className="text-muted-foreground p-2 text-sm" data-testid="plannable-empty">
+                        {emptyText}
+                    </p>
+                )}
             </div>
         </div>
     );
