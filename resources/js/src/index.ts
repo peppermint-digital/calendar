@@ -26,6 +26,12 @@ export { SlotFinder, defaultSlotFinderLabels } from './SlotFinder';
 export type { FinderDay, FinderSlot, SlotFinderLabels, SlotFinderProps } from './SlotFinder';
 export { AttendeePicker, defaultAttendeePickerLabels } from './AttendeePicker';
 export type { AttendeePickerLabels, AttendeePickerProps, PickableAttendee } from './AttendeePicker';
+export { SlotFinderScreen, defaultSlotFinderScreenLabels } from './SlotFinderScreen';
+export type {
+    SlotFinderScreenLabels,
+    SlotFinderScreenProps,
+    SlotFinderSettings,
+} from './SlotFinderScreen';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
 export { PlannableList, PLANNABLE_ATTRIBUTE } from './PlannableList';
 export { PlannableSearch } from './PlannableSearch';

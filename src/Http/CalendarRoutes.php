@@ -107,6 +107,21 @@ class CalendarRoutes
                 ->name('calendar.category-report');
         }
 
+        // Ebenfalls VOR `{event}`, aus demselben Grund.
+        //
+        // Diese Zeile stand bis zum 20.10.2026 in DREI Produkten von Hand —
+        // im Manager, im CRM und in der Verwaltung, jeweils mit einem eigenen
+        // Kommentar ueber die Reihenfolge. Genau das ist Frage 3 des
+        // Paketvertrags („Schreibt jedes Produkt denselben Verdrahtungscode?"),
+        // und die Antwort war dreimal ja. Dass sie hier fehlte, ist auch der
+        // Grund, warum das AI Brain als einziges System gar keine
+        // Terminfindung hatte: Es gab nichts, was es nur haette aufrufen
+        // muessen (#8307).
+        if ($nimmt('findTime')) {
+            Route::get('calendar/find-time', [$controller, 'findTime'])
+                ->name('calendar.find-time');
+        }
+
         if ($nimmt('store')) {
             Route::post('calendar', [$controller, 'store'])->name('calendar.store');
         }

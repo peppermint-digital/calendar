@@ -119,3 +119,45 @@ it('legt die Auswertung vor den Platzhalter', function () {
     expect($namen->search('calendar.category-report'))
         ->toBeLessThan($namen->search('calendar.show'));
 });
+
+/**
+ * Die Terminfindung gehoert ins Paket, nicht in drei Routendateien.
+ *
+ * Bis zum 20.10.2026 legte jedes Produkt diese Route selbst — Manager, CRM und
+ * Verwaltung mit demselben Pfad, demselben Namen und jeweils einem eigenen
+ * Kommentar ueber die Reihenfolge. Das AI Brain hatte sie deshalb gar nicht:
+ * Es gab nichts, was es nur haette aufrufen muessen (#8307).
+ */
+it('legt die Terminfindung mit demselben Pfad und Namen wie die drei Produkte', function () {
+    expect(routePath('calendar.find-time'))->toBe('calendar/find-time');
+});
+
+/**
+ * „find-time" waere sonst eine Terminkennung, und die Seite zeigte einen 404 —
+ * dieselbe Falle wie bei `create` und `category-report`.
+ */
+it('legt die Terminfindung VOR den Platzhalter', function () {
+    $pfade = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($r) => str_starts_with($r->uri(), 'calendar') && in_array('GET', $r->methods(), true))
+        ->map(fn ($r) => $r->uri())
+        ->values();
+
+    $findTime = $pfade->search('calendar/find-time');
+    $platzhalter = $pfade->search('calendar/{event}');
+
+    expect($findTime)->not->toBeFalse();
+    expect($platzhalter)->not->toBeFalse();
+    expect($findTime)->toBeLessThan($platzhalter);
+});
+
+/**
+ * Ein Produkt ohne Terminfindung soll die Route auch nicht bekommen — sonst
+ * zeigt sie auf eine Methode, die es nicht hat.
+ */
+it('laesst die Terminfindung weg, wenn das Produkt sie nicht nennt', function () {
+    Route::setRoutes(new Illuminate\Routing\RouteCollection);
+    Route::middleware('web')->group(fn () => CalendarRoutes::pages('App\\Fake\\CalendarController', ['index']));
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(routePath('calendar.find-time'))->toBeNull();
+});
