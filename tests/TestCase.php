@@ -9,6 +9,7 @@ use Peppermint\Calendar\CalendarServiceProvider;
 use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Tests\Fixtures\BusinessKind;
 use Peppermint\Calendar\Tests\Fixtures\CategorisedKind;
+use Peppermint\Calendar\Tests\Fixtures\GroupedBlockKind;
 use Peppermint\Calendar\Tests\Fixtures\PlainCategorisedKind;
 use Peppermint\Calendar\Tests\Fixtures\PrivateKind;
 
@@ -46,6 +47,9 @@ abstract class TestCase extends Orchestra
             // Eine Art, die Kategorien nur zustimmt — fuer den Rueckfall
             // auf die Zuordnung, die das Paket selbst haelt.
             PlainCategorisedKind::class,
+            // Eine Art ohne Kategorie, die aber eine Gruppe nennen kann —
+            // die Lage eines Zeitblocks.
+            GroupedBlockKind::class,
         ]);
     }
 

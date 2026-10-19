@@ -92,3 +92,45 @@ describe('CategoryReport', () => {
         expect(screen.queryByText(/zählt bei jeder voll/)).toBeNull();
     });
 });
+
+describe('CategoryReport — die Aufschlüsselung ohne Kategorie', () => {
+    const mitGruppen = (): CategoryReportData => ({
+        categories: [zeile('Kundentermin', 60)],
+        groups: [zeile('Projekt Nord', 120, 3), zeile('Projekt Süd', 30)],
+        uncategorized: zeile('', 150, 4),
+        total: zeile('total', 210, 5),
+    });
+
+    it('zeigt sie mit eigener Überschrift', () => {
+        render(<CategoryReport report={mitGruppen()} />);
+
+        expect(screen.getByText('Davon ohne Kategorie, nach Herkunft')).toBeTruthy();
+        expect(screen.getByText('Projekt Nord')).toBeTruthy();
+        expect(screen.getByText('2 h · 3×')).toBeTruthy();
+    });
+
+    /**
+     * Der Hinweis ist nicht Deko: Gewählte und abgeleitete Zahlen, die gleich
+     * aussehen, sind der Anfang eines lügenden Berichts.
+     */
+    it('sagt, dass sie abgeleitet ist', () => {
+        render(<CategoryReport report={mitGruppen()} />);
+
+        expect(screen.getByText(/Abgeleitet aus dem Vorgang/)).toBeTruthy();
+    });
+
+    it('zeigt nichts davon, wenn es keine Aufschlüsselung gibt', () => {
+        render(<CategoryReport report={{ ...mitGruppen(), groups: [] }} />);
+
+        expect(screen.queryByText('Davon ohne Kategorie, nach Herkunft')).toBeNull();
+    });
+
+    /** Ältere Produkte liefern das Feld gar nicht — das darf nicht krachen. */
+    it('kommt ohne das Feld aus', () => {
+        const { groups: _weg, ...ohne } = mitGruppen();
+
+        render(<CategoryReport report={ohne as CategoryReportData} />);
+
+        expect(screen.getByText('Kundentermin')).toBeTruthy();
+    });
+});

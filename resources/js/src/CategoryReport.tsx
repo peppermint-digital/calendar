@@ -8,6 +8,15 @@ export type CategoryReportRow = {
 
 export type CategoryReportData = {
     categories: CategoryReportRow[];
+    /**
+     * Die Aufschlüsselung dessen, was ohne Kategorie bleibt — ABGELEITET aus
+     * dem Subjekt (Projekt, Ticketbereich), nicht gewählt.
+     *
+     * Eigene Liste und nicht zwischen den Kategorien: Gewählte und abgeleitete
+     * Zahlen, die in einer Tabelle gleich aussehen, sind der Anfang eines
+     * lügenden Berichts.
+     */
+    groups?: CategoryReportRow[];
     uncategorized: CategoryReportRow;
     total: CategoryReportRow;
 };
@@ -15,6 +24,8 @@ export type CategoryReportData = {
 export type CategoryReportLabels = {
     empty: string;
     uncategorized: string;
+    groupsTitle: string;
+    groupsHint: string;
     multipleHint: string;
     /** 135 → „2:15 h". */
     duration: (minuten: number) => string;
@@ -34,6 +45,8 @@ export function formatDuration(minuten: number): string {
 export const defaultCategoryReportLabels: CategoryReportLabels = {
     empty: 'In diesem Zeitraum trägt kein Termin eine Kategorie.',
     uncategorized: 'Ohne Kategorie',
+    groupsTitle: 'Davon ohne Kategorie, nach Herkunft',
+    groupsHint: 'Abgeleitet aus dem Vorgang, an dem der Termin hängt — nicht von Hand gewählt.',
     multipleHint:
         'Ein Termin mit mehreren Kategorien zählt bei jeder voll — die Summe der Kategorien ist deshalb größer als die Gesamtzeit.',
     duration: formatDuration,
@@ -98,6 +111,38 @@ export function CategoryReport({ report, labels }: CategoryReportProps) {
                         </div>
                     </div>
                 ))
+            )}
+
+            {/*
+                Die Aufschlüsselung der Sammelzeile. Sie steht UNTER „ohne
+                Kategorie" und mit eigener Überschrift, weil sie etwas anderes
+                ist: abgeleitet aus dem Vorgang, nicht gewählt. Ein Zeitblock
+                etwa trägt bewusst keine Kategorie — er zeigt auf eine
+                Aufgabe, und die trägt den Zweck präziser. Seine Zeit ist
+                trotzdem nicht nichts: im Manager 40 Prozent des Kalenders.
+
+                Gedämpft gesetzt, damit sie nicht wie eine Kategorie gelesen
+                wird.
+            */}
+            {report.groups !== undefined && report.groups.length > 0 && (
+                <div className="border-t pt-3">
+                    <p className="text-xs font-medium text-muted-foreground">{t.groupsTitle}</p>
+                    <p className="text-muted-foreground mb-2 text-xs">{t.groupsHint}</p>
+
+                    <div className="space-y-1">
+                        {report.groups.map((zeile) => (
+                            <div
+                                key={zeile.label ?? 'ohne'}
+                                className="text-muted-foreground flex items-baseline justify-between gap-3 text-sm"
+                            >
+                                <span>{zeile.label}</span>
+                                <span className="tabular-nums">
+                                    {t.duration(zeile.minutes)} · {zeile.count}×
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             )}
 
             {report.uncategorized.count > 0 && (

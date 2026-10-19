@@ -47,6 +47,7 @@ final class CategoryReportAssembler
      * @return array{
      *     categories: array<int, array<string, mixed>>,
      *     uncategorized: array<string, mixed>,
+     *     groups: array<int, array<string, mixed>>,
      *     total: array<string, mixed>
      * }
      */
@@ -72,6 +73,9 @@ final class CategoryReportAssembler
         $nachKategorie = [];
         $ohne = ['count' => 0, 'minutes' => 0];
 
+        /** @var array<string, array{label: string, count: int, minutes: int}> $nachGruppe */
+        $nachGruppe = [];
+
         foreach ($vorkommen as $eintrag) {
             $minuten = $this->minuten($eintrag);
             $etiketten = $eintrag->event->kindDefinition()->categories($eintrag->event);
@@ -79,6 +83,29 @@ final class CategoryReportAssembler
             if ($etiketten === []) {
                 $ohne['count']++;
                 $ohne['minutes'] += $minuten;
+
+                // Was ohne Kategorie bleibt, AUFSCHLUESSELN, wenn die
+                // Terminart sagen kann, worueber.
+                //
+                // Ein Zeitblock traegt keine Kategorie — er zeigt auf eine
+                // Aufgabe, und die trägt den Zweck praeziser, als ein Etikett
+                // es koennte. Trotzdem ist seine Zeit nicht nichts: Im
+                // Manager sind 483 von 1211 Terminen solche Bloecke, 40
+                // Prozent des Kalenders. Die standen bisher in einer einzigen
+                // Sammelzeile.
+                //
+                // ABGELEITET, nicht gewaehlt: Das Etikett kommt aus dem
+                // Subjekt (Projekt, Ticketbereich), nicht aus einer Wahl.
+                // Deshalb eine EIGENE Liste und keine Zeile zwischen den
+                // Kategorien — sonst steht Gewaehltes neben Abgeleitetem und
+                // sieht gleich aus.
+                $gruppe = $eintrag->event->kindDefinition()->reportGroup($eintrag->event);
+
+                if ($gruppe !== null && $gruppe !== '') {
+                    $nachGruppe[$gruppe] ??= ['label' => $gruppe, 'count' => 0, 'minutes' => 0];
+                    $nachGruppe[$gruppe]['count']++;
+                    $nachGruppe[$gruppe]['minutes'] += $minuten;
+                }
 
                 continue;
             }
@@ -110,8 +137,17 @@ final class CategoryReportAssembler
 
         $gesamtMinuten = $vorkommen->sum(fn (Occurrence $eintrag) => $this->minuten($eintrag));
 
+        $gruppen = array_values($nachGruppe);
+
+        usort($gruppen, fn (array $a, array $b) => $b['minutes'] <=> $a['minutes']);
+
         return [
             'categories' => array_map($this->mitStunden(...), $kategorien),
+            // Die Aufschluesselung dessen, was ohne Kategorie bleibt. Ihre
+            // Summe ist deshalb nie groesser als `uncategorized` — und
+            // genau das prueft ein Test: Ein Termin ohne Kategorie zaehlt
+            // hier EINMAL, nicht in mehreren Gruppen.
+            'groups' => array_map($this->mitStunden(...), $gruppen),
             'uncategorized' => $this->mitStunden([
                 'label' => null,
                 'count' => $ohne['count'],

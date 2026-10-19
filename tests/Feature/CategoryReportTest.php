@@ -4,6 +4,7 @@ use Carbon\CarbonImmutable;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Services\CategoryReportAssembler;
 use Peppermint\Calendar\Tests\Fixtures\CategorisedKind;
+use Peppermint\Calendar\Tests\Fixtures\GroupedBlockKind;
 
 /**
  * Wie viel Zeit ging in welche Kategorie? (#7846)
@@ -35,6 +36,18 @@ function berichtTermin(array $werte = [], array $kategorien = []): CalendarEvent
         'starts_at' => '2026-09-08 09:00',
         'ends_at' => '2026-09-08 10:00',
     ], $werte));
+}
+
+/** Ein Zeitblock: keine Kategorie, aber eine Gruppe (siehe `GroupedBlockKind`). */
+function blockTermin(string $titel, int $minuten): CalendarEvent
+{
+    return CalendarEvent::create([
+        'kind' => 'grouped_block',
+        'title' => $titel,
+        'owner_id' => 1,
+        'starts_at' => '2026-09-08 09:00',
+        'ends_at' => CarbonImmutable::parse('2026-09-08 09:00')->addMinutes($minuten)->toDateTimeString(),
+    ]);
 }
 
 function bericht(string $von = '2026-09-07', string $bis = '2026-09-30'): array
@@ -141,4 +154,79 @@ it('liefert beide Masse', function () {
     $zeile = collect(bericht()['categories'])->firstWhere('label', 'X');
 
     expect($zeile['minutes'])->toBe(90)->and($zeile['hours'])->toBe(1.5);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Was ohne Kategorie bleibt, aufschlüsseln (#7846)
+|--------------------------------------------------------------------------
+|
+| Ein Zeitblock trägt bewusst keine Kategorie: Er zeigt auf eine Aufgabe, und
+| die trägt den Zweck präziser, als ein Etikett es könnte. Seine Zeit ist
+| trotzdem nicht nichts — im Manager sind 483 von 1211 Terminen solche Blöcke,
+| 40 Prozent des Kalenders, und die standen in einer einzigen Sammelzeile.
+|
+| Abgeleitet, nicht gewählt: Das Etikett kommt aus dem Subjekt. Deshalb eine
+| eigene Liste — gewählte und abgeleitete Zahlen, die in einer Tabelle gleich
+| aussehen, sind der Anfang eines lügenden Berichts.
+*/
+
+beforeEach(function () {
+    GroupedBlockKind::$nachTitel = [];
+});
+
+it('schluesselt auf, was ohne Kategorie bleibt', function () {
+    GroupedBlockKind::$nachTitel = ['Block A' => 'Projekt Nord', 'Block B' => 'Projekt Nord', 'Block C' => 'Projekt Süd'];
+
+    // Unterschiedliche Summen, damit der Test die SORTIERUNG prüft und nicht
+    // nur die Zahlen: Bei Gleichstand ist die Reihenfolge offen, und ein Test
+    // darüber wäre je nach Laune grün.
+    blockTermin('Block A', 60);
+    blockTermin('Block B', 30);
+    blockTermin('Block C', 120);
+
+    $bericht = bericht();
+
+    expect(collect($bericht['groups'])->pluck('minutes', 'label')->all())
+        ->toBe(['Projekt Süd' => 120, 'Projekt Nord' => 90]);
+});
+
+/**
+ * Die Invariante, die den Bericht ehrlich hält: Die Gruppen schlüsseln NUR
+ * auf, was ohne Kategorie bleibt. Ihre Summe darf also nie größer sein als
+ * „ohne Kategorie" — sonst zählte ein Termin doppelt.
+ */
+it('zaehlt in den Gruppen nie mehr als „ohne Kategorie"', function () {
+    GroupedBlockKind::$nachTitel = ['Block' => 'Projekt Nord'];
+
+    blockTermin('Block', 60);
+    berichtTermin(['title' => 'Mit Kategorie'], ['Kundentermin']);
+
+    $bericht = bericht();
+
+    $summe = collect($bericht['groups'])->sum('minutes');
+
+    expect($summe)->toBeLessThanOrEqual($bericht['uncategorized']['minutes']);
+});
+
+it('laesst eine Art ohne Gruppe in der Sammelzeile', function () {
+    GroupedBlockKind::$nachTitel = [];
+
+    blockTermin('Ohne alles', 45);
+
+    $bericht = bericht();
+
+    expect($bericht['groups'])->toBe([])
+        ->and($bericht['uncategorized']['minutes'])->toBe(45);
+});
+
+/** Ein Termin MIT Kategorie gehört nicht in die Aufschlüsselung. */
+it('schluesselt einen Termin mit Kategorie nicht zusaetzlich auf', function () {
+    GroupedBlockKind::$nachTitel = ['Beides' => 'Projekt Nord'];
+
+    berichtTermin(['title' => 'Beides'], ['Kundentermin']);
+
+    $bericht = bericht();
+
+    expect($bericht['groups'])->toBe([]);
 });
