@@ -204,8 +204,18 @@ final class FreeSlotFinder
             // Ganztägig belegt den ganzen Tag: Es gibt keine Scheibe, in die
             // der Termin fällt, also wäre jemand mit einem Urlaubstag sonst
             // den ganzen Tag frei.
+            //
+            // Und zwar JEDEN Tag zwischen Anfang und Ende, nicht nur den
+            // ersten. Hier stand bis zum 19.10.2026 `isSameDay($eintrag
+            // ['start'])` — eine Urlaubswoche sperrte damit den Montag und gab
+            // Dienstag bis Freitag frei. Gefunden durch einen Test über einen
+            // Tag MITTEN in einem längeren Urlaub; der Fall mit nur einem Tag
+            // war grün und hat den Fehler verdeckt.
             if (($eintrag['allDay'] ?? false) === true) {
-                if ($start->isSameDay($eintrag['start'])) {
+                $vonTag = CarbonImmutable::instance($eintrag['start'])->startOfDay();
+                $bisTag = CarbonImmutable::instance($eintrag['end'])->endOfDay();
+
+                if ($start >= $vonTag && $start <= $bisTag) {
                     return true;
                 }
 

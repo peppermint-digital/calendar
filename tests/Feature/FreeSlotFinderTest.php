@@ -249,3 +249,32 @@ it('laesst einen Dienstag frei, wenn die Serie montags liegt', function () {
 
     expect(scheibe($raster, '2026-09-08', '10:00')['free'])->toBeTrue();
 });
+
+it('belegt JEDEN Tag eines mehrtaegigen ganztaegigen Eintrags', function () {
+    // Montag bis Freitag, ganztaegig — etwa eine Urlaubswoche oder eine
+    // Messe. Bis zum 19.10.2026 sperrte das nur den Montag.
+    slotTermin(1, '2026-09-07 00:00', '2026-09-11 23:59', ['all_day' => true]);
+
+    $raster = app(FreeSlotFinder::class)->grid(
+        [1],
+        CarbonImmutable::parse('2026-09-07'),
+        CarbonImmutable::parse('2026-09-11'),
+    );
+
+    expect(scheibe($raster, '2026-09-07', '10:00')['free'])->toBeFalse()
+        ->and(scheibe($raster, '2026-09-09', '10:00')['free'])->toBeFalse()
+        ->and(scheibe($raster, '2026-09-11', '10:00')['free'])->toBeFalse();
+});
+
+it('laesst den Tag nach einem mehrtaegigen Eintrag wieder frei', function () {
+    slotTermin(1, '2026-09-07 00:00', '2026-09-08 23:59', ['all_day' => true]);
+
+    $raster = app(FreeSlotFinder::class)->grid(
+        [1],
+        CarbonImmutable::parse('2026-09-07'),
+        CarbonImmutable::parse('2026-09-09'),
+    );
+
+    // Sonst sperrt ein einmal begonnener Urlaub alles, was danach kommt.
+    expect(scheibe($raster, '2026-09-09', '10:00')['free'])->toBeTrue();
+});
