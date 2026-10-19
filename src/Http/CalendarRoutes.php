@@ -98,6 +98,14 @@ class CalendarRoutes
             Route::get('calendar/agenda', [$controller, 'agenda'])->name('calendar.agenda');
         }
 
+        // Auch VOR `{event}`: „category-report" wuerde sonst als Kennung
+        // gelesen, und das Produkt antwortete mit „Termin nicht gefunden"
+        // statt mit dem Bericht. Dieselbe Falle wie bei `create`.
+        if ($nimmt('categoryReport')) {
+            Route::get('calendar/category-report', [$controller, 'categoryReport'])
+                ->name('calendar.category-report');
+        }
+
         if ($nimmt('store')) {
             Route::post('calendar', [$controller, 'store'])->name('calendar.store');
         }
