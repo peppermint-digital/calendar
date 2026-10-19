@@ -1,0 +1,119 @@
+/** Eine Zeile des Berichts, wie der `CategoryReportAssembler` sie liefert. */
+export type CategoryReportRow = {
+    label: string | null;
+    count: number;
+    minutes: number;
+    hours: number;
+};
+
+export type CategoryReportData = {
+    categories: CategoryReportRow[];
+    uncategorized: CategoryReportRow;
+    total: CategoryReportRow;
+};
+
+export type CategoryReportLabels = {
+    empty: string;
+    uncategorized: string;
+    multipleHint: string;
+    /** 135 → „2:15 h". */
+    duration: (minuten: number) => string;
+};
+
+/** 135 → „2:15 h". Stunden und Minuten, wie man sie ausspricht. */
+export function formatDuration(minuten: number): string {
+    const stunden = Math.floor(minuten / 60);
+    const rest = minuten % 60;
+
+    if (stunden === 0) return `${rest} min`;
+    if (rest === 0) return `${stunden} h`;
+
+    return `${stunden}:${String(rest).padStart(2, '0')} h`;
+}
+
+export const defaultCategoryReportLabels: CategoryReportLabels = {
+    empty: 'In diesem Zeitraum trägt kein Termin eine Kategorie.',
+    uncategorized: 'Ohne Kategorie',
+    multipleHint:
+        'Ein Termin mit mehreren Kategorien zählt bei jeder voll — die Summe der Kategorien ist deshalb größer als die Gesamtzeit.',
+    duration: formatDuration,
+};
+
+export type CategoryReportProps = {
+    report: CategoryReportData;
+    labels?: Partial<CategoryReportLabels>;
+};
+
+/**
+ * Wofür ist die Zeit draufgegangen.
+ *
+ * ## Warum die Darstellung im Paket liegt
+ *
+ * Die Rechnung lag hier schon (`CategoryReportAssembler`, v0.59.0), die
+ * Darstellung nicht — sie entstand am 18.10.2026 im AI Brain. Beim Nachziehen
+ * in CRM und Verwaltung hätte sie ein zweites und drittes Mal gebaut werden
+ * müssen, und der Manager führt bereits eine vierte, eigene Fassung von vorher.
+ *
+ * Vier Darstellungen derselben Zahlen sind vier Gelegenheiten, dieselbe Frage
+ * verschieden zu beantworten — und bei dieser Darstellung steckt die Antwort
+ * nicht in den Zahlen, sondern im Maßstab (siehe unten). Deshalb einmal hier.
+ *
+ * Der Rahmen bleibt beim Produkt: Überschrift, Zeitraumwahl und Layout gibt
+ * jede Anwendung selbst, weil sie dort zu ihren anderen Seiten passen müssen.
+ *
+ * ## Warum der Balken die längste Kategorie als Maßstab nimmt
+ *
+ * Nicht die Gesamtzeit: Ein Termin mit zwei Kategorien zählt bei beiden voll,
+ * die Summe der Kategorien kann also größer sein als die Gesamtzeit. Ein
+ * Balken gegen die Gesamtzeit wäre dann länger als die Spur — und die Frage
+ * ist ohnehin „was war am meisten", nicht „welcher Anteil".
+ *
+ * Der Hinweis darunter gehört dazu, sonst liest man die Summe der Kategorien
+ * als Gesamtzeit und sucht einen Rechenfehler, wo keiner ist.
+ */
+export function CategoryReport({ report, labels }: CategoryReportProps) {
+    const t = { ...defaultCategoryReportLabels, ...labels };
+
+    const groesste = Math.max(1, ...report.categories.map((zeile) => zeile.minutes));
+    const summe = report.categories.reduce((gesamt, zeile) => gesamt + zeile.minutes, 0);
+
+    return (
+        <div className="space-y-4" data-testid="category-report">
+            {report.categories.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t.empty}</p>
+            ) : (
+                report.categories.map((zeile) => (
+                    <div key={zeile.label ?? 'ohne'} className="space-y-1">
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                            <span className="font-medium">{zeile.label}</span>
+                            <span className="text-muted-foreground tabular-nums">
+                                {t.duration(zeile.minutes)} · {zeile.count}×
+                            </span>
+                        </div>
+                        <div className="bg-muted h-2 overflow-hidden rounded">
+                            <div
+                                className="bg-primary h-full"
+                                style={{ width: `${Math.round((zeile.minutes / groesste) * 100)}%` }}
+                            />
+                        </div>
+                    </div>
+                ))
+            )}
+
+            {report.uncategorized.count > 0 && (
+                <div className="border-t pt-3 text-sm">
+                    <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-muted-foreground">{t.uncategorized}</span>
+                        <span className="text-muted-foreground tabular-nums">
+                            {t.duration(report.uncategorized.minutes)} · {report.uncategorized.count}×
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {summe > report.total.minutes && (
+                <p className="text-muted-foreground text-xs">{t.multipleHint}</p>
+            )}
+        </div>
+    );
+}
