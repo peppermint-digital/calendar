@@ -247,3 +247,36 @@ describe('Sprungziel eines Vorgangs (#8307)', () => {
         expect(screen.queryByRole('link', { name: 'Projekt Nord' })).toBeNull();
     });
 });
+
+describe('Doppelte Abschnitte vermeiden (#8307)', () => {
+    it('laesst die Herkunfts-Aufschluesselung weg, wenn gar nichts eingeordnet ist', () => {
+        // Dann zeigt sie dieselben Zahlen wie „Nach Vorgang", nur unter einer
+        // zweiten Ueberschrift — im Browser gesehen, und es liest sich wie ein
+        // Fehler.
+        render(
+            <CategoryReport
+                report={bericht({
+                    categories: [],
+                    subjects: [zeile('Projekt Nord', 120)],
+                    groups: [zeile('Projekt Nord', 120)],
+                })}
+            />,
+        );
+
+        expect(screen.queryByTestId('category-report-groups')).toBeNull();
+        expect(screen.getByTestId('category-report-subjects')).toBeTruthy();
+    });
+
+    it('zeigt sie, sobald etwas eingeordnet ist — dann sagen die beiden Verschiedenes', () => {
+        render(
+            <CategoryReport
+                report={bericht({
+                    subjects: [zeile('Projekt Nord', 180)],
+                    groups: [zeile('Projekt Nord', 60)],
+                })}
+            />,
+        );
+
+        expect(screen.getByTestId('category-report-groups').textContent).toContain('1 h');
+    });
+});

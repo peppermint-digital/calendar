@@ -222,7 +222,18 @@ export function CategoryReport({ report, labels }: CategoryReportProps) {
                 Gedämpft gesetzt, damit sie nicht wie eine Kategorie gelesen
                 wird.
             */}
-            {report.groups !== undefined && report.groups.length > 0 && (
+            {/*
+                Die Aufschluesselung der Sammelzeile NUR, wenn ueberhaupt etwas
+                eingeordnet ist.
+
+                Traegt kein Termin eine Kategorie, ist „ohne Kategorie" der
+                ganze Bericht — und dann stehen hier dieselben Zahlen wie unter
+                „Nach Vorgang", nur unter einer zweiten Ueberschrift. Am
+                19.10.2026 im Browser genau so gesehen: zwei Abschnitte, zwei
+                Erklaerungen, identische Zeilen. Das liest sich wie ein Fehler,
+                und zwar zu Recht.
+            */}
+            {report.groups !== undefined && report.groups.length > 0 && report.categories.length > 0 && (
                 <div className="border-t pt-3" data-testid="category-report-groups">
                     <p className="text-xs font-medium text-muted-foreground">{t.groupsTitle}</p>
                     <p className="text-muted-foreground mb-2 text-xs">{t.groupsHint}</p>
