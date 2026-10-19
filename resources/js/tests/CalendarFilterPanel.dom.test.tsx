@@ -231,3 +231,57 @@ describe('Zuruecksetzen und Eigenes', () => {
         expect(screen.getByRole('button', { name: 'Nur meine Mandanten' })).toBeTruthy();
     });
 });
+
+describe('Leere Gruppen (#8307)', () => {
+    const gruppe = (over: Partial<FilterGroup> = {}): FilterGroup => ({
+        key: 'projekte',
+        label: 'Projekt',
+        mode: 'only',
+        options: [],
+        selected: [],
+        onChange: vi.fn(),
+        ...over,
+    });
+
+    it('zeigt eine Gruppe ohne Auswahlmoeglichkeiten gar nicht erst', () => {
+        // Sonst steht eine Ueberschrift mit Trennstrich darunter und sonst
+        // nichts — ein Versprechen, das die Tafel nicht einloest.
+        //
+        // Ein Schalter ist dabei, damit die Tafel ueberhaupt erscheint: Mit
+        // NUR einer leeren Gruppe bleibt sie ganz weg, und das prueft der
+        // dritte Fall.
+        render(
+            <CalendarFilterPanel
+                groups={[gruppe()]}
+                toggles={[{ key: 'x', label: 'Irgendwas', value: false, onChange: vi.fn() }]}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+
+        expect(screen.queryByText('Projekt')).toBeNull();
+        expect(screen.getByText('Irgendwas')).toBeTruthy();
+    });
+
+    it('zeigt die Gruppen daneben weiterhin', () => {
+        render(
+            <CalendarFilterPanel
+                groups={[
+                    gruppe(),
+                    gruppe({ key: 'arten', label: 'Terminart', options: [{ value: 'business', label: 'Geschäftlich' }] }),
+                ]}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Filter/ }));
+
+        expect(screen.queryByText('Projekt')).toBeNull();
+        expect(screen.getByText('Terminart')).toBeTruthy();
+    });
+
+    it('bleibt ganz weg, wenn ALLE Gruppen leer sind und es keine Schalter gibt', () => {
+        render(<CalendarFilterPanel groups={[gruppe()]} />);
+
+        expect(screen.queryByRole('button', { name: /Filter/ })).toBeNull();
+    });
+});

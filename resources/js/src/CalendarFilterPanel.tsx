@@ -197,7 +197,21 @@ export function CalendarFilterPanel({
         abschnitte.push({ name: schalter.section, hint: schalter.hint, schalter: [schalter] });
     }
 
-    if (groups.length === 0 && toggles.length === 0 && ! children) {
+    /**
+     * Eine Gruppe ohne Auswahlmoeglichkeiten bleibt WEG.
+     *
+     * Sonst steht eine Ueberschrift mit einem Trennstrich darunter und sonst
+     * nichts — ein Versprechen, das die Tafel nicht einloest. Am 19.10.2026 im
+     * Browser genau so gesehen: „Projekt" als leere Zeile, weil die angemeldete
+     * Person an keinem Projekt haengt (#8307).
+     *
+     * Die Entscheidung gehoert hierher und nicht ins Produkt: Jedes Produkt
+     * muesste sie sonst selbst treffen, und drei von vier wuerden es
+     * vergessen.
+     */
+    const sichtbareGruppen = groups.filter((gruppe) => gruppe.options.length > 0);
+
+    if (sichtbareGruppen.length === 0 && toggles.length === 0 && ! children) {
         return null;
     }
 
@@ -304,7 +318,7 @@ export function CalendarFilterPanel({
                                 )}
                             </div>
 
-                            {groups.map((gruppe) => (
+                            {sichtbareGruppen.map((gruppe) => (
                                 <div key={gruppe.key} className="space-y-3 border-t pt-3">
                                     <div className="flex items-center gap-2">
                                         {gruppe.icon}
