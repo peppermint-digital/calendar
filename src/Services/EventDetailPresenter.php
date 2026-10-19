@@ -6,7 +6,6 @@ use Peppermint\Calendar\Categories\CategoryRegistry;
 use Peppermint\Calendar\Categories\EventCategories;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Models\CalendarEvent;
-use Peppermint\Calendar\Models\CalendarEventAttendee;
 
 /**
  * Ein Termin in der Form, die die Einzelansicht liest.
@@ -136,7 +135,20 @@ final class EventDetailPresenter
         return $event->attendees()
             ->with('user')
             ->get()
-            ->map(fn (CalendarEventAttendee $person) => [
+            // KEIN Typ-Hinweis auf `CalendarEventAttendee`.
+            //
+            // Ein Produkt darf `attendees()` mit seinem EIGENEN Modell
+            // ueberschreiben, und der Manager tut das (`App\Models\
+            // CalendarEventAttendee`, das die Paketklasse nicht erweitert).
+            // Mit dem Hinweis warf die Einzelansicht dort einen TypeError —
+            // aber nur bei Terminen MIT Teilnehmern, weil die Abbildung sonst
+            // nie laeuft. Genau deshalb ist es beim ersten Blick in den
+            // Browser durchgerutscht: Der Probetermin hatte keine.
+            //
+            // Gelesen werden ohnehin nur Felder, die jedes Teilnehmermodell
+            // hat. Ein Typ-Hinweis, der eine Klasse verlangt, die das Produkt
+            // austauschen DARF, ist eine falsche Zusicherung.
+            ->map(fn ($person) => [
                 'name' => $person->user?->name
                     ?? $person->name
                     ?? $person->email

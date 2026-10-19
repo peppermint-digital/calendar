@@ -4,6 +4,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Calendar\Services\EventDetailPresenter;
+use Peppermint\Calendar\Tests\Fixtures\FremderTeilnehmer;
+use Peppermint\Calendar\Tests\Fixtures\TerminMitFremdenTeilnehmern;
 use Peppermint\Calendar\Tests\Fixtures\DemoUser;
 
 /**
@@ -187,4 +189,57 @@ it('liefert die Mailadresse zum Teilnehmer', function () {
     $daten = app(EventDetailPresenter::class)->present($termin);
 
     expect($daten['attendees'][0]['email'])->toBe('gast@example.test');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Produkteigene Teilnehmermodelle (#8307)
+|--------------------------------------------------------------------------
+|
+| Ein Produkt darf `attendees()` mit seinem EIGENEN Modell ueberschreiben, und
+| der Manager tut das. Der Presenter typisierte die Abbildung trotzdem auf die
+| Paketklasse — und warf dort einen TypeError.
+|
+| Das Fiese daran: Der Fehler trat NUR bei Terminen mit Teilnehmern auf, weil
+| die Abbildung sonst nie laeuft. Beim ersten Blick in den Browser ist er
+| deshalb durchgerutscht — der Probetermin hatte keine. Aufgefallen ist er
+| erst, als ich fuer eine andere Pruefung Teilnehmer angelegt habe.
+*/
+
+it('kommt mit einem produkteigenen Teilnehmermodell zurecht', function () {
+    $termin = TerminMitFremdenTeilnehmern::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Mit fremden Teilnehmern',
+        'starts_at' => '2026-09-08 09:00',
+        'ends_at' => '2026-09-08 10:00',
+    ]);
+
+    FremderTeilnehmer::create([
+        'event_id' => $termin->id,
+        'user_id' => null,
+        'name' => 'Gast Extern',
+        'email' => 'gast@example.test',
+        'status' => 'accepted',
+    ]);
+
+    $daten = app(EventDetailPresenter::class)->present($termin);
+
+    expect($daten['attendees'])->toBe([
+        ['name' => 'Gast Extern', 'status' => 'accepted', 'email' => 'gast@example.test'],
+    ]);
+});
+
+it('laesst die Liste leer, wenn das fremde Modell niemanden liefert', function () {
+    // Die Gegenprobe: Ohne Teilnehmer lief die Abbildung nie — und genau
+    // deshalb sah die kaputte Fassung heil aus.
+    $termin = TerminMitFremdenTeilnehmern::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Ohne Teilnehmer',
+        'starts_at' => '2026-09-08 09:00',
+        'ends_at' => '2026-09-08 10:00',
+    ]);
+
+    expect(app(EventDetailPresenter::class)->present($termin)['attendees'])->toBe([]);
 });
