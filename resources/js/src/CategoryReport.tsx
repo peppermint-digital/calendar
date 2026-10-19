@@ -26,6 +26,14 @@ export type CategoryReportData = {
      * ueber die Kategorien summiert nicht.
      */
     kinds?: CategoryReportKindRow[];
+    /**
+     * Nach Vorgang, über ALLE Termine — nicht nur die ohne Kategorie.
+     *
+     * Der Unterschied zu `groups` ist der Nenner, und er steht auch so auf der
+     * Seite: `groups` schlüsselt auf, was ohne Kategorie bleibt, `subjects`
+     * zählt jeden Termin mit bekannter Herkunft.
+     */
+    subjects?: CategoryReportRow[];
     uncategorized: CategoryReportRow;
     total: CategoryReportRow;
 };
@@ -42,6 +50,8 @@ export type CategoryReportLabels = {
     groupsHint: string;
     kindsTitle: string;
     kindsHint: string;
+    subjectsTitle: string;
+    subjectsHint: string;
     totalTitle: string;
     multipleHint: string;
     /** 135 → „2:15 h". */
@@ -66,6 +76,8 @@ export const defaultCategoryReportLabels: CategoryReportLabels = {
     groupsHint: 'Abgeleitet aus dem Vorgang, an dem der Termin hängt — nicht von Hand gewählt.',
     kindsTitle: 'Nach Terminart',
     kindsHint: 'Jeder Termin zählt bei genau einer Art — die Summe hier ist die Gesamtzeit.',
+    subjectsTitle: 'Nach Vorgang',
+    subjectsHint: 'Projekt, Ticket oder Aufgabe, an dem der Termin hängt — abgeleitet, nicht gewählt.',
     totalTitle: 'Gesamtzeit',
     multipleHint:
         'Ein Termin mit mehreren Kategorien zählt bei jeder voll — die Summe der Kategorien ist deshalb größer als die Gesamtzeit.',
@@ -151,6 +163,35 @@ export function CategoryReport({ report, labels }: CategoryReportProps) {
             )}
 
             {/*
+                Nach Vorgang. Steht VOR der Sammelzeile, weil es die groessere
+                Aussage ist: Hier zaehlt jeder Termin mit bekannter Herkunft,
+                nicht nur der ohne Kategorie.
+
+                Abgeleitet und nicht gewaehlt — deshalb gedaempft und mit
+                eigener Ueberschrift, wie die Sammelzeile darunter.
+            */}
+            {report.subjects !== undefined && report.subjects.length > 0 && (
+                <div className="border-t pt-3" data-testid="category-report-subjects">
+                    <p className="text-xs font-medium text-muted-foreground">{t.subjectsTitle}</p>
+                    <p className="text-muted-foreground mb-2 text-xs">{t.subjectsHint}</p>
+
+                    <div className="space-y-1">
+                        {report.subjects.map((zeile) => (
+                            <div
+                                key={zeile.label ?? 'ohne'}
+                                className="text-muted-foreground flex items-baseline justify-between gap-3 text-sm"
+                            >
+                                <span>{zeile.label}</span>
+                                <span className="tabular-nums">
+                                    {t.duration(zeile.minutes)} · {zeile.count}×
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/*
                 Die Aufschlüsselung der Sammelzeile. Sie steht UNTER „ohne
                 Kategorie" und mit eigener Überschrift, weil sie etwas anderes
                 ist: abgeleitet aus dem Vorgang, nicht gewählt. Ein Zeitblock
@@ -162,7 +203,7 @@ export function CategoryReport({ report, labels }: CategoryReportProps) {
                 wird.
             */}
             {report.groups !== undefined && report.groups.length > 0 && (
-                <div className="border-t pt-3">
+                <div className="border-t pt-3" data-testid="category-report-groups">
                     <p className="text-xs font-medium text-muted-foreground">{t.groupsTitle}</p>
                     <p className="text-muted-foreground mb-2 text-xs">{t.groupsHint}</p>
 

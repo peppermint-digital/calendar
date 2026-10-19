@@ -77,6 +77,21 @@ final class CategoryReportAssembler
         $nachGruppe = [];
 
         /**
+         * Nach Vorgang — ueber ALLE Termine, nicht nur die ohne Kategorie.
+         *
+         * Der Unterschied zu `groups` ist der Nenner: `groups` schluesselt
+         * auf, was ohne Kategorie BLEIBT; `subjects` zaehlt jeden Termin,
+         * dessen Herkunft die Art benennen kann. Beide braucht es, und zwar
+         * aus einem gemessenen Grund: Im Manager hing die Projektsicht an
+         * einer eigenen, 183 Zeilen langen Rechnung, weil das Paket nur die
+         * engere Frage beantwortete — und solange das so war, konnte er seine
+         * Seite nicht gegen die geteilte tauschen (#8307).
+         *
+         * @var array<string, array{label: string, count: int, minutes: int}>
+         */
+        $nachVorgang = [];
+
+        /**
          * Nach Terminart, mit den Kategorien je Art darunter.
          *
          * Diese Aufschluesselung beantwortet eine andere Frage als
@@ -109,6 +124,16 @@ final class CategoryReportAssembler
             ];
             $nachArt[$artSchluessel]['count']++;
             $nachArt[$artSchluessel]['minutes'] += $minuten;
+
+            // Der Vorgang zaehlt wie die Art: immer und einmal, unabhaengig
+            // davon, ob der Termin eine Kategorie traegt.
+            $vorgang = $art->reportGroup($eintrag->event);
+
+            if ($vorgang !== null && $vorgang !== '') {
+                $nachVorgang[$vorgang] ??= ['label' => $vorgang, 'count' => 0, 'minutes' => 0];
+                $nachVorgang[$vorgang]['count']++;
+                $nachVorgang[$vorgang]['minutes'] += $minuten;
+            }
 
             foreach ($etiketten as $etikettDerArt) {
                 $unter = (string) $etikettDerArt;
@@ -183,6 +208,10 @@ final class CategoryReportAssembler
 
         usort($gruppen, fn (array $a, array $b) => $b['minutes'] <=> $a['minutes']);
 
+        $vorgaenge = array_values($nachVorgang);
+
+        usort($vorgaenge, fn (array $a, array $b) => $b['minutes'] <=> $a['minutes']);
+
         $arten = array_values(array_map(function (array $zeile): array {
             $unter = array_values($zeile['categories']);
 
@@ -207,6 +236,10 @@ final class CategoryReportAssembler
             // Summe ueber alle Arten ist deshalb `total` — anders als bei
             // `categories`, wo ein Termin mit zwei Kategorien zweimal steht.
             'kinds' => $arten,
+            // Nach Vorgang, ueber alle Termine. Anders als `groups` ist diese
+            // Summe nicht durch `uncategorized` gedeckelt — sie kann bis an
+            // `total` heranreichen.
+            'subjects' => array_map($this->mitStunden(...), $vorgaenge),
             'uncategorized' => $this->mitStunden([
                 'label' => null,
                 'count' => $ohne['count'],

@@ -192,3 +192,37 @@ describe('Nach Terminart (#8307)', () => {
         expect(screen.queryByTestId('category-report-kinds')).toBeNull();
     });
 });
+
+describe('Nach Vorgang (#8307)', () => {
+    it('zeigt jeden Vorgang mit Dauer und Anzahl', () => {
+        render(<CategoryReport report={bericht({ subjects: [zeile('Projekt Nord', 180, 3)] })} />);
+
+        const abschnitt = screen.getByTestId('category-report-subjects');
+
+        expect(abschnitt.textContent).toContain('Projekt Nord');
+        expect(abschnitt.textContent).toContain('3 h · 3×');
+    });
+
+    it('steht getrennt von der Herkunfts-Aufschluesselung, weil beide anders zaehlen', () => {
+        render(
+            <CategoryReport
+                report={bericht({
+                    subjects: [zeile('Projekt Nord', 180, 3)],
+                    groups: [zeile('Projekt Nord', 60, 1)],
+                })}
+            />,
+        );
+
+        // Zwei Abschnitte, zwei Zahlen zum selben Etikett — genau das soll
+        // die Seite zeigen: 3 h gingen in den Vorgang, davon 1 h ohne
+        // Kategorie. Eine gemeinsame Tabelle waere eine falsche Summe.
+        expect(screen.getByTestId('category-report-subjects').textContent).toContain('3 h');
+        expect(screen.getByTestId('category-report-groups').textContent).toContain('1 h');
+    });
+
+    it('bleibt weg, wenn das Produkt keine Vorgaenge liefert', () => {
+        render(<CategoryReport report={bericht()} />);
+
+        expect(screen.queryByTestId('category-report-subjects')).toBeNull();
+    });
+});

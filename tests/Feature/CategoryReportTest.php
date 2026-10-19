@@ -15,6 +15,7 @@ use Peppermint\Calendar\Tests\Fixtures\GroupedBlockKind;
  */
 beforeEach(function () {
     CategorisedKind::$nachTitel = [];
+    CategorisedKind::$vorgangNachTitel = [];
 });
 
 /**
@@ -296,4 +297,63 @@ it('stellt die laengste Art nach vorn', function () {
     blockTermin('Lang', 300);
 
     expect(bericht()['kinds'][0]['label'])->toBe('Zeitblock mit Gruppe');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Nach Vorgang (#8307)
+|--------------------------------------------------------------------------
+|
+| `groups` beantwortet „was bleibt ohne Kategorie, und woher kommt es";
+| `subjects` beantwortet „wie viel Zeit ging in welchen Vorgang" — ueber ALLE
+| Termine. Der Manager fuehrte dafuer eine eigene Rechnung, weil das Paket nur
+| die engere Frage kannte.
+*/
+
+it('zaehlt auch Termine MIT Kategorie in ihren Vorgang', function () {
+    // Derselbe Vorgang, zwei Termine: einer mit Kategorie, einer ohne.
+    // `groups` sieht nur den ohne, `subjects` beide — das ist der ganze
+    // Unterschied zwischen den zwei Abschnitten.
+    GroupedBlockKind::$nachTitel = ['Ohne' => 'Projekt Nord'];
+    CategorisedKind::$vorgangNachTitel = ['Mit' => 'Projekt Nord'];
+
+    blockTermin('Ohne', 60);
+    berichtTermin(['title' => 'Mit', 'starts_at' => '2026-09-09 09:00', 'ends_at' => '2026-09-09 11:00'], ['Kundentermin']);
+
+    $ergebnis = bericht();
+
+    // `groups` sieht nur den Block (60), `subjects` beide (180).
+    expect(collect($ergebnis['groups'])->pluck('minutes', 'label')->all())->toBe(['Projekt Nord' => 60])
+        ->and(collect($ergebnis['subjects'])->pluck('minutes', 'label')->all())->toBe(['Projekt Nord' => 180]);
+});
+
+it('kann bis an die Gesamtzeit heranreichen, anders als die Gruppen', function () {
+    GroupedBlockKind::$nachTitel = ['Eins' => 'Projekt Nord', 'Zwei' => 'Projekt Süd'];
+
+    blockTermin('Eins', 60);
+    blockTermin('Zwei', 120);
+
+    $ergebnis = bericht();
+
+    // Jeder Termin gehoert zu einem Vorgang, also ist die Summe gleich der
+    // Gesamtzeit. `groups` kann das auch — aber nur, solange keiner von ihnen
+    // eine Kategorie traegt. Genau deshalb sind es zwei Abschnitte.
+    expect(collect($ergebnis['subjects'])->sum('minutes'))->toBe($ergebnis['total']['minutes']);
+});
+
+it('laesst eine Art ohne Vorgang draussen, statt sie „Unbekannt" zu nennen', function () {
+    berichtTermin(['title' => 'Ohne Vorgang'], ['Kundentermin']);
+
+    // `CategorisedKind` kennt keinen Vorgang. Eine Zeile „Unbekannt" waere
+    // eine Behauptung ueber etwas, das die Art nicht beantworten kann.
+    expect(bericht()['subjects'])->toBe([]);
+});
+
+it('stellt den groessten Vorgang nach vorn', function () {
+    GroupedBlockKind::$nachTitel = ['Klein' => 'Projekt Nord', 'Gross' => 'Projekt Süd'];
+
+    blockTermin('Klein', 30);
+    blockTermin('Gross', 240);
+
+    expect(bericht()['subjects'][0]['label'])->toBe('Projekt Süd');
 });

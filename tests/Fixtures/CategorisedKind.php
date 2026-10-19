@@ -18,6 +18,17 @@ class CategorisedKind extends EventKind
     /** @var array<string, array<int, string>> Titel des Termins → Kategorien */
     public static array $nachTitel = [];
 
+    /**
+     * Titel des Termins → Vorgang.
+     *
+     * Dazugekommen fuer `subjects` (#8307): Dort geht es um Termine, die
+     * BEIDES haben — eine Kategorie und eine Herkunft. `GroupedBlockKind`
+     * kann nur die Herkunft, diese Art nun beides.
+     *
+     * @var array<string, string>
+     */
+    public static array $vorgangNachTitel = [];
+
     public function key(): string
     {
         return 'categorised';
@@ -43,5 +54,10 @@ class CategorisedKind extends EventKind
     public function categories(CalendarEvent $event): array
     {
         return self::$nachTitel[(string) $event->title] ?? [];
+    }
+
+    public function reportGroup(CalendarEvent $event): ?string
+    {
+        return self::$vorgangNachTitel[(string) $event->title] ?? null;
     }
 }
