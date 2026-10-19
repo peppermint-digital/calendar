@@ -26,6 +26,14 @@ export type EventDetailData = {
     /** Die Farbe, in der das Raster ihn zeichnet. */
     colour?: string | null;
     recurring?: boolean;
+    /**
+     * Ein privater Termin — nur für die eigene Person sichtbar.
+     *
+     * Als eigenes Feld und nicht aus `kindLabel` abgelesen: „privat" ist eine
+     * Sichtbarkeit, keine Terminart. Ein geschäftlicher Termin kann privat
+     * gestellt sein, und ein Geburtstag ist es immer.
+     */
+    private?: boolean;
     attendees?: { name: string; status?: string | null }[];
     categories?: string[];
     /** Die Slugs dazu — nötig, um umzuschalten. Ein Etikett ist kein Schlüssel. */
@@ -40,7 +48,22 @@ export type EventDetailLabels = {
     categories: string;
     series: string;
     allDay: string;
+    duration: string;
+    privateHint: string;
+    /** 135 → „2 Std. 15 Min." */
+    formatDuration: (minutes: number) => string;
 };
+
+/** 135 → „2 Std. 15 Min."; 60 → „1 Std."; 45 → „45 Min." */
+function deutscheDauer(minuten: number): string {
+    const stunden = Math.floor(minuten / 60);
+    const rest = minuten % 60;
+
+    if (stunden === 0) return `${rest} Min.`;
+    if (rest === 0) return stunden === 1 ? '1 Std.' : `${stunden} Std.`;
+
+    return `${stunden} Std. ${rest} Min.`;
+}
 
 const DETAIL_DEFAULTS: EventDetailLabels = {
     when: 'Wann',
@@ -50,6 +73,9 @@ const DETAIL_DEFAULTS: EventDetailLabels = {
     categories: 'Kategorien',
     series: 'Teil einer Serie',
     allDay: 'ganztägig',
+    duration: 'Dauer',
+    privateHint: 'Privat',
+    formatDuration: deutscheDauer,
 };
 
 export interface EventDetailProps {
@@ -156,6 +182,40 @@ export function EventDetail({
             : `${beginn}, ${event.start}`;
     };
 
+    /**
+     * Wie lange der Termin dauert, in Minuten — oder null.
+     *
+     * Bei einem ganztägigen Termin steht die Dauer NICHT in Minuten: „1440
+     * Min." ist keine Auskunft, und bei mehreren Tagen erst recht nicht. Dort
+     * sagt der Zeitraum oben schon alles.
+     *
+     * Die Dauer stand bis zum 19.10.2026 nur in der Einzelansicht des
+     * Managers. Sie ist die zweite Frage nach „wann" — und sie aus zwei
+     * Uhrzeiten im Kopf zu rechnen ist genau die Arbeit, die eine Maske
+     * abnehmen soll.
+     */
+    const dauerMinuten = (): number | null => {
+        if (ganztags) return null;
+        if (event.start === null || event.start === undefined || event.start === '') return null;
+        if (event.end === null || event.end === undefined || event.end === '') return null;
+        if (event.endDate !== null && event.endDate !== undefined && event.endDate !== '' && event.endDate !== event.date) return null;
+
+        const [vonStunde, vonMinute] = event.start.split(':').map(Number);
+        const [bisStunde, bisMinute] = event.end.split(':').map(Number);
+
+        if ([vonStunde, vonMinute, bisStunde, bisMinute].some((zahl) => zahl === undefined || Number.isNaN(zahl))) {
+            return null;
+        }
+
+        const minuten = (bisStunde! * 60 + bisMinute!) - (vonStunde! * 60 + vonMinute!);
+
+        // Ein Termin über Mitternacht hinaus käme negativ heraus. Lieber keine
+        // Angabe als eine falsche.
+        return minuten > 0 ? minuten : null;
+    };
+
+    const dauer = dauerMinuten();
+
     return (
         <div data-slot="event-detail" className={`space-y-4 ${className}`.trim()}>
             <div className="space-y-1">
@@ -170,8 +230,19 @@ export function EventDetail({
                     <h2 className="text-lg font-semibold">{event.title}</h2>
                 </div>
 
-                {event.kindLabel !== null && event.kindLabel !== undefined && event.kindLabel !== '' && (
-                    <p className="text-xs text-muted-foreground">{event.kindLabel}</p>
+                {(event.private === true ||
+                    (event.kindLabel !== null && event.kindLabel !== undefined && event.kindLabel !== '')) && (
+                    <p className="text-xs text-muted-foreground">
+                        {event.kindLabel}
+                        {event.private === true && (
+                            <span data-testid="event-detail-private">
+                                {event.kindLabel !== null && event.kindLabel !== undefined && event.kindLabel !== ''
+                                    ? ' · '
+                                    : ''}
+                                {beschriftung.privateHint}
+                            </span>
+                        )}
+                    </p>
                 )}
             </div>
 
@@ -179,6 +250,11 @@ export function EventDetail({
                 <div>
                     <dt className="text-xs font-medium text-muted-foreground">{beschriftung.when}</dt>
                     <dd>{zeitraum()}</dd>
+                    {dauer !== null && (
+                        <dd className="text-muted-foreground text-xs" data-testid="event-detail-duration">
+                            {beschriftung.duration}: {beschriftung.formatDuration(dauer)}
+                        </dd>
+                    )}
                 </div>
 
                 {/*

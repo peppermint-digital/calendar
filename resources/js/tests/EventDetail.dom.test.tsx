@@ -264,3 +264,71 @@ describe('EventDetail — Kategorien wählen', () => {
         expect(screen.queryByText('Kategorien')).toBeNull();
     });
 });
+
+describe('Dauer und Privat (#8307)', () => {
+    const termin = (over: Partial<EventDetailData> = {}): EventDetailData => ({
+        title: 'Besprechung',
+        date: '2026-10-19',
+        start: '09:00',
+        end: '10:30',
+        ...over,
+    });
+
+    it('nennt die Dauer, damit man sie nicht im Kopf rechnet', () => {
+        render(<EventDetail event={termin()} />);
+
+        expect(screen.getByTestId('event-detail-duration').textContent).toBe('Dauer: 1 Std. 30 Min.');
+    });
+
+    it('sagt bei einer vollen Stunde „1 Std." und nicht „1 Std. 0 Min."', () => {
+        render(<EventDetail event={termin({ end: '10:00' })} />);
+
+        expect(screen.getByTestId('event-detail-duration').textContent).toBe('Dauer: 1 Std.');
+    });
+
+    it('sagt unter einer Stunde nur die Minuten', () => {
+        render(<EventDetail event={termin({ end: '09:45' })} />);
+
+        expect(screen.getByTestId('event-detail-duration').textContent).toBe('Dauer: 45 Min.');
+    });
+
+    it('laesst sie bei einem ganztaegigen Termin weg', () => {
+        // „1440 Min." ist keine Auskunft.
+        render(<EventDetail event={termin({ allDay: true, start: null, end: null })} />);
+
+        expect(screen.queryByTestId('event-detail-duration')).toBeNull();
+    });
+
+    it('laesst sie ueber mehrere Tage weg — dort sagt der Zeitraum alles', () => {
+        render(<EventDetail event={termin({ endDate: '2026-10-21' })} />);
+
+        expect(screen.queryByTestId('event-detail-duration')).toBeNull();
+    });
+
+    it('laesst sie weg statt etwas Falsches zu sagen, wenn das Ende vor dem Anfang liegt', () => {
+        render(<EventDetail event={termin({ start: '22:00', end: '02:00' })} />);
+
+        expect(screen.queryByTestId('event-detail-duration')).toBeNull();
+    });
+
+    it('kennzeichnet einen privaten Termin', () => {
+        render(<EventDetail event={termin({ kindLabel: 'Geschäftlich', private: true })} />);
+
+        // Sichtbarkeit und Terminart stehen nebeneinander: Ein geschaeftlicher
+        // Termin KANN privat gestellt sein.
+        expect(screen.getByTestId('event-detail-private').textContent).toContain('Privat');
+        expect(screen.getByText(/Geschäftlich/)).toBeTruthy();
+    });
+
+    it('zeigt „Privat" auch ohne Terminart', () => {
+        render(<EventDetail event={termin({ private: true })} />);
+
+        expect(screen.getByTestId('event-detail-private').textContent).toContain('Privat');
+    });
+
+    it('schweigt bei einem nicht privaten Termin', () => {
+        render(<EventDetail event={termin({ kindLabel: 'Geschäftlich' })} />);
+
+        expect(screen.queryByTestId('event-detail-private')).toBeNull();
+    });
+});
