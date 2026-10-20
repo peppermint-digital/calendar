@@ -87,7 +87,7 @@ class CategorySync
                 CalendarCategory::query()->create(CalendarCategory::onlyExistingColumns([
                     CalendarCategory::column('slug') => $slug,
                     CalendarCategory::column('label') => (string) $zeile['label'],
-                    CalendarCategory::column('colour') => $zeile['colour'] ?? null,
+                    ...$this->farbe($zeile),
                     CalendarCategory::column('sort_order') => (int) ($zeile['sort_order'] ?? 0),
                     CalendarCategory::column('is_active') => (bool) ($zeile['is_active'] ?? true),
                     CalendarCategory::column('kind') => $zeile['kind'] ?? null,
@@ -101,7 +101,7 @@ class CategorySync
 
             $neu = CalendarCategory::onlyExistingColumns([
                 CalendarCategory::column('label') => (string) $zeile['label'],
-                CalendarCategory::column('colour') => $zeile['colour'] ?? null,
+                ...$this->farbe($zeile),
                 CalendarCategory::column('sort_order') => (int) ($zeile['sort_order'] ?? 0),
                 CalendarCategory::column('is_active') => (bool) ($zeile['is_active'] ?? true),
                 CalendarCategory::column('kind') => $zeile['kind'] ?? null,
@@ -142,6 +142,43 @@ class CategorySync
         }
 
         return $bericht;
+    }
+
+    /**
+     * Die Farbe — nur wenn die Quelle eine nennt.
+     *
+     * ## Warum nicht einfach `$zeile['colour'] ?? null`
+     *
+     * Weil das ein ausdrueckliches NULL in die Spalte schreibt, und das ist
+     * etwas anderes als „keine Angabe". Gemessen am 20.10.2026 im Peppermint
+     * Manager: Dort heisst die Spalte `color`, ist NOT NULL und hat die
+     * Vorgabe `#3b82f6`. Eine Kategorie, die aus der Nabe OHNE Farbe kommt,
+     * liess den ganzen Lauf platzen:
+     *
+     *     SQLSTATE[23000]: NOT NULL constraint failed: event_categories.color
+     *
+     * Und zwar nicht im `try` um die Quelle herum, sondern danach beim
+     * Abgleich — der geplante Lauf endete also mit einer Ausnahme statt mit
+     * einem auswertbaren Fehlerstatus.
+     *
+     * Fehlt der Schluessel, greift beim Anlegen die Vorgabe der Spalte, und
+     * beim Abgleich bleibt eine vorhandene Farbe stehen. Das ist auch die
+     * richtige Lesart: „Die Quelle nennt keine Farbe" heisst nicht „die Farbe
+     * soll weg". `kind` behandeln wir absichtlich NICHT so — dort bedeutet
+     * leer etwas, naemlich „fuer jede Terminart".
+     *
+     * @param  array<string, mixed>  $zeile
+     * @return array<string, mixed>
+     */
+    private function farbe(array $zeile): array
+    {
+        $farbe = $zeile['colour'] ?? null;
+
+        if ($farbe === null || $farbe === '') {
+            return [];
+        }
+
+        return [CalendarCategory::column('colour') => $farbe];
     }
 
     /**

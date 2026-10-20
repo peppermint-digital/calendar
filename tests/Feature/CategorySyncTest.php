@@ -71,6 +71,44 @@ it('reports what it left alone', function () {
 });
 
 /**
+ * A source row without a colour must not clear the colour that is already here.
+ *
+ * ## Why this matters beyond tidiness
+ *
+ * Writing `colour => null` and writing nothing are the same thing in THIS
+ * schema — the column is nullable here. In a product they are not. Measured in
+ * the Peppermint Manager on 20.10.2026: the column is called `color`, it is
+ * NOT NULL and it carries the default `#3b82f6`. A category arriving from the
+ * hub without a colour blew up the whole run:
+ *
+ *     SQLSTATE[23000]: NOT NULL constraint failed: event_categories.color
+ *
+ * And it blew up AFTER the source call, so the command's try/catch around the
+ * source did not catch it — the scheduled run ended in an exception instead of
+ * a status a scheduler can act on.
+ *
+ * Found by writing the test that was missing: until that day not one of the
+ * four products covered `calendar:pull-categories` at all.
+ */
+it('keeps the colour it already has when the source names none', function () {
+    $vorhanden = hier(['colour' => '#f59e0b']);
+
+    $bericht = abgleich()->apply([quelle(['colour' => null])]);
+
+    expect($vorhanden->refresh()->field('colour'))->toBe('#f59e0b')
+        ->and($bericht)->toMatchArray(['created' => 0, 'updated' => 0, 'untouched' => 1]);
+});
+
+/** An empty string is an absent colour too, not a colour named "". */
+it('treats an empty colour as none given', function () {
+    $vorhanden = hier(['colour' => '#f59e0b']);
+
+    abgleich()->apply([quelle(['colour' => ''])]);
+
+    expect($vorhanden->refresh()->field('colour'))->toBe('#f59e0b');
+});
+
+/**
  * The rule that makes this a sync and not a mirror. A deleted category takes
  * the classification of its events with it — measured in the Manager: 206 of
  * 359 events carry one, 199 of them the same. Deleting on sync would have
