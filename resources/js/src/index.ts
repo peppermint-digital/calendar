@@ -12,10 +12,6 @@ export type { CalendarFilterPanelLabels, CalendarFilterPanelProps, FilterGroup, 
 export { CategoryAdmin, defaultCategoryAdminLabels } from './CategoryAdmin';
 export { CategoryPicker } from './CategoryPicker';
 export type { CategoryPickerProps, PickableCategory } from './CategoryPicker';
-export { CategoryReport, defaultCategoryReportLabels, formatDuration } from './CategoryReport';
-export type { CategoryReportData, CategoryReportKindRow, CategoryReportLabels, CategoryReportProps, CategoryReportRow } from './CategoryReport';
-export { CategoryReportRange, defaultCategoryReportRangeLabels } from './CategoryReportRange';
-export type { CategoryReportRangeLabels, CategoryReportRangeProps } from './CategoryReportRange';
 export type { AdminCategory, CategoryAdminLabels, CategoryAdminProps } from './CategoryAdmin';
 export { SOURCE_KEY_PREFIX, isHidden, sourceKey, toggleHidden } from './filters';
 export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';

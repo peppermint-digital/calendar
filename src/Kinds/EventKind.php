@@ -149,52 +149,6 @@ abstract class EventKind
     }
 
     /**
-     * Under what label should this kind's events appear in the report when
-     * they carry no category?
-     *
-     * null means "nowhere" — they stay in the single "no category" row, which
-     * is the right answer for an ordinary appointment somebody simply did not
-     * label.
-     *
-     * It is the right answer for a PLANNED BLOCK too, and that is why this
-     * exists. A block carries no category on purpose: it points at a task, and
-     * the task carries the purpose more precisely than a label could. But its
-     * time is not nothing — measured in the Manager on 19.10.2026, 483 of 1211
-     * events are blocks on a task, 40 percent of the calendar, and all of it
-     * used to sit in one collecting row.
-     *
-     * So the kind may say what to group it by: the project behind the task,
-     * the area behind the ticket. DERIVED from the subject, never chosen by
-     * anyone — which is also why the assembler keeps it in its own list.
-     * Chosen and derived numbers that look alike in one table are how a report
-     * starts lying.
-     *
-     * The label is the product's to give: only it knows what its subjects are
-     * called.
-     */
-    public function reportGroup(CalendarEvent $event): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Where the report group points — the project, the ticket, the task.
-     *
-     * Optional, and deliberately separate from {@see reportGroup()}: a label
-     * without a link is still a useful row, a link without a label is not.
-     * Returning null leaves the row as plain text.
-     *
-     * The URL is the product's to give, for the same reason the label is: only
-     * the application knows its own routes. A package that built the path
-     * itself would guess, and a wrong link is worse than none — it looks like
-     * it works.
-     */
-    public function reportGroupUrl(CalendarEvent $event): ?string
-    {
-        return null;
-    }
-
-    /**
      * Validation rules for this kind's extra fields. The core does not apply
      * them itself — the application pulls them into its own requests.
      *

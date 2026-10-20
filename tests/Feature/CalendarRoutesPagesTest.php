@@ -87,40 +87,6 @@ it('lenkt die alten deutschen Pfade dauerhaft um', function () {
 });
 
 /**
- * Der Bericht liegt unter derselben Adresse wie in den anderen Systemen.
- *
- * Der Manager fuehrt ihn seit laengerem unter `calendar/category-report`; das
- * Brain bekam ihn gestern, CRM und Verwaltung heute. Vier Systeme, EINE
- * Adresse — das war der Grund, warum die Pfade ueberhaupt aus dem Paket
- * kommen: Am 16.10.2026 hiess „Termin anlegen" in vier Systemen vier
- * verschiedene Dinge.
- */
-it('legt die Auswertung unter die gemeinsame Adresse', function () {
-    Route::middleware('web')->group(fn () => CalendarRoutes::pages('App\\Fake\\CalendarController', ['categoryReport']));
-
-    $route = Route::getRoutes()->getByName('calendar.category-report');
-
-    expect($route)->not->toBeNull()
-        ->and($route->uri())->toBe('calendar/category-report');
-});
-
-/**
- * VOR `{event}`: Sonst liest der Router „category-report" als Kennung und das
- * Produkt antwortet mit „Termin nicht gefunden" statt mit dem Bericht.
- */
-it('legt die Auswertung vor den Platzhalter', function () {
-    Route::middleware('web')->group(fn () => CalendarRoutes::pages('App\\Fake\\CalendarController', ['categoryReport', 'show']));
-
-    $namen = collect(Route::getRoutes()->getRoutes())
-        ->map(fn ($r) => $r->getName())
-        ->filter()
-        ->values();
-
-    expect($namen->search('calendar.category-report'))
-        ->toBeLessThan($namen->search('calendar.show'));
-});
-
-/**
  * Die Terminfindung gehoert ins Paket, nicht in drei Routendateien.
  *
  * Bis zum 20.10.2026 legte jedes Produkt diese Route selbst — Manager, CRM und

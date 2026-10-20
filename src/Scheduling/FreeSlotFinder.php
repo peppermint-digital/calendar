@@ -150,8 +150,10 @@ final class FreeSlotFinder
             //
             // Das ist der schlimmste Fehler, den ein Planer machen kann: Er
             // bietet eine Zeit an, in der die halbe Runde schon sitzt, und
-            // sieht dabei vollkommen plausibel aus. Dieselbe Begruendung wie
-            // im `CategoryReportAssembler`, wo es seit v0.59.0 so steht.
+            // sieht dabei vollkommen plausibel aus. Dieselbe Begruendung
+            // hatte die Kategorie-Auswertung, solange sie im Paket lag
+            // (v0.59.0 bis v0.84.0) — die Ueberschneidung, nicht der Beginn,
+            // ist die Frage, die ein Mensch meint.
             ->where(CalendarEvent::column('starts_at'), '<', $to)
             ->where(function ($abfrage) use ($userIds) {
                 $abfrage->whereIn(CalendarEvent::column('owner_id'), $userIds)
