@@ -17,8 +17,7 @@ export type { CategoryReportData, CategoryReportKindRow, CategoryReportLabels, C
 export { CategoryReportRange, defaultCategoryReportRangeLabels } from './CategoryReportRange';
 export type { CategoryReportRangeLabels, CategoryReportRangeProps } from './CategoryReportRange';
 export type { AdminCategory, CategoryAdminLabels, CategoryAdminProps } from './CategoryAdmin';
-export { CalendarFilters, SOURCE_KEY_PREFIX, isHidden, sourceKey, toggleHidden } from './CalendarFilters';
-export type { CalendarFilterEntry, CalendarFiltersProps } from './CalendarFilters';
+export { SOURCE_KEY_PREFIX, isHidden, sourceKey, toggleHidden } from './filters';
 export { CalendarToolbar, defaultToolbarLabels } from './CalendarToolbar';
 export type { CalendarToolbarButton, CalendarToolbarLabels, CalendarToolbarProps } from './CalendarToolbar';
 export { AgendaList, groupByDay } from './AgendaList';

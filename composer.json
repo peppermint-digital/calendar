@@ -19,6 +19,9 @@
         "orchestra/testbench": "^9.0|^10.0|^11.0",
         "pestphp/pest": "^3.0|^4.0"
     },
+    "suggest": {
+        "peppermint/ai-brain-bridge": "Fuer BrainCategorySource und BrainCalendarSources — die gemeinsame Kategorienliste und die Kalender der anderen Systeme ueber den Komm-Layer. Regel 7 des Paketvertrags: nicht erzwungen, damit das Paket fuer sich installierbar bleibt."
+    },
     "autoload": {
         "psr-4": {
             "Peppermint\\Calendar\\": "src/"
