@@ -20,7 +20,7 @@ use Throwable;
  * // config/calendar.php
  * 'categories' => [
  *     'source' => fn () => \Peppermint\AiBrainBridge\Facades\AiBrain::call(
- *         'list-calendar-categories',
+ *         'list-calendar-categories-tool',
  *     )['categories'] ?? [],
  * ],
  * ```

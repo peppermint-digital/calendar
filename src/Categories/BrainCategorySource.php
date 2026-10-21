@@ -53,6 +53,28 @@ use Peppermint\Calendar\Exceptions\BrainBridgeMissing;
  */
 class BrainCategorySource
 {
+    /**
+     * Wie das Werkzeug in der Nabe heisst.
+     *
+     * **Mit `-tool` am Ende.** Die Nabe benennt jedes ihrer Werkzeuge so, und
+     * jeder andere Aufrufer im Haus haelt sich daran — `list-projects-tool`,
+     * `create-task-tool`, `channel-list-tool`. Hier stand bis zum 21.10.2026
+     * der kurze Name, und der Abruf scheiterte bei jedem Lauf:
+     *
+     *     MCP tools/call error: Tool [list-calendar-categories] not found.
+     *     Did you mean [list-calendar-categories-tool]?
+     *
+     * Aufgefallen ist es erst, als das Werkzeug ueberhaupt registriert war —
+     * vorher verdeckte ein zweiter Fehler diesen hier (Verwaltung Bug #1065).
+     * Zwei Ursachen hinter einer Meldung, und die erste zu beheben machte die
+     * zweite sichtbar.
+     *
+     * Als Konstante und nicht als Zeichenkette im Aufruf, damit der Name
+     * pruefbar ist: Die Suite dieses Pakets hat die Bruecke nicht installiert
+     * und kann den Aufruf selbst nicht nachstellen.
+     */
+    public const WERKZEUG = 'list-calendar-categories-tool';
+
     /** @return array<int, array<string, mixed>> */
     public function __invoke(): array
     {
@@ -62,7 +84,7 @@ class BrainCategorySource
             throw BrainBridgeMissing::forCategories();
         }
 
-        $antwort = $bruecke::call('list-calendar-categories');
+        $antwort = $bruecke::call(self::WERKZEUG);
 
         return $antwort['categories'] ?? [];
     }

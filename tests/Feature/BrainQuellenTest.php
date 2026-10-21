@@ -71,3 +71,23 @@ it('nimmt die Wache als Parameter', function () {
     expect(fn () => $ohne->build())->toThrow(BrainBridgeMissing::class);
     expect(fn () => $mit->build())->toThrow(BrainBridgeMissing::class);
 });
+
+/**
+ * Der Name des Werkzeugs — der Fehler, den diese Suite strukturell nicht sehen
+ * konnte.
+ *
+ * Die Brücke ist hier nicht installiert, der Aufruf lässt sich also nicht
+ * nachstellen. Genau darin lag die Lücke: Der Name stand als Zeichenkette im
+ * Aufruf, war falsch (`list-calendar-categories` statt
+ * `list-calendar-categories-tool`), und jeder nächtliche Lauf in den Produkten
+ * scheiterte daran — monatelang unbemerkt, weil ein zweiter Fehler dieselbe
+ * Meldung erzeugte (Verwaltung Bug #1065).
+ *
+ * Die Nabe benennt JEDES ihrer Werkzeuge mit `-tool` am Ende. Das ist die
+ * Zusage, die hier festgehalten wird.
+ */
+it('ruft das Werkzeug unter dem Namen, den die Nabe vergibt', function () {
+    expect(BrainCategorySource::WERKZEUG)
+        ->toBe('list-calendar-categories-tool')
+        ->toEndWith('-tool');
+});
