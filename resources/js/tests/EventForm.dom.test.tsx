@@ -48,6 +48,31 @@ describe('EventForm', () => {
         expect(screen.queryByLabelText('Terminart')).not.toBeNull();
     });
 
+    /**
+     * Gesucht wird die Feldgruppe — der Kasten, in dem die Beschriftung
+     * steht —, nicht das unmittelbare Elternelement.
+     *
+     * Grund: Seit dem 22.10.2026 umschliesst `DateField` sein Eingabefeld mit
+     * einem eigenen Rahmen (darin sitzt der Knopf fuer die Datumsauswahl,
+     * #1070). Ein `parentElement` traefe seitdem diesen Rahmen statt der
+     * Gruppe — und der Test waere rot, obwohl die Meldung unveraendert unter
+     * dem Feld steht. Ueber die Beschriftung zu suchen ist unabhaengig davon,
+     * wie tief ein Feld verschachtelt ist.
+     */
+    const gruppeVon = (feld: HTMLElement): HTMLElement => {
+        let knoten = feld.parentElement;
+
+        while (knoten && ! knoten.querySelector(':scope > label')) {
+            knoten = knoten.parentElement;
+        }
+
+        if (! knoten) {
+            throw new Error('Keine Feldgruppe mit Beschriftung gefunden.');
+        }
+
+        return knoten;
+    };
+
     it('haengt die Beanstandung unter das Feld, das sie meint', () => {
         show({
             value: draft({ recurrence: emptyRecurrence() }),
@@ -55,11 +80,12 @@ describe('EventForm', () => {
         });
 
         // Nicht nur „steht irgendwo": Der Fehler muss beim richtigen Feld haengen.
-        const ort = screen.getByLabelText('Ort').parentElement;
-        expect(ort?.textContent).toContain('Ort fehlt');
+        expect(gruppeVon(screen.getByLabelText('Ort')).textContent).toContain('Ort fehlt');
+        expect(gruppeVon(screen.getByLabelText('Wiederholen bis *')).textContent).toContain('Enddatum fehlt');
 
-        const bis = screen.getByLabelText('Wiederholen bis *').parentElement;
-        expect(bis?.textContent).toContain('Enddatum fehlt');
+        // Und nicht beim falschen — ohne das waere ein Treffer im ganzen
+        // Formular schon genug, und genau davon handelt dieser Test nicht.
+        expect(gruppeVon(screen.getByLabelText('Ort')).textContent).not.toContain('Enddatum fehlt');
     });
 
     it('laesst nicht absenden, solange die Art noch etwas verlangt', () => {
@@ -275,8 +301,25 @@ describe('das Datumsfeld', () => {
     it('nimmt das deutsche Feld, nicht das native', () => {
         show({ value: draft({ allDay: true }), multiDay: true });
 
-        expect(document.querySelectorAll('[data-slot="date-field"]').length).toBeGreaterThan(0);
-        expect(document.querySelectorAll('input[type="date"]')).toHaveLength(0);
+        const eigene = document.querySelectorAll('[data-slot="date-field"]');
+        expect(eigene.length).toBeGreaterThan(0);
+        eigene.forEach((feld) => expect((feld as HTMLInputElement).type).toBe('text'));
+
+        /*
+         * Seit dem 22.10.2026 gibt es native Datumsfelder — aber NUR als
+         * Auswaehler hinter dem Kalender-Knopf (#1070). Frueher stand hier
+         * „keins davon". Das war einfacher zu pruefen und sagte das Falsche:
+         * Verboten ist nicht das native Feld, verboten ist seine ANZEIGE.
+         *
+         * Diese Fassung ist strenger als die alte Zaehlung auf null, denn sie
+         * laesst sich nicht dadurch erfuellen, dass jemand das sichtbare Feld
+         * auf `type="date"` umstellt — dann waere es weder `text` noch
+         * versteckt.
+         */
+        document.querySelectorAll('input[type="date"]').forEach((nativ) => {
+            expect(nativ.getAttribute('aria-hidden')).toBe('true');
+            expect((nativ as HTMLInputElement).tabIndex).toBe(-1);
+        });
     });
 
     /**
