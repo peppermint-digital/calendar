@@ -152,3 +152,76 @@ describe('die Ansichts-Knoepfe', () => {
         expect(meldungen.filter((m) => String(m).includes('unique "key"'))).toHaveLength(0);
     });
 });
+
+/**
+ * Die Leiste am Telefon (#8599, 22.10.2026).
+ *
+ * Gemessen bei 390 px Bildschirmbreite: Die Leiste ist dort 358 px breit, ihr
+ * Inhalt summiert sich aber auf 688 px — Navigation 259, Ansichten 258,
+ * Schalter 171. Das ergibt drei Reihen und 112 px, bevor der erste Termin zu
+ * sehen ist. Zwei Reihen zusammenzulegen geht nicht: 258 + 171 passen
+ * ebenfalls nicht nebeneinander.
+ *
+ * Also wandert das SELTENERE in einen Ueberlauf. „Monat / Woche / Tag" waehlt
+ * man staendig, „24 h" und „Wochenende" stellt man einmal ein.
+ */
+describe('die Leiste auf schmalen Bildschirmen', () => {
+    const breiteSetzen = (px: number) => {
+        Object.defineProperty(window, 'innerWidth', { value: px, writable: true, configurable: true });
+        fireEvent(window, new Event('resize'));
+    };
+
+    afterEach(() => breiteSetzen(1024));
+
+    const leiste = () =>
+        render(
+            <CalendarToolbar
+                renderButton={knopf}
+                views={['dayGridMonth', 'timeGridWeek']}
+                view="timeGridWeek"
+                onViewChange={() => {}}
+                onToday={() => {}}
+                fullDay={false}
+                onFullDayChange={() => {}}
+                weekends
+                onWeekendsChange={() => {}}
+            />,
+        );
+
+    it('raeumt die Ansichts-Schalter in den Ueberlauf', () => {
+        breiteSetzen(390);
+        leiste();
+
+        expect(screen.getByLabelText('Weitere Ansichtsoptionen')).toBeTruthy();
+
+        // Die Ansichten bleiben sichtbar — sie sind das Haeufige.
+        expect(screen.getByRole('button', { name: 'Monat' })).toBeTruthy();
+    });
+
+    it('laesst sie breit in der Leiste stehen', () => {
+        breiteSetzen(1024);
+        leiste();
+
+        expect(screen.queryByLabelText('Weitere Ansichtsoptionen')).toBeNull();
+        expect(screen.getByRole('button', { name: '24 h' })).toBeTruthy();
+    });
+
+    /**
+     * Der eigentliche Waechter. Der naheliegende Weg waere, beide Fassungen zu
+     * zeichnen und eine per CSS auszublenden — dann staenden zwei bedienbare
+     * Knoepfe desselben Namens im Baum. Ein Screenreader liest sie doppelt,
+     * und jede Suche nach „dem 24-h-Knopf" findet zwei. Das braeche auch die
+     * Tests der vier Produkte, die dieses Paket einbinden.
+     */
+    it('zeigt jeden Schalter genau einmal, egal wie breit', () => {
+        breiteSetzen(390);
+        leiste();
+        expect(screen.getAllByRole('button', { name: '24 h' })).toHaveLength(1);
+
+        cleanup();
+
+        breiteSetzen(1024);
+        leiste();
+        expect(screen.getAllByRole('button', { name: '24 h' })).toHaveLength(1);
+    });
+});
