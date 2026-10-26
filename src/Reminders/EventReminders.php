@@ -4,7 +4,11 @@ namespace Peppermint\Calendar\Reminders;
 
 use Carbon\CarbonImmutable;
 use Closure;
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Model;
 use Peppermint\Calendar\Models\CalendarEvent;
+use Peppermint\Reminders\Abgleich\Abgleich;
+use Peppermint\Reminders\Abgleich\ErinnerungsAnlass;
 use Peppermint\Reminders\Models\Reminder;
 use RuntimeException;
 
@@ -49,7 +53,7 @@ use RuntimeException;
  * of the day instead, in LOCAL time: the column stores UTC, and without the
  * zone "08:00" arrives two hours late in summer.
  */
-class EventReminders
+class EventReminders implements ErinnerungsAnlass
 {
     /** The one source this rule owns. Dedup hangs off it. */
     public const SOURCE_LEAD = 'event:lead';
@@ -62,6 +66,18 @@ class EventReminders
     public function __construct(private ?Closure $recipient = null) {}
 
     /**
+     * Bringt die erzeugten Erinnerungen in Einklang mit den Terminen.
+     *
+     * ## Seit 26.10.2026 nur noch die Haelfte
+     *
+     * Das Anlegen, Verschieben, Abgehaktes-in-Ruhe-Lassen, Wegnehmen und
+     * Zaehlen macht {@see Abgleich} im Erinnerungs-Paket. Diese Klasse
+     * beantwortet nur noch, WELCHE Termine eine Erinnerung verdienen und WANN.
+     *
+     * Grund: Das Aufgaben-Paket hatte dieselben Bauteile ein zweites Mal —
+     * 238 gegen 247 Zeilen, verschieden war genau `momente()`. Pruefrage 3
+     * des Paketvertrags.
+     *
      * @return array<string, int>
      */
     public function reconcile(): array
@@ -76,64 +92,82 @@ class EventReminders
             );
         }
 
-        $bilanz = ['created' => 0, 'moved' => 0, 'removed' => 0, 'skipped' => 0];
-
         if (! config('calendar.reminders.enabled', false)) {
-            return $bilanz;
+            return ['created' => 0, 'moved' => 0, 'removed' => 0, 'skipped' => 0];
         }
 
-        $klasse = $this->eventKlasse();
+        $bilanz = (new Abgleich($this))->fahren();
 
-        // Die Erinnerungen werden je Haeppchen nachgeladen, NICHT ueber eine
-        // Beziehung am Termin-Modell. Zwei Gruende, und beide zaehlen:
-        //
-        // 1. `peppermint/reminders` ist ein `suggest`. Eine Beziehung, deren
-        //    Rumpf eine fehlende Klasse nennt, bricht beim Aufruf — und sie
-        //    stuende dann in einem Modell, das jedes Produkt erbt.
-        // 2. Der Name `reminders` ist in Produkten schon vergeben. Das
-        //    Aufgaben-Paket hat genau daran einmal einen halben Tag verloren:
-        //    Eine Beziehung mit festem Rueckgabetyp laesst sich nicht
-        //    ueberschreiben, und PHP bricht beim LADEN der Klasse ab.
-        $klasse::query()
-            ->where($klasse::column('starts_at'), '>', now())
-            ->chunkById(200, function ($termine) use (&$bilanz, $klasse): void {
-                $vorhandene = Reminder::query()
-                    ->where('source', self::SOURCE_LEAD)
-                    ->where('subject_type', (new $klasse)->getMorphClass())
-                    ->whereIn('subject_id', $termine->modelKeys())
-                    ->get()
-                    ->keyBy('subject_id');
+        return [
+            'created' => $bilanz['angelegt'],
+            'moved' => $bilanz['verschoben'],
+            'removed' => $bilanz['weggenommen'],
+            'skipped' => count($bilanz['ohne_empfaenger']),
+        ];
+    }
 
-                foreach ($termine as $termin) {
-                    $empfaenger = $this->empfaenger($termin);
+    /** @return array<int, string> */
+    public function quellen(): array
+    {
+        return [self::SOURCE_LEAD];
+    }
 
-                    if ($empfaenger === null) {
-                        // Gezaehlt, nicht still uebergangen: Ein Termin ohne
-                        // Empfaenger ist ein Befund, keine Nebensache.
-                        $bilanz['skipped']++;
+    /**
+     * Die Termin-Klasse des PRODUKTS, nicht die des Pakets.
+     *
+     * Daran haengt der Morph-Typ in `subject_type`. Mit der Paket-Klasse
+     * stuende dort ein Modell, das kein Produkt instanziiert — und die Suche
+     * nach den Erinnerungen eines Termins traefe nie. Lautlos.
+     *
+     * @return class-string<CalendarEvent>
+     */
+    public function gegenstandsKlasse(): string
+    {
+        return (string) config('calendar.event_model', CalendarEvent::class);
+    }
 
-                        continue;
-                    }
+    public function gegenstaende()
+    {
+        $klasse = $this->gegenstandsKlasse();
 
-                    $this->abgleichen(
-                        $termin,
-                        $vorhandene->get($termin->getKey()),
-                        $this->moment($termin),
-                        (int) $empfaenger,
-                        $bilanz
-                    );
-                }
-            });
+        // Nur was noch kommt. Ein Termin, der begonnen hat, braucht keine
+        // Vorwarnung mehr — und seine Zeile raeumt der Abgleich weg, weil er
+        // aus dieser Menge gefallen ist. Geloeschte faellt ebenfalls heraus:
+        // Das Paket fuehrt SoftDeletes, der polymorphe Verweis traegt keinen
+        // Fremdschluessel und kaskadiert deshalb nicht.
+        return $klasse::query()->where($klasse::column('starts_at'), '>', now());
+    }
 
-        $this->entferneVerwaiste($bilanz);
+    /**
+     * @return array<string, DateTimeInterface>
+     */
+    public function momente(Model $gegenstand): array
+    {
+        return [self::SOURCE_LEAD => $this->moment($gegenstand)];
+    }
 
-        return $bilanz;
+    public function wortlaut(Model $gegenstand, string $quelle): string
+    {
+        return (string) $gegenstand->field('title');
+    }
+
+    public function empfaenger(Model $gegenstand): int|string|null
+    {
+        if ($this->recipient !== null) {
+            $wert = ($this->recipient)($gegenstand);
+
+            return $wert === null ? null : (int) $wert;
+        }
+
+        $eigner = $gegenstand->field('owner_id');
+
+        return $eigner === null ? null : (int) $eigner;
     }
 
     /**
      * Der Zeitpunkt, an dem erinnert wird.
      */
-    private function moment(CalendarEvent $termin): CarbonImmutable
+    private function moment(Model $termin): CarbonImmutable
     {
         $start = CarbonImmutable::parse($termin->field('starts_at'));
 
@@ -147,101 +181,4 @@ class EventReminders
         return $start->subMinutes((int) config('calendar.reminders.lead_minutes', 15));
     }
 
-    private function abgleichen(CalendarEvent $termin, ?Reminder $vorhanden, CarbonImmutable $zeitpunkt, int $empfaenger, array &$bilanz): void
-    {
-        if ($vorhanden === null) {
-            Reminder::query()->create([
-                'subject_type' => $termin->getMorphClass(),
-                'subject_id' => $termin->getKey(),
-                'user_id' => $empfaenger,
-                'remind_at' => $zeitpunkt,
-                'source' => self::SOURCE_LEAD,
-                'title' => (string) $termin->field('title'),
-            ]);
-
-            $bilanz['created']++;
-
-            return;
-        }
-
-        // Abgehaktes bleibt, wie es ist. Es ist der Nachweis, dass jemand
-        // erinnert wurde und gehandelt hat — daran nachtraeglich zu drehen
-        // hiesse, die Geschichte umzuschreiben.
-        if ($vorhanden->is_dismissed) {
-            return;
-        }
-
-        $verschoben = ! $vorhanden->remind_at->equalTo($zeitpunkt)
-            || (int) $vorhanden->user_id !== $empfaenger;
-
-        if (! $verschoben) {
-            return;
-        }
-
-        $vorhanden->forceFill([
-            'remind_at' => $zeitpunkt,
-            'user_id' => $empfaenger,
-            'title' => (string) $termin->field('title'),
-            // Der Termin ist woanders: Was zum alten Zeitpunkt herausging,
-            // gilt nicht mehr. Ohne das Zuruecksetzen erreicht die
-            // verschobene Erinnerung niemanden.
-            'delivered_at' => null,
-        ])->save();
-
-        $bilanz['moved']++;
-    }
-
-    /**
-     * Zeilen wegnehmen, deren Anlass es nicht mehr gibt.
-     *
-     * Drei Faelle, und alle drei sind echt: Der Termin ist geloescht (das
-     * Paket fuehrt SoftDeletes, der Fremdschluessel fehlt absichtlich und
-     * kaskadiert deshalb nicht), er hat begonnen, oder er hat keinen
-     * Empfaenger mehr.
-     *
-     * Abgehaktes bleibt auch hier stehen — es ist Geschichte, nicht Rueckstand.
-     */
-    private function entferneVerwaiste(array &$bilanz): void
-    {
-        $klasse = $this->eventKlasse();
-
-        $offen = $klasse::query()
-            ->where($klasse::column('starts_at'), '>', now())
-            ->pluck((new $klasse)->getKeyName());
-
-        $bilanz['removed'] = Reminder::query()
-            ->where('source', self::SOURCE_LEAD)
-            ->where('subject_type', (new $klasse)->getMorphClass())
-            ->where('is_dismissed', false)
-            ->whereNotIn('subject_id', $offen)
-            ->delete();
-    }
-
-    private function empfaenger(CalendarEvent $termin): ?int
-    {
-        if ($this->recipient !== null) {
-            $wert = ($this->recipient)($termin);
-
-            return $wert === null ? null : (int) $wert;
-        }
-
-        $eigner = $termin->field('owner_id');
-
-        return $eigner === null ? null : (int) $eigner;
-    }
-
-    /**
-     * Die Termin-Klasse des PRODUKTS, nicht die des Pakets.
-     *
-     * `getMorphClass()` darauf liefert den Typ, der in `subject_type` landet.
-     * Mit der Paket-Klasse stuende dort ein Modell, das kein Produkt
-     * instanziiert — und die Suche nach den Erinnerungen eines Termins traefe
-     * nie. Lautlos.
-     *
-     * @return class-string<CalendarEvent>
-     */
-    private function eventKlasse(): string
-    {
-        return (string) config('calendar.event_model', CalendarEvent::class);
-    }
 }
