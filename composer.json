@@ -17,10 +17,12 @@
     },
     "require-dev": {
         "orchestra/testbench": "^9.0|^10.0|^11.0",
-        "pestphp/pest": "^3.0|^4.0"
+        "pestphp/pest": "^3.0|^4.0",
+        "peppermint/reminders": "dev-main"
     },
     "suggest": {
-        "peppermint/ai-brain-bridge": "Fuer BrainCategorySource und BrainCalendarSources — die gemeinsame Kategorienliste und die Kalender der anderen Systeme ueber den Komm-Layer. Regel 7 des Paketvertrags: nicht erzwungen, damit das Paket fuer sich installierbar bleibt."
+        "peppermint/ai-brain-bridge": "Fuer BrainCategorySource und BrainCalendarSources — die gemeinsame Kategorienliste und die Kalender der anderen Systeme ueber den Komm-Layer. Regel 7 des Paketvertrags: nicht erzwungen, damit das Paket fuer sich installierbar bleibt.",
+        "peppermint/reminders": "Fuer Termin-Erinnerungen: der Abgleich erzeugt echte Erinnerungs-Zeilen, die das Produkt ueber seinen eigenen Zustell-Lauf verschickt. Optional — Regel 7 des Paketvertrags: nicht erzwungen, damit das Paket fuer sich installierbar bleibt."
     },
     "autoload": {
         "psr-4": {
@@ -45,5 +47,11 @@
         }
     },
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/peppermint-digital/reminders.git"
+        }
+    ]
 }

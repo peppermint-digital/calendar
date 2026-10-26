@@ -27,7 +27,15 @@ abstract class TestCase extends Orchestra
 
     protected function getPackageProviders($app): array
     {
-        return [CalendarServiceProvider::class];
+        $anbieter = [CalendarServiceProvider::class];
+
+        // Nur wenn es da ist — `peppermint/reminders` ist ein `suggest`, kein
+        // `require`. Genauso entscheidet es sich im Produkt.
+        if (class_exists(\Peppermint\Reminders\RemindersServiceProvider::class)) {
+            $anbieter[] = \Peppermint\Reminders\RemindersServiceProvider::class;
+        }
+
+        return $anbieter;
     }
 
     protected function defineEnvironment($app): void
@@ -54,6 +62,10 @@ abstract class TestCase extends Orchestra
     protected function defineDatabaseMigrations(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        if (is_dir($erinnerungen = __DIR__.'/../vendor/peppermint/reminders/database/migrations')) {
+            $this->loadMigrationsFrom($erinnerungen);
+        }
 
         // Sonst nur per vendor:publish — in Tests direkt geladen, damit die
         // Kategorienfunktion ueberhaupt pruefbar ist.

@@ -11,6 +11,21 @@ return [
     | Event kinds. Every application registers its own; the package ships none.
     | Each entry is the class name of a Peppermint\Calendar\Kinds\EventKind subclass.
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Event model
+    |--------------------------------------------------------------------------
+    |
+    | The application's own event class. Needed since reminders can hang off an
+    | event (`peppermint/reminders`): a reminder stores WHAT it is about as a
+    | morph type, and that type has to be the class the product actually uses.
+    |
+    | Left at the package class, `subject_type` would name a model no product
+    | instantiates, and looking a reminder up by its event would never match.
+    | Silently — nothing would break, it just would not find anything.
+    */
+    'event_model' => \Peppermint\Calendar\Models\CalendarEvent::class,
+
     'kinds' => [],
 
     /*
@@ -76,6 +91,40 @@ return [
     | already owns a calendar_events table and brings the schema across itself;
     | publish them with the `calendar-migrations` tag to start from a copy.
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Event reminders
+    |--------------------------------------------------------------------------
+    |
+    | A start time on its own tells nobody. These settings drive the
+    | reconciliation that turns one into real reminder rows — the same rows a
+    | person sets by hand, delivered down the same path, dismissible in the
+    | same list. Needs `peppermint/reminders`; without it the reconciliation
+    | refuses rather than half-working.
+    |
+    | `enabled` is false by default ON PURPOSE. Switching it on starts sending
+    | notifications to real people; that is a product's decision, not a
+    | package's, and a package that opts a product in by being installed is a
+    | package that gets uninstalled.
+    */
+    'reminders' => [
+        'enabled' => false,
+
+        // How long before the start the reminder fires. The classic case, and
+        // the only one: a reminder AT the start is a reminder about something
+        // you are already late for.
+        'lead_minutes' => 15,
+
+        // An all-day event starts at midnight, so "15 minutes before" would
+        // land at 23:45 the night before — technically correct and useless.
+        // It gets the morning of the day instead.
+        'all_day_hour' => 8,
+
+        // The zone that hour is meant in. The column stores UTC; without this
+        // "08:00" would arrive two hours late in summer.
+        'timezone' => 'Europe/Berlin',
+    ],
+
     'run_migrations' => true,
 
     /*
