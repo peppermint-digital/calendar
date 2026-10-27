@@ -16,9 +16,20 @@ use Peppermint\Calendar\Sources\ErklaertAbwesenheit;
  * (`hasPluginCapability('calendar')`). Wer sie nicht hat, bekommt sie gar nicht
  * angemeldet — und der Abruf endete in einer `WARNING` je Seitenaufruf.
  *
- * Gemessen am 27.10.2026 im Peppermint Manager: **144 solche Zeilen an einem
- * Tag**, von vier Personen (34/26/9/4), Spitze 52 um 12 Uhr. Keine davon war
- * ein Fehler.
+ * Nachgemessen am 27.10.2026 am Produktionslog des Peppermint Manager —
+ * eine frühere Angabe („144 Zeilen an einem Tag") zählte ZEILEN statt
+ * Vorfällen und warf zwei Tage zusammen:
+ *
+ *   **73 Vorfälle** — 32 am 26.10., 41 am 27.10.
+ *   vier Personen: 34/26/9/4 (userId 5, 16, 10, 9)
+ *   Spitze 26 um 12 Uhr
+ *
+ * Kein Zeitplan, sondern Menschen, die auf ihren Kalender schauen.
+ *
+ * Je Vorfall entstehen ZWEI Zeilen, 146 insgesamt — und das ist der Punkt:
+ * nicht nur eine `WARNING`, sondern davor eine `ERROR` der Brücke („Tool
+ * [list-calendar-bundle-tool] not found"). Halb so viele Vorfälle wie zuerst
+ * gemeldet, aber sie standen im FEHLERlog. Kaputt war keiner davon.
  *
  * ## Was hier geprüft wird, und was nicht
  *
@@ -29,7 +40,7 @@ use Peppermint\Calendar\Sources\ErklaertAbwesenheit;
  * ein Ausfall nicht als Nichtwahl erscheint.
  *
  * Der dritte Punkt ist der eigentliche Zweck: Ein Riegel, der je Seitenaufruf
- * einen Abruf kostet, hätte die 144 nur umbenannt.
+ * einen Abruf kostet, hätte die 73 nur umbenannt.
  */
 beforeEach(function () {
     Cache::flush();
@@ -109,7 +120,7 @@ it('bietet sie an, sobald die Freischaltung da ist', function () {
     expect($quelle->isAvailable())->toBeTrue();
 });
 
-it('fragt die Freischaltung je Person nur EINMAL — sonst waeren die 144 nur umbenannt', function () {
+it('fragt die Freischaltung je Person nur EINMAL — sonst waeren die 73 nur umbenannt', function () {
     $freigabe = freigabeMitWerkzeugen(['list-tasks-tool']);
     $quelle = quelleMitFreigabe($freigabe);
 

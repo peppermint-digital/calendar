@@ -17,13 +17,22 @@ namespace Peppermint\Calendar\Sources;
  * rätseln, ob er leer ist, ob etwas kaputt ist oder ob er ihn nie verbunden
  * hat.
  *
- * Vorher stand an dieser Stelle eine `WARNING` im Fehlerlog, bei jedem
- * Seitenaufruf — gemessen am 27.10.2026 im Peppermint Manager: 144 an einem
- * Tag, von vier Personen, Verteilung nach Arbeitstag mit Spitze 52 um 12 Uhr.
- * **Keine dieser Zeilen war ein Fehler.** Eine fehlende Freischaltung ist eine
- * Nichtwahl, und die gehört nicht ins Log, wo sie niemanden erreicht, den sie
- * betrifft — sondern leise in die Oberfläche, für die Person, die sie treffen
- * kann.
+ * Vorher landete die fehlende Freischaltung im Fehlerlog, bei jedem
+ * Seitenaufruf. Nachgemessen am 27.10.2026 am Produktionslog des Peppermint
+ * Manager:
+ *
+ *   **73 Vorfälle** — 32 am 26.10., 41 am 27.10.
+ *   vier Personen: 34/26/9/4 (userId 5, 16, 10, 9)
+ *   Spitze 26 um 12 Uhr
+ *   146 Zeilen, weil je Vorfall ZWEI entstehen
+ *
+ * Die zwei Zeilen sind der Punkt: nicht nur eine `WARNING`, sondern davor eine
+ * `ERROR` der Brücke („Tool [list-calendar-bundle-tool] not found").
+ *
+ * **Kaputt war keiner dieser Vorfälle.** Eine fehlende Freischaltung ist eine
+ * Nichtwahl, und die gehört nicht ins Fehlerlog — dort erreicht sie niemanden,
+ * den sie betrifft, und verdeckt die echten Fehler. Sie gehört leise in die
+ * Oberfläche, für die Person, die sie treffen kann.
  *
  * ## Freiwillig, nicht Pflicht
  *

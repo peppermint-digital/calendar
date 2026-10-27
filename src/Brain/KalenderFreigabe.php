@@ -14,12 +14,22 @@ use Throwable;
  *
  * Die Kalender-Werkzeuge der Nabe hängen an einer persönlichen Freischaltung
  * (`hasPluginCapability('calendar')`). Wer sie nicht hat, bekommt sie gar nicht
- * angemeldet — und der Abruf endete in einer `WARNING` je Seitenaufruf.
+ * angemeldet — und der Abruf endete je Seitenaufruf im Fehlerlog.
  *
- * Gemessen am 27.10.2026 im Peppermint Manager: **144 solche Zeilen an einem
- * Tag**, von vier Personen (34/26/9/4), Verteilung nach Arbeitstag mit Spitze
- * 52 um 12 Uhr. Kein Zeitplan, sondern Menschen, die auf ihren Kalender
- * schauen. Keine dieser Zeilen war ein Fehler.
+ * Nachgemessen am 27.10.2026 am Produktionslog des Peppermint Manager —
+ * eine frühere Angabe („144 Zeilen an einem Tag") zählte ZEILEN statt
+ * Vorfällen und warf zwei Tage zusammen:
+ *
+ *   **73 Vorfälle** — 32 am 26.10., 41 am 27.10.
+ *   vier Personen: 34/26/9/4 (userId 5, 16, 10, 9)
+ *   Spitze 26 um 12 Uhr
+ *
+ * Kein Zeitplan, sondern Menschen, die auf ihren Kalender schauen.
+ *
+ * Je Vorfall entstehen ZWEI Zeilen, 146 insgesamt — und das ist der Punkt:
+ * nicht nur eine `WARNING`, sondern davor eine `ERROR` der Brücke („Tool
+ * [list-calendar-bundle-tool] not found"). Halb so viele Vorfälle wie zuerst
+ * gemeldet, aber sie standen im FEHLERlog. Kaputt war keiner davon.
  *
  * ## Gefragt wird die Werkzeugliste, nicht ein eigenes Werkzeug
  *
@@ -34,7 +44,7 @@ use Throwable;
  * ## Der Zwischenspeicher, und warum er der eigentliche Zweck ist
  *
  * **60 Sekunden je Person.** Ein Riegel, der je Seitenaufruf einen Netzweg
- * kostet, hätte die 144 nur umbenannt — darum geht es hier überhaupt.
+ * kostet, hätte die 73 nur umbenannt — darum geht es hier überhaupt.
  *
  * 60 und nicht 300: Nach einer gerade erteilten Freischaltung soll die Quelle
  * bald erscheinen. Mit fünf Minuten sah die Person noch minutenlang „nicht
