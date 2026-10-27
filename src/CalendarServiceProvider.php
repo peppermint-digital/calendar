@@ -11,6 +11,8 @@ use Peppermint\Calendar\Console\SeedWorkCategoriesCommand;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
 use Peppermint\Calendar\Sources\EventSource;
+use Peppermint\Calendar\Brain\KalenderFreigabe;
+use Peppermint\Calendar\Sources\BrainPrivateEventSource;
 use Peppermint\Calendar\Sources\EventSourceRegistry;
 
 class CalendarServiceProvider extends ServiceProvider
@@ -38,6 +40,27 @@ class CalendarServiceProvider extends ServiceProvider
 
             return $registry;
         });
+
+        /*
+        | Die Quelle fuer die privaten Termine aus der Nabe — gebunden, damit
+        | die WACHE aus der Konfiguration kommt.
+        |
+        | Ohne diese Bindung wuerde der Behaelter die Klasse selbst bauen und
+        | den Vorgabewert `null` fuer `$guard` nehmen. Das stimmt in Manager
+        | und CRM und ist in der Verwaltung falsch — sie fuehrt ihre Menschen
+        | auf einer anderen Wache. Genau dieser Unterschied war bei
+        | `BrainCalendarSources` schon einmal der Grund fuer eine dritte Kopie.
+        |
+        | Ein Produkt traegt deshalb nur `BrainPrivateEventSource::class` in
+        | `calendar.sources` ein und braucht keine Zeile Verdrahtung.
+        */
+        $this->app->singleton(KalenderFreigabe::class, fn ($app): KalenderFreigabe => new KalenderFreigabe(
+            $app['config']->get('calendar.brain_private_events.guard'),
+        ));
+
+        $this->app->singleton(BrainPrivateEventSource::class, fn ($app): BrainPrivateEventSource => new BrainPrivateEventSource(
+            $app->make(KalenderFreigabe::class),
+        ));
 
         $this->app->singleton(EventSourceRegistry::class, function ($app): EventSourceRegistry {
             $registry = new EventSourceRegistry;

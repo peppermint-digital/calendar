@@ -41,4 +41,23 @@ class BrainBridgeMissing extends RuntimeException
             .'`config/calendar.sources` von Hand einstellen.'
         );
     }
+    /**
+     * Die Quelle fuer die privaten Termine aus der Nabe.
+     *
+     * Eigene Fabrik und nicht `forSources()`: Das sind zwei verschiedene
+     * Dinge, und die Meldung soll sagen, welches gemeint ist.
+     * `BrainCalendarSources` holt die Kalender der anderen PRODUKTE ueber das
+     * Faehigkeits-Register; diese Quelle holt die PRIVATEN Termine der
+     * angemeldeten Person aus der Nabe selbst. Wer die falsche Meldung
+     * bekommt, schaltet die falsche Sache ab.
+     */
+    public static function forPrivateEvents(): self
+    {
+        return new self(
+            'Die Quelle `BrainPrivateEventSource` braucht `peppermint/ai-brain-bridge`. '
+            .'Entweder installieren (`composer require peppermint/ai-brain-bridge`) oder in '
+            .'`config/calendar.php` unter `brain_private_events.enabled` auf `false` stellen.'
+        );
+    }
+
 }

@@ -45,6 +45,44 @@ return [
     'sources' => [],
 
     /*
+    | Die PRIVATEN Termine der angemeldeten Person aus der Nabe (AI Brain).
+    |
+    | Nicht zu verwechseln mit `sources` oben: Dort stehen die Kalender der
+    | anderen PRODUKTE. Hier geht es um den persoenlichen Kalender eines
+    | Menschen in der Nabe, der neben seinen dienstlichen Terminen erscheint.
+    |
+    | Standard AN, und das ist Absicht: Der eigentliche Schalter ist die
+    | Freischaltung JE PERSON in der Nabe
+    | (`hasPluginCapability('calendar')`). Wer sie nicht hat, sieht nichts
+    | ausser einem leisen Hinweis — niemandem wird etwas aufgedrueckt, nur weil
+    | das Produkt die Quelle anbietet.
+    |
+    | `enabled => false` schaltet sie fuer ein ganzes Produkt ab. Dann
+    | verschwindet auch der Hinweis: Wer eine Quelle nicht einschalten kann,
+    | muss nicht erfahren, dass es sie gibt.
+    |
+    | Braucht `peppermint/ai-brain-bridge` (suggest, Regel 7). Fehlt die
+    | Bruecke, ist die Quelle still nicht verfuegbar und meldet sich erst, wenn
+    | jemand sie ausdruecklich benutzt — siehe
+    | {@see \Peppermint\Calendar\Exceptions\BrainBridgeMissing}.
+    */
+    'brain_private_events' => [
+        'enabled' => filter_var(env('CALENDAR_BRAIN_PRIVATE_EVENTS', true), FILTER_VALIDATE_BOOL),
+        'label' => env('CALENDAR_BRAIN_PRIVATE_EVENTS_LABEL', 'AI Brain (privat)'),
+        'colour' => env('CALENDAR_BRAIN_PRIVATE_EVENTS_COLOUR', '#8b5cf6'),
+
+        /*
+        | Die Wache, auf der die Person angemeldet ist.
+        |
+        | `null` heisst „die Vorgabe-Wache". Die Verwaltung fuehrt ihre
+        | Menschen auf einer anderen — genau dieser Unterschied war bei
+        | `BrainCalendarSources` schon einmal der Grund fuer eine dritte
+        | Kopie, und er ist jetzt ein Parameter.
+        */
+        'guard' => env('CALENDAR_BRAIN_PRIVATE_EVENTS_GUARD'),
+    ],
+
+    /*
     | Table names, for adopting tables that already exist under other names.
     */
     'tables' => [
