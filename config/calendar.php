@@ -171,6 +171,26 @@ return [
     | package's, and a package that opts a product in by being installed is a
     | package that gets uninstalled.
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Die abonnierten Kalender aus der Nabe
+    |--------------------------------------------------------------------------
+    |
+    | Ein Abo (Outlook, Google, ICS) lebt seit dem 29.10.2026 in AI Brain und
+    | nicht mehr im Produkt — es gehoert dem Menschen und nicht einem System.
+    | Die Produkte ZEIGEN es an, ueber `BrainSubscribedEventSource` in
+    | `calendar.sources`.
+    |
+    | `label` und `colour` sind Anzeige und gehoeren deshalb dem Produkt.
+    | `enabled` ist der Schalter fuer das ganze System — eine Anwendung ohne
+    | Nabe hat davon nichts.
+    */
+    'brain_subscriptions' => [
+        'enabled' => (bool) env('CALENDAR_BRAIN_SUBSCRIPTIONS', true),
+        'label' => 'Abonnierte Kalender',
+        'colour' => '#0ea5e9',
+    ],
+
     'reminders' => [
         'enabled' => false,
 

@@ -14,6 +14,7 @@ use Peppermint\Calendar\Kinds\EventKindRegistry;
 use Peppermint\Calendar\Sources\EventSource;
 use Peppermint\Calendar\Brain\KalenderFreigabe;
 use Peppermint\Calendar\Sources\BrainPrivateEventSource;
+use Peppermint\Calendar\Sources\BrainSubscribedEventSource;
 use Peppermint\Calendar\Sources\EventSourceRegistry;
 
 class CalendarServiceProvider extends ServiceProvider
@@ -60,6 +61,21 @@ class CalendarServiceProvider extends ServiceProvider
         ));
 
         $this->app->singleton(BrainPrivateEventSource::class, fn ($app): BrainPrivateEventSource => new BrainPrivateEventSource(
+            $app->make(KalenderFreigabe::class),
+        ));
+
+        /*
+        | Die abonnierten fremden Kalender aus der Nabe (Bug #1081).
+        |
+        | Aus demselben Grund gebunden wie die Quelle darueber: Ohne Bindung
+        | baut der Behaelter die Klasse selbst und nimmt die Vorgabe `null`
+        | fuer die Wache — richtig in Manager und CRM, falsch in der
+        | Verwaltung, die ihre Menschen auf einer anderen Wache fuehrt.
+        |
+        | Ein Produkt traegt deshalb nur `BrainSubscribedEventSource::class` in
+        | `calendar.sources` ein und braucht keine Zeile Verdrahtung.
+        */
+        $this->app->singleton(BrainSubscribedEventSource::class, fn ($app): BrainSubscribedEventSource => new BrainSubscribedEventSource(
             $app->make(KalenderFreigabe::class),
         ));
 
