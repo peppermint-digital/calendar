@@ -243,3 +243,45 @@ it('laesst die Liste leer, wenn das fremde Modell niemanden liefert', function (
 
     expect(app(EventDetailPresenter::class)->present($termin)['attendees'])->toBe([]);
 });
+
+it('laesst „pending" heraus, auch wenn es als Enum kommt', function () {
+    // „eingeladen und noch nicht geantwortet" ist der Normalfall und sagt
+    // nichts. Ueber das produkteigene Modell, weil nur DAS castet — eine
+    // Probe am Paket-Modell traefe den Enum-Pfad nie und waere gruen, ohne
+    // etwas zu pruefen.
+    $termin = TerminMitFremdenTeilnehmern::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Noch offen',
+        'starts_at' => '2026-09-08 09:00',
+        'ends_at' => '2026-09-08 10:00',
+    ]);
+
+    FremderTeilnehmer::create([
+        'event_id' => $termin->id,
+        'user_id' => null,
+        'name' => 'Bert',
+        'status' => 'pending',
+    ]);
+
+    expect(app(EventDetailPresenter::class)->present($termin)['attendees'][0]['status'])->toBeNull();
+});
+
+it('liest eine vorlaeufige Antwort, die als Enum kommt', function () {
+    $termin = TerminMitFremdenTeilnehmern::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'Vielleicht',
+        'starts_at' => '2026-09-08 09:00',
+        'ends_at' => '2026-09-08 10:00',
+    ]);
+
+    FremderTeilnehmer::create([
+        'event_id' => $termin->id,
+        'user_id' => null,
+        'name' => 'Clara',
+        'status' => 'tentative',
+    ]);
+
+    expect(app(EventDetailPresenter::class)->present($termin)['attendees'][0]['status'])->toBe('tentative');
+});

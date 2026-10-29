@@ -130,6 +130,32 @@ final class EventDetailPresenter
         return app(EventCategories::class)->slugsOf($event);
     }
 
+    /**
+     * Die Antwort eines Teilnehmers — als Zeichenkette, oder null.
+     *
+     * ## Warum hier ein Enum ankommen kann
+     *
+     * Die Spalte ist eine Zeichenkette, aber ein Produkt darf sie casten, und
+     * der Peppermint Manager tut das (`App\AttendeeStatus`). Bis zum
+     * 29.10.2026 stand hier ein `in_array(..., true)` gegen drei Strings —
+     * gegen ein Enum ist das IMMER falsch. Folge: In der Einzelansicht des
+     * Managers stand hinter keinem Teilnehmer eine Antwort, auch wenn er
+     * zugesagt hatte. Kein Fehler, keine leere Liste, nichts, was auffaellt.
+     *
+     * Gefunden beim Beheben von Bug #1110 („kein Zusage-Knopf") — dasselbe
+     * Thema von der anderen Seite: Man konnte nicht antworten UND man sah die
+     * Antworten nicht.
+     *
+     * `pending` faellt weiter heraus: „eingeladen und noch nicht geantwortet"
+     * ist der Normalfall und sagt nichts.
+     */
+    private function antwort(mixed $status): ?string
+    {
+        $wert = $status instanceof \BackedEnum ? $status->value : $status;
+
+        return in_array($wert, ['accepted', 'declined', 'tentative'], true) ? (string) $wert : null;
+    }
+
     private function attendees(CalendarEvent $event): array
     {
         return $event->attendees()
@@ -156,9 +182,7 @@ final class EventDetailPresenter
                 // `pending` ist der Vorgabewert der Spalte und sagt nichts —
                 // „eingeladen und noch nicht geantwortet" ist der Normalfall.
                 // Angezeigt wird nur eine echte Antwort.
-                'status' => in_array($person->status, ['accepted', 'declined', 'tentative'], true)
-                    ? $person->status
-                    : null,
+                'status' => $this->antwort($person->status),
                 // Die Adresse zum Namen. Beim externen Gast ist sie haeufig
                 // das Einzige, was es gibt — dann steht sie schon oben als
                 // `name`, und die Darstellung laesst sie hier weg, statt sie

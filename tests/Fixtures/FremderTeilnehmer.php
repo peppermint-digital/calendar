@@ -25,8 +25,41 @@ class FremderTeilnehmer extends Model
 
     protected $guarded = [];
 
+    /**
+     * Die Antwort als ENUM — auch das macht der Manager so
+     * (`App\AttendeeStatus`).
+     *
+     * Dazugekommen am 29.10.2026, und es hat sofort etwas gefunden: Der
+     * Presenter pruefte die Antwort mit `in_array(..., true)` gegen drei
+     * Strings, und gegen ein Enum ist das IMMER falsch. In der Einzelansicht
+     * des Managers stand deshalb hinter keinem Teilnehmer eine Antwort, auch
+     * wenn er zugesagt hatte. Kein Fehler, keine leere Liste — nur eine
+     * Angabe, die nie erscheint.
+     *
+     * Die Attrappe gehoert also nicht nur dem TypeError von #8307, sondern
+     * jedem Unterschied, den ein produkteigenes Modell mitbringt. Das ist der
+     * Grund, warum sie das Paket NICHT erweitert.
+     */
+    protected $casts = [
+        'status' => FremdeAntwort::class,
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(DemoUser::class, 'user_id');
     }
+}
+
+/**
+ * Das Vokabular, mit dem ein Produkt die Antwortspalte castet.
+ *
+ * Das Paket hat keines und soll keines haben — die Worte gehoeren dem
+ * Produkt. Hier steht es nur, damit die Attrappe eines haben kann.
+ */
+enum FremdeAntwort: string
+{
+    case Pending = 'pending';
+    case Accepted = 'accepted';
+    case Declined = 'declined';
+    case Tentative = 'tentative';
 }
