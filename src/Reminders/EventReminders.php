@@ -284,23 +284,24 @@ class EventReminders implements AnlassMitEmpfaengern
 
     /**
      * Der Zeitpunkt, an dem erinnert wird.
+     *
+     * Die Rechnung selbst liegt in {@see LeadMoment} — sie wird seit dem
+     * 29.10.2026 von einem zweiten Anlass gebraucht (abonnierte fremde
+     * Kalender im Manager, Bug #1081), und dort stand sie prompt ein zweites
+     * Mal. Mit ihr ist auch die Zeitzonen-Falle an EINER Stelle behoben; die
+     * Begruendung steht im Kopf jener Klasse.
+     *
+     * Der Vorlauf gilt bei einem Ganztagstermin fuer niemanden: Es gibt keine
+     * Uhrzeit, von der er abgezogen werden koennte. Was je Person bleibt, ist
+     * die Frage, OB erinnert wird.
      */
     private function moment(Model $termin, int $minuten): CarbonImmutable
     {
-        $start = CarbonImmutable::parse($termin->field('starts_at'));
-
-        if ((bool) $termin->field('all_day')) {
-            // Der Vorlauf gilt hier NICHT, und zwar fuer niemanden: Es gibt
-            // keine Uhrzeit, von der er abgezogen werden koennte. Was je
-            // Person bleibt, ist die Frage, OB erinnert wird — die Stunde ist
-            // eine Produkteinstellung.
-            $zone = (string) config('calendar.reminders.timezone', 'Europe/Berlin');
-            $stunde = (int) config('calendar.reminders.all_day_hour', 8);
-
-            return $start->setTimezone($zone)->startOfDay()->addHours($stunde)->utc();
-        }
-
-        return $start->subMinutes($minuten);
+        return LeadMoment::fuer(
+            $termin->field('starts_at'),
+            (bool) $termin->field('all_day'),
+            $minuten,
+        );
     }
 
     private function vorlauf(): ReminderLead
