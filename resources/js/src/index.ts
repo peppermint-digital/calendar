@@ -6,6 +6,8 @@ export { CalendarGrid } from './CalendarGrid';
 export type { CalendarEntry, CalendarGridHandle, CalendarGridProps, CalendarViewName, EntryChange } from './CalendarGrid';
 // Die Filtertafel: ein Knopf, dahinter ALLE Filter dieses Kalenders. Aussehen
 // aus dem Paket, Inhalt als Daten vom Produkt.
+export { CalendarUserSwitcher } from './CalendarUserSwitcher';
+export type { CalendarUserSwitcherProps, SwitchableUser } from './CalendarUserSwitcher';
 export { CalendarFilterPanel } from './CalendarFilterPanel';
 export type { CalendarFilterPanelLabels, CalendarFilterPanelProps, FilterGroup, FilterOption, FilterToggle } from './CalendarFilterPanel';
 // Die Filterleiste: Arten und Fremdquellen — was alle vier Systeme haben.
