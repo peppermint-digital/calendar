@@ -35,14 +35,6 @@ final class AgendaAssembler
 {
     public function __construct(
         private readonly EventSourceRegistry $sources,
-        /**
-         * Wer was sehen darf — in den Worten des Produkts.
-         *
-         * Ohne Bindung gilt `visibleTo`: Eigentum oder Teilnahme. Siehe
-         * {@see AgendaSichtbarkeit} fuer den Grund, warum das ueberschreibbar
-         * sein muss und warum nicht per Unterklasse.
-         */
-        private readonly ?AgendaSichtbarkeit $sichtbarkeit = null,
     ) {}
 
     /**
@@ -234,19 +226,36 @@ final class AgendaAssembler
      * Agenda breiter machen will, wuerde dort Rechte mitverschieben — und zwar
      * lautlos.
      *
-     * Deshalb ein eigener Vertrag ({@see AgendaSichtbarkeit}) und kein
-     * Konfigurationswert: Ein Scope-Name in der Konfiguration faellt bei einem
-     * Tippfehler still auf die Vorgabe zurueck, eine fehlende Bindung an eine
-     * Schnittstelle nicht.
+     * ## Hier stand am 29.10.2026 fuer drei Stunden ein Vertrag, und er ist weg
+     *
+     * `AgendaSichtbarkeit` (v0.92.0) war als optionale Abhaengigkeit gedacht,
+     * damit der Manager seine breite Regel einhaengen kann. Gebaut habe ich sie
+     * in der Annahme, der Manager-Agenda-Controller wechsle auf diesen
+     * Zusammensteller.
+     *
+     * Er wechselt nicht, und das ist gemessen: Seine Seite braucht an jedem
+     * Termin Felder, die es hier nicht gibt und nicht geben soll — Projekt,
+     * Aufgabe, Kategorie, den Namen der Person fuer die Team-Ansicht,
+     * Aufgabenstatus. Ein Wechsel haette entweder diese Felder ins Paket
+     * gezogen (ein Kalender-Paket, das Aufgabenstatus kennt) oder sie per
+     * zweiter Abfrage nachgeholt. Beides schlechter als der Zustand vorher.
+     *
+     * Damit hatte der Vertrag keinen Abrufer — und eine unbenutzte
+     * Schnittstelle in einem geteilten Paket kostet dauerhaft: Jemand liest sie
+     * als Angebot und baut darauf. Entfernt in v0.95.0.
+     *
+     * **Wer sie wieder braucht**, baut sie mit Abrufer im selben Schritt. Die
+     * Form war richtig und steht zum Nachlesen in v0.92.0 bis v0.94.0: ein
+     * Vertrag als optionale Abhaengigkeit, keine Unterklasse (diese Klasse ist
+     * `final`, weil wer die ZEILEN-Form ueberschreiben kann, die Liste im
+     * Frontend von ihrem Server entkoppelt), und kein Konfigurationswert mit
+     * einem Scope-Namen (der faellt bei einem Tippfehler still auf die Vorgabe
+     * zurueck).
      *
      * @return \Illuminate\Database\Eloquent\Builder<CalendarEvent>
      */
     private function eigeneAbfrage(int $userId)
     {
-        if ($this->sichtbarkeit !== null) {
-            return $this->sichtbarkeit->fuer($userId);
-        }
-
         $klasse = $this->terminKlasse();
 
         return $klasse::query()->visibleTo($userId);
