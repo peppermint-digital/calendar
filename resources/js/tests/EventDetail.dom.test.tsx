@@ -106,6 +106,22 @@ describe('die Felder', () => {
         expect(screen.getByText('Bert')).toBeTruthy();
     });
 
+    it('uebersetzt die bekannten Antwort-Schluessel', () => {
+        // Bis zum 29.10.2026 stand hier der ROHE Schluessel — ein englisches
+        // Wort aus der Datenbank, mitten in einer deutschen Maske.
+        render(<EventDetail event={{ ...TERMIN, attendees: [{ name: 'Anna', status: 'accepted' }] }} />);
+
+        expect(screen.getByText('Zugesagt')).toBeTruthy();
+        expect(screen.queryByText('accepted')).toBeNull();
+    });
+
+    it('laesst ein unbekanntes Antwortwort durch, statt es zu verschlucken', () => {
+        // Ein Produkt mit eigenem Vokabular soll sein Wort sehen.
+        render(<EventDetail event={{ ...TERMIN, attendees: [{ name: 'Anna', status: 'wartet noch' }] }} />);
+
+        expect(screen.getByText('wartet noch')).toBeTruthy();
+    });
+
     it('zeigt Kategorien', () => {
         render(<EventDetail event={{ ...TERMIN, categories: ['Kundentermin', 'Abrechenbar'] }} />);
 
@@ -373,5 +389,74 @@ describe('Mailadresse der Teilnehmer (#8307)', () => {
         );
 
         expect(screen.getByText('Anna Beispiel')).toBeTruthy();
+    });
+});
+
+/*
+| Die eigene Antwort auf eine Einladung (Bug #1110 im Peppermint Manager).
+|
+| Vorgeschichte: Den Zusage-Knopf gab es dort nur im Bearbeiten-Dialog, und
+| dort rendert er wegen einer fehlenden Prop fuer NIEMANDEN. Die
+| Benachrichtigung verlinkt aber auf die Detailseite — wer eingeladen wurde,
+| landete also zuverlaessig auf der einen Seite, auf der man nicht zusagen
+| kann, und bekam nur „Bearbeiten" angeboten.
+*/
+describe('die eigene Teilnahme', () => {
+    it('zeigt nichts, solange das Produkt keine Antwort reicht', () => {
+        render(<EventDetail event={TERMIN} />);
+
+        expect(screen.queryByText('Deine Teilnahme')).toBeNull();
+    });
+
+    it('zeigt nichts ohne Weg, daran etwas zu aendern', () => {
+        // Eine Anzeige „noch offen" ohne Knopf ist genau der Zustand, aus dem
+        // der Fehler entstand.
+        render(<EventDetail event={TERMIN} myAttendance={{ status: 'pending' }} />);
+
+        expect(screen.queryByText('Deine Teilnahme')).toBeNull();
+    });
+
+    it('bietet beides an, solange nichts geantwortet ist', () => {
+        render(<EventDetail event={TERMIN} myAttendance={{ status: 'pending' }} onRespond={() => {}} />);
+
+        expect(screen.getByText('Noch offen')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Zusagen' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Absagen' })).toBeTruthy();
+    });
+
+    it('blendet den Knopf des schon gesetzten Zustands aus', () => {
+        render(<EventDetail event={TERMIN} myAttendance={{ status: 'accepted' }} onRespond={() => {}} />);
+
+        expect(screen.queryByRole('button', { name: 'Zusagen' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'Absagen' })).toBeTruthy();
+    });
+
+    it('meldet die NEUE Antwort, nicht einen Umschalt-Befehl', () => {
+        const gerufen: string[] = [];
+
+        render(
+            <EventDetail
+                event={TERMIN}
+                myAttendance={{ status: 'pending' }}
+                onRespond={(status) => gerufen.push(status)}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Zusagen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Absagen' }));
+
+        expect(gerufen).toEqual(['accepted', 'declined']);
+    });
+
+    it('fuehrt KEINEN eigenen Zustand ueber die Antwort', () => {
+        // Zwei Staende derselben Sache laufen auseinander — hier waere das ein
+        // Abzeichen, das etwas anderes sagt als die Datenbank. Die Seite kommt
+        // mit frischen Props zurueck, und bis dahin steht das Alte da.
+        render(<EventDetail event={TERMIN} myAttendance={{ status: 'pending' }} onRespond={() => {}} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Zusagen' }));
+
+        expect(screen.getByText('Noch offen')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Zusagen' })).toBeTruthy();
     });
 });

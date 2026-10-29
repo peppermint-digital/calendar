@@ -56,3 +56,9 @@ export { eventFormRules, weekdayOf } from './rules';
 export type { EventFormRules } from './rules';
 export { emptyDraft, emptyRecurrence, FIELD, WEEKDAYS } from './types';
 export type { CategoryMode, EventCategory, EventDraft, EventKind, FieldKey, Frequency, RecurrenceDraft, Weekday } from './types';
+// Der Vorlauf je Person — „keine / 15 / 30 Minuten vor dem Termin".
+// Gepflegt an EINER Stelle, im AI Brain neben der Benachrichtigungs-Matrix;
+// dieselbe Maske stellt dort den eigenen Vorlauf und den jedes angebundenen
+// Produkts (#520).
+export { ReminderLeadSetting } from './ReminderLeadSetting';
+export type { ReminderLeadSettingLabels, ReminderLeadSettingProps, ReminderLeadState } from './ReminderLeadSetting';

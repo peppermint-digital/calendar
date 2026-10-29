@@ -64,6 +64,19 @@ export type EventDetailLabels = {
     privateHint: string;
     /** 135 → „2 Std. 15 Min." */
     formatDuration: (minutes: number) => string;
+    /** Über den Zu-/Absage-Knöpfen. */
+    yourAttendance: string;
+    accept: string;
+    decline: string;
+    /**
+     * `accepted` → „Zugesagt".
+     *
+     * Freigestellt, aber mit einer Vorgabe, die die vier bekannten Schlüssel
+     * übersetzt und alles andere durchlässt. Bis zum 29.10.2026 stand in der
+     * Teilnehmerliste der ROHE Schlüssel — ein englisches Wort aus der
+     * Datenbank, mitten in einer deutschen Maske.
+     */
+    formatStatus: (status: string) => string;
 };
 
 /** 135 → „2 Std. 15 Min."; 60 → „1 Std."; 45 → „45 Min." */
@@ -77,6 +90,24 @@ function deutscheDauer(minuten: number): string {
     return `${stunden} Std. ${rest} Min.`;
 }
 
+/** `accepted` → „Zugesagt"; unbekanntes bleibt, wie es ist. */
+function deutscheAntwort(status: string): string {
+    switch (status) {
+        case 'accepted':
+            return 'Zugesagt';
+        case 'declined':
+            return 'Abgesagt';
+        case 'tentative':
+            return 'Vielleicht';
+        case 'pending':
+            return 'Noch offen';
+        default:
+            // Durchlassen und nicht verschlucken: Ein Produkt mit eigenem
+            // Vokabular soll sein Wort sehen, nicht ein leeres Feld.
+            return status;
+    }
+}
+
 const DETAIL_DEFAULTS: EventDetailLabels = {
     when: 'Wann',
     where: 'Wo',
@@ -88,6 +119,10 @@ const DETAIL_DEFAULTS: EventDetailLabels = {
     duration: 'Dauer',
     privateHint: 'Privat',
     formatDuration: deutscheDauer,
+    yourAttendance: 'Deine Teilnahme',
+    accept: 'Zusagen',
+    decline: 'Absagen',
+    formatStatus: deutscheAntwort,
 };
 
 export interface EventDetailProps {
@@ -122,6 +157,29 @@ export interface EventDetailProps {
      * und zwei Rechnungen laufen auseinander.
      */
     onCategoriesChange?: (slugs: string[]) => void;
+    /**
+     * Die eigene Antwort auf diese Einladung — wenn die angemeldete Person
+     * eingeladen ist.
+     *
+     * Nur das Produkt weiss, wer angemeldet ist und welche Teilnehmerzeile ihr
+     * gehört; der Kern bekommt die Antwort, er ermittelt sie nicht. Dieselbe
+     * Haltung wie bei `availableCategories`.
+     *
+     * Zusammen mit `onRespond` entstehen die Knöpfe. Ohne beides passiert
+     * nichts — eine Anzeige „noch offen" ohne Weg, daran etwas zu ändern,
+     * wäre genau der Zustand, aus dem Bug #1110 entstand.
+     */
+    myAttendance?: { status: string };
+    /**
+     * Wird mit der NEUEN Antwort gerufen, nicht mit einem Umschalt-Befehl.
+     *
+     * Das Produkt schickt sie weiter (im Manager `POST /attendee/{id}/accept`)
+     * und liefert die Seite mit frischen Props zurück — die Komponente führt
+     * keinen eigenen Zustand darüber. Zwei Stände derselben Sache laufen
+     * auseinander, und hier wäre das ein Abzeichen, das etwas anderes sagt als
+     * die Datenbank.
+     */
+    onRespond?: (status: 'accepted' | 'declined') => void;
 }
 
 /** `2026-09-08` → `Di., 08. September 2026`. */
@@ -167,6 +225,8 @@ export function EventDetail({
     className = '',
     availableCategories,
     onCategoriesChange,
+    myAttendance,
+    onRespond,
 }: EventDetailProps) {
     const beschriftung = { ...DETAIL_DEFAULTS, ...labels };
 
@@ -315,10 +375,63 @@ export function EventDetail({
                                             <span className="ml-1 text-muted-foreground">{person.email}</span>
                                         )}
                                     {person.status !== null && person.status !== undefined && person.status !== '' && (
-                                        <span className="ml-1 text-muted-foreground">{person.status}</span>
+                                        <span className="ml-1 text-muted-foreground">
+                                            {beschriftung.formatStatus(person.status)}
+                                        </span>
                                     )}
                                 </span>
                             ))}
+                        </dd>
+                    </div>
+                )}
+
+                {/*
+                    Die eigene Antwort — und zwar HIER, auf der Leseseite.
+
+                    Bis zum 29.10.2026 gab es den Zusage-Knopf im Manager nur
+                    im Bearbeiten-Dialog, und dort rendert er wegen einer
+                    fehlenden Prop fuer niemanden. Die Benachrichtigung
+                    verlinkt aber auf die Detailseite: Wer eingeladen wurde,
+                    landete also zuverlaessig auf der einen Seite ohne
+                    Moeglichkeit zuzusagen, und das Einzige, was ihm angeboten
+                    wurde, war „Bearbeiten" (Bug #1110).
+
+                    Hier und nicht im Bearbeiten-Dialog ist auch sachlich
+                    richtig: Zusagen ist keine Aenderung am Termin, sondern
+                    eine Antwort darauf. Wer nur antworten will, soll den
+                    Termin nicht bearbeiten muessen — und wer ihn gar nicht
+                    bearbeiten DARF, koennte sonst nie zusagen.
+
+                    Der schon gesetzte Zustand blendet seinen eigenen Knopf
+                    aus: Wer zugesagt hat, sieht nur noch „Absagen". Dieselbe
+                    Regel wie in der Manager-Komponente, aus der dieser Teil
+                    kommt.
+                */}
+                {myAttendance !== undefined && onRespond !== undefined && (
+                    <div>
+                        <dt className="text-xs font-medium text-muted-foreground">{beschriftung.yourAttendance}</dt>
+                        <dd className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md border px-1.5 py-0.5 text-xs">
+                                {beschriftung.formatStatus(myAttendance.status)}
+                            </span>
+                            {myAttendance.status !== 'accepted' && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRespond('accepted')}
+                                    className="rounded-md border px-2 py-0.5 text-xs font-medium hover:bg-accent"
+                                >
+                                    {beschriftung.accept}
+                                </button>
+                            )}
+                            {myAttendance.status !== 'declined' && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRespond('declined')}
+                                    className="rounded-md border px-2 py-0.5 text-xs font-medium hover:bg-accent"
+                                >
+                                    {beschriftung.decline}
+                                </button>
+                            )}
                         </dd>
                     </div>
                 )}
