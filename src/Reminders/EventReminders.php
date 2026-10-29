@@ -8,7 +8,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Peppermint\Calendar\Models\CalendarEvent;
 use Peppermint\Reminders\Abgleich\Abgleich;
-use Peppermint\Reminders\Abgleich\ErinnerungsAnlass;
+use Peppermint\Reminders\Abgleich\AnlassMitEmpfaengern;
 use Peppermint\Reminders\Models\Reminder;
 use RuntimeException;
 
@@ -52,18 +52,59 @@ use RuntimeException;
  * the night before — correct arithmetic, useless reminder. It gets the morning
  * of the day instead, in LOCAL time: the column stores UTC, and without the
  * zone "08:00" arrives two hours late in summer.
+ *
+ * ## Wer erinnert wird: der Eigner UND die Teilnehmer (Stand 29.10.2026)
+ *
+ * Hier stand bis zum 29.10.2026 der Eigner, und nur er. Die Begruendung war:
+ *
+ * > „Alle Teilnehmer ausser dem Eigner" ist eine Frage an produkteigene
+ * > Beziehungen — der Kern nimmt eine Antwort an, er ermittelt sie nicht.
+ *
+ * Die andere Seite dieser Rechnung hat Bug #1080 im Peppermint Manager
+ * gezeigt. Chris bekam keine Terminerinnerungen, und der abgeschaltete
+ * Schalter war nur der erste Grund: Bei seinen Terminen ist er TEILNEHMER.
+ * Auch eingeschaltet haette er nie etwas bekommen — und der Lauf haette dabei
+ * „angelegt" gemeldet, fuer jemand anderen. Ein Termin ohne Erinnerung fuer
+ * seine Teilnehmer ist kein Grenzfall, sondern der Normalfall einer
+ * Besprechung.
+ *
+ * Die alte Begruendung war ausserdem an der falschen Stelle gemessen:
+ * `calendar_event_attendees` ist eine KERNTABELLE dieses Pakets, mit einer
+ * Beziehung dieses Pakets. Teilnehmer sind kein Produktwissen, sie stehen hier.
+ *
+ * Was die alte Entscheidung schuetzen wollte, hat weiter einen Weg: Der
+ * `$recipients`-Haken nimmt die Antwort des Produkts, wenn es eine hat, und
+ * dann ermittelt diese Klasse nichts.
  */
-class EventReminders implements ErinnerungsAnlass
+class EventReminders implements AnlassMitEmpfaengern
 {
     /** The one source this rule owns. Dedup hangs off it. */
     public const SOURCE_LEAD = 'event:lead';
 
     /**
-     * @param  Closure(CalendarEvent): (int|null)|null  $recipient  Who to
-     *         remind. Defaults to the event's owner; a product that plans for
-     *         other people hands in its own answer.
+     * Termine, an denen GAR NIEMAND haengt — kein Eigner, kein interner
+     * Teilnehmer.
+     *
+     * Gesammelt waehrend des Laufs, weil nur diese Klasse den Unterschied
+     * kennt: Ein Termin, bei dem alle Beteiligten „keine Erinnerung" gewaehlt
+     * haben, sieht fuer den Abgleich genauso aus wie einer ohne Beteiligte —
+     * der erste ist eine Entscheidung, der zweite ein Befund.
+     *
+     * @var array<int, mixed>
      */
-    public function __construct(private ?Closure $recipient = null) {}
+    private array $ohneBeteiligte = [];
+
+    /**
+     * @param  Closure(CalendarEvent): (int|string|array<int, int|string>|null)|null  $recipients
+     *         Who to remind. Without it: the owner and every internal
+     *         attendee. A product that knows better hands in its own answer —
+     *         a single id or null is still accepted, which is the form this
+     *         hook had while there was only ever one recipient.
+     */
+    public function __construct(
+        private ?Closure $recipients = null,
+        private ?ReminderLead $vorlauf = null,
+    ) {}
 
     /**
      * Bringt die erzeugten Erinnerungen in Einklang mit den Terminen.
@@ -72,7 +113,8 @@ class EventReminders implements ErinnerungsAnlass
      *
      * Das Anlegen, Verschieben, Abgehaktes-in-Ruhe-Lassen, Wegnehmen und
      * Zaehlen macht {@see Abgleich} im Erinnerungs-Paket. Diese Klasse
-     * beantwortet nur noch, WELCHE Termine eine Erinnerung verdienen und WANN.
+     * beantwortet nur noch, WELCHE Termine eine Erinnerung verdienen, WEN sie
+     * erreicht und WANN.
      *
      * Grund: Das Aufgaben-Paket hatte dieselben Bauteile ein zweites Mal —
      * 238 gegen 247 Zeilen, verschieden war genau `momente()`. Pruefrage 3
@@ -96,13 +138,15 @@ class EventReminders implements ErinnerungsAnlass
             return ['created' => 0, 'moved' => 0, 'removed' => 0, 'skipped' => 0];
         }
 
+        $this->ohneBeteiligte = [];
+
         $bilanz = (new Abgleich($this))->fahren();
 
         return [
             'created' => $bilanz['angelegt'],
             'moved' => $bilanz['verschoben'],
             'removed' => $bilanz['weggenommen'],
-            'skipped' => count($bilanz['ohne_empfaenger']),
+            'skipped' => count($this->ohneBeteiligte),
         ];
     }
 
@@ -135,15 +179,13 @@ class EventReminders implements ErinnerungsAnlass
         // aus dieser Menge gefallen ist. Geloeschte faellt ebenfalls heraus:
         // Das Paket fuehrt SoftDeletes, der polymorphe Verweis traegt keinen
         // Fremdschluessel und kaskadiert deshalb nicht.
-        return $klasse::query()->where($klasse::column('starts_at'), '>', now());
-    }
-
-    /**
-     * @return array<string, DateTimeInterface>
-     */
-    public function momente(Model $gegenstand): array
-    {
-        return [self::SOURCE_LEAD => $this->moment($gegenstand)];
+        //
+        // Die Teilnehmer kommen MIT. Ohne das waere es eine Abfrage je Termin,
+        // und zwei Produkte fahren `preventLazyLoading` — dort waere es nicht
+        // langsam, sondern ein Abbruch mitten im Lauf.
+        return $klasse::query()
+            ->with('attendees')
+            ->where($klasse::column('starts_at'), '>', now());
     }
 
     public function wortlaut(Model $gegenstand, string $quelle): string
@@ -151,34 +193,118 @@ class EventReminders implements ErinnerungsAnlass
         return (string) $gegenstand->field('title');
     }
 
-    public function empfaenger(Model $gegenstand): int|string|null
+    /**
+     * Wer erinnert wird, und wann — je Person ein eigener Zeitpunkt.
+     *
+     * Eine Person, die „keine Erinnerung" eingestellt hat, FEHLT hier; der
+     * Abgleich nimmt ihr eine vorhandene Zeile dann weg. Damit braucht das
+     * Abstellen kein zweites Feld.
+     *
+     * @return array<int|string, array<string, DateTimeInterface>>
+     */
+    public function empfaengerMomente(Model $gegenstand): array
     {
-        if ($this->recipient !== null) {
-            $wert = ($this->recipient)($gegenstand);
+        $beteiligte = $this->beteiligte($gegenstand);
 
-            return $wert === null ? null : (int) $wert;
+        if ($beteiligte === []) {
+            // Ein Befund, kein Normalfall — und nur hier unterscheidbar von
+            // „alle haben es abgestellt". Siehe {@see $ohneBeteiligte}.
+            $this->ohneBeteiligte[] = $gegenstand->getKey();
+
+            return [];
         }
+
+        $vorlauf = $this->vorlauf();
+        $momente = [];
+
+        foreach ($beteiligte as $person) {
+            $minuten = $vorlauf->minutenFuer($person);
+
+            if ($minuten === null) {
+                continue;
+            }
+
+            $momente[$person] = [self::SOURCE_LEAD => $this->moment($gegenstand, $minuten)];
+        }
+
+        return $momente;
+    }
+
+    /**
+     * Der Eigner und die internen Teilnehmer — ohne Doppelte.
+     *
+     * ## Warum ein abgesagter Teilnehmer NICHT dabei ist
+     *
+     * Wer abgesagt hat, hat gesagt, dass er nicht kommt. Ihn zu erinnern waere
+     * die Art von Meldung, die Menschen dazu bringt, alle Meldungen
+     * abzuschalten. `pending` und `tentative` bleiben drin: Dort ist die Frage
+     * offen, und eine Vorwarnung ist genau dann nuetzlich.
+     *
+     * ## Warum externe Teilnehmer nicht dabei sind
+     *
+     * Sie haben kein Konto in diesem System (`user_id` ist null) — es gibt
+     * niemanden, dem eine Glocke gehoert. Ihr Weg ist die Einladung per Mail,
+     * und das ist eine andere Sache an einer anderen Stelle.
+     *
+     * @return array<int, int|string>
+     */
+    private function beteiligte(Model $gegenstand): array
+    {
+        if ($this->recipients !== null) {
+            $antwort = ($this->recipients)($gegenstand);
+
+            if ($antwort === null) {
+                return [];
+            }
+
+            return array_values(array_unique(array_filter(
+                (array) $antwort,
+                fn ($wert): bool => $wert !== null && $wert !== '',
+            )));
+        }
+
+        $leute = [];
 
         $eigner = $gegenstand->field('owner_id');
 
-        return $eigner === null ? null : (int) $eigner;
+        if ($eigner !== null) {
+            $leute[] = (int) $eigner;
+        }
+
+        foreach ($gegenstand->attendees as $teilnehmer) {
+            if ($teilnehmer->user_id === null || $teilnehmer->status === 'declined') {
+                continue;
+            }
+
+            $leute[] = (int) $teilnehmer->user_id;
+        }
+
+        return array_values(array_unique($leute));
     }
 
     /**
      * Der Zeitpunkt, an dem erinnert wird.
      */
-    private function moment(Model $termin): CarbonImmutable
+    private function moment(Model $termin, int $minuten): CarbonImmutable
     {
         $start = CarbonImmutable::parse($termin->field('starts_at'));
 
         if ((bool) $termin->field('all_day')) {
+            // Der Vorlauf gilt hier NICHT, und zwar fuer niemanden: Es gibt
+            // keine Uhrzeit, von der er abgezogen werden koennte. Was je
+            // Person bleibt, ist die Frage, OB erinnert wird — die Stunde ist
+            // eine Produkteinstellung.
             $zone = (string) config('calendar.reminders.timezone', 'Europe/Berlin');
             $stunde = (int) config('calendar.reminders.all_day_hour', 8);
 
             return $start->setTimezone($zone)->startOfDay()->addHours($stunde)->utc();
         }
 
-        return $start->subMinutes((int) config('calendar.reminders.lead_minutes', 15));
+        return $start->subMinutes($minuten);
     }
 
+    private function vorlauf(): ReminderLead
+    {
+        return $this->vorlauf ??= app(ReminderLead::class);
+    }
 }

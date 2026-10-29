@@ -90,6 +90,13 @@ return [
         'attendees' => 'calendar_event_attendees',
         'categories' => 'calendar_categories',
         'event_categories' => 'calendar_event_categories',
+
+        // Der Vorlauf je Person. Die Tabelle kommt ueber eine
+        // VEROEFFENTLICHTE Migration — wer Termin-Erinnerungen nie einschaltet,
+        // soll keine leere Tabelle bekommen:
+        //
+        //     php artisan vendor:publish --tag=calendar-reminder-leads
+        'reminder_preferences' => 'calendar_reminder_preferences',
     ],
 
     /*
@@ -151,7 +158,22 @@ return [
         // How long before the start the reminder fires. The classic case, and
         // the only one: a reminder AT the start is a reminder about something
         // you are already late for.
+        //
+        // Die VORGABE des Produkts, nicht das letzte Wort: Wer etwas anderes
+        // eingestellt hat, bekommt seinen Wert
+        // ({@see \Peppermint\Calendar\Reminders\ReminderLead}). `null` ist
+        // zulaessig und heisst „nur wer ausdruecklich eine will".
         'lead_minutes' => 15,
+
+        // Die Stufen, die eine Einstellungsmaske anbietet — in Minuten.
+        //
+        // Nur die ZAHLEN, nicht die Worte: Ein Paket, das Beschriftungen
+        // mitbringt, bringt eine Sprache mit, und das Produkt hat schon eine.
+        // Dieselbe Trennung wie beim Schlummern in `peppermint/reminders`.
+        //
+        // „Keine" steht nicht in der Liste — das ist kein Vorlauf, sondern
+        // seine Abwesenheit, und die gibt es immer.
+        'lead_choices' => [5, 10, 15, 30, 60],
 
         // An all-day event starts at midnight, so "15 minutes before" would
         // land at 23:45 the night before — technically correct and useless.

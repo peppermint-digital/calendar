@@ -7,6 +7,7 @@ use Peppermint\Calendar\Http\Controllers\CategoryAdminController;
 use Peppermint\Calendar\Http\Controllers\EventCategoryAssignmentController;
 use Peppermint\Calendar\Http\Controllers\EventSourceController;
 use Peppermint\Calendar\Http\Controllers\IcsFeedController;
+use Peppermint\Calendar\Http\Controllers\ReminderLeadController;
 
 /**
  * Die Routen, die das Paket mitbringt — zum Legen, nicht zum Erben.
@@ -220,6 +221,35 @@ class CalendarRoutes
     {
         Route::patch('calendar/{event}/categories', [EventCategoryAssignmentController::class, 'update'])
             ->name('calendar.event.categories.update');
+    }
+
+    /**
+     * Der Vorlauf je Person — „keine / 15 / 30 Minuten vor dem Termin".
+     *
+     * Vom Produkt dort aufgerufen, wo seine Benachrichtigungs-Einstellungen
+     * schon stehen:
+     *
+     * ```php
+     * Route::middleware(['web', 'auth'])->prefix('settings')->group(function () {
+     *     CalendarRoutes::reminderLead();
+     * });
+     * ```
+     *
+     * Die Namen `calendar.reminder-lead.*` gehoeren zum Vertrag: Die Maske des
+     * Produkts ruft sie auf, und zwei Produkte sollen dieselbe benutzen
+     * koennen.
+     *
+     * Was hier NICHT liegt: die Maske. Paketvertrag Regel 8 — Oberflaeche
+     * bleibt im Produkt. Geteilt ist die Pruefung dahinter, die sonst in
+     * jedem Produkt gleich aussaehe.
+     */
+    public static function reminderLead(): void
+    {
+        Route::get('calendar/reminder-lead', [ReminderLeadController::class, 'show'])
+            ->name('calendar.reminder-lead.show');
+
+        Route::put('calendar/reminder-lead', [ReminderLeadController::class, 'update'])
+            ->name('calendar.reminder-lead.update');
     }
 
     public static function sources(): void

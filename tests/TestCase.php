@@ -67,6 +67,12 @@ abstract class TestCase extends Orchestra
             $this->loadMigrationsFrom($erinnerungen);
         }
 
+        // Sonst nur per vendor:publish — in Tests direkt geladen, damit der
+        // Vorlauf je Person ueberhaupt pruefbar ist. Dass er ohne die Tabelle
+        // auf die Vorgabe zurueckfaellt, prueft ein eigener Test, der sie
+        // wieder wegnimmt.
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations-reminders');
+
         // Sonst nur per vendor:publish — in Tests direkt geladen, damit die
         // Kategorienfunktion ueberhaupt pruefbar ist.
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations-optional');

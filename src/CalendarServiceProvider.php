@@ -121,6 +121,19 @@ class CalendarServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations-optional' => database_path('migrations'),
             ], 'calendar-categories');
 
+            // Der Vorlauf je Person — aus demselben Grund veroeffentlicht und
+            // nicht geladen, nur eine Ebene tiefer: Termin-Erinnerungen sind
+            // in der Vorgabe AUS. Wer sie nie einschaltet, soll keine leere
+            // Tabelle bekommen.
+            //
+            // Fehlt sie, faellt {@see ReminderLead} auf die Vorgabe des
+            // Produkts zurueck und der Abgleich sagt es laut. Eine fehlende
+            // Einstellungstabelle darf nicht dazu fuehren, dass niemand mehr
+            // erinnert wird.
+            $this->publishesMigrations([
+                __DIR__.'/../database/migrations-reminders' => database_path('migrations'),
+            ], 'calendar-reminder-leads');
+
             $this->commands([
                 ReconcileEventRemindersCommand::class,
                 PurgeTrashedEventsCommand::class,
