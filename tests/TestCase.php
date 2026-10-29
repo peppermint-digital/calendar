@@ -73,6 +73,10 @@ abstract class TestCase extends Orchestra
         // wieder wegnimmt.
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations-reminders');
 
+        // Ebenfalls nur per vendor:publish — in Tests direkt geladen, damit die
+        // abonnierten Kalender pruefbar sind.
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations-subscriptions');
+
         // Sonst nur per vendor:publish — in Tests direkt geladen, damit die
         // Kategorienfunktion ueberhaupt pruefbar ist.
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations-optional');

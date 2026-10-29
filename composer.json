@@ -19,12 +19,14 @@
         "orchestra/testbench": "^9.0|^10.0|^11.0",
         "pestphp/pest": "^3.0|^4.0",
         "peppermint/reminders": "dev-main",
-        "laravel/mcp": "^0.1|^1.0"
+        "laravel/mcp": "^0.1|^1.0",
+        "sabre/vobject": "^4.5"
     },
     "suggest": {
         "peppermint/ai-brain-bridge": "Fuer BrainCategorySource und BrainCalendarSources — die gemeinsame Kategorienliste und die Kalender der anderen Systeme ueber den Komm-Layer. Regel 7 des Paketvertrags: nicht erzwungen, damit das Paket fuer sich installierbar bleibt.",
         "peppermint/reminders": "Fuer Termin-Erinnerungen: der Abgleich erzeugt echte Erinnerungs-Zeilen, die das Produkt ueber seinen eigenen Zustell-Lauf verschickt. Optional — Regel 7 des Paketvertrags: nicht erzwungen, damit das Paket fuer sich installierbar bleibt.",
-        "laravel/mcp": "Stellt den Vorlauf je Person als MCP-Werkzeuge bereit — damit die Pflegemaske im AI Brain stehen kann, wie bei den Benachrichtigungen (#520). Regel 7 des Paketvertrags: nicht erzwungen."
+        "laravel/mcp": "Stellt den Vorlauf je Person als MCP-Werkzeuge bereit — damit die Pflegemaske im AI Brain stehen kann, wie bei den Benachrichtigungen (#520). Regel 7 des Paketvertrags: nicht erzwungen.",
+        "sabre/vobject": "Fuer abonnierte fremde Kalender (ICS/Outlook/Google). Optional — Regel 7 des Paketvertrags: Wer keine Abos fuehrt, soll keinen iCalendar-Auswerter mitinstallieren muessen."
     },
     "autoload": {
         "psr-4": {

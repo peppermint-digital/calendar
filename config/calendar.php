@@ -26,6 +26,14 @@ return [
     */
     'event_model' => \Peppermint\Calendar\Models\CalendarEvent::class,
 
+    /*
+    | Die Termin-Klasse der ABONNIERTEN Kalender, falls ein Produkt eine eigene
+    | mitbringt. Dieselbe Begruendung wie bei `event_model`: Daran haengt der
+    | Morph-Typ einer Erinnerung, und mit der Paket-Klasse stuende dort ein
+    | Modell, das niemand instanziiert.
+    */
+    'subscribed_event_model' => \Peppermint\Calendar\Subscriptions\Models\SubscribedEvent::class,
+
     'kinds' => [],
 
     /*
@@ -97,6 +105,17 @@ return [
         //
         //     php artisan vendor:publish --tag=calendar-reminder-leads
         'reminder_preferences' => 'calendar_reminder_preferences',
+
+        // Abonnierte fremde Kalender und ihre Termine. Ebenfalls ueber eine
+        // veroeffentlichte Migration:
+        //
+        //     php artisan vendor:publish --tag=calendar-subscriptions
+        //
+        // Die Namen sind die aus dem Bestand des Peppermint Managers, von wo
+        // die Abos am 29.10.2026 nach AI Brain gezogen sind — ohne Praefix,
+        // weil sie dort die einzige Fassung sind und nicht „die vom Brain".
+        'subscriptions' => 'external_calendars',
+        'subscribed_events' => 'external_calendar_events',
     ],
 
     /*

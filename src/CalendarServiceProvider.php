@@ -8,6 +8,7 @@ use Peppermint\Calendar\Console\PullCategoriesCommand;
 use Peppermint\Calendar\Console\PurgeTrashedEventsCommand;
 use Peppermint\Calendar\Console\ReconcileEventRemindersCommand;
 use Peppermint\Calendar\Console\SeedWorkCategoriesCommand;
+use Peppermint\Calendar\Console\SyncSubscriptionsCommand;
 use Peppermint\Calendar\Kinds\EventKind;
 use Peppermint\Calendar\Kinds\EventKindRegistry;
 use Peppermint\Calendar\Sources\EventSource;
@@ -134,8 +135,17 @@ class CalendarServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations-reminders' => database_path('migrations'),
             ], 'calendar-reminder-leads');
 
+            // Abonnierte fremde Kalender — aus demselben Grund veroeffentlicht
+            // und nicht geladen: Wer keine fuehrt, soll keine leeren Tabellen
+            // bekommen. Seit dem 29.10.2026 fuehrt sie genau ein Produkt,
+            // AI Brain; vorher lagen sie im Manager.
+            $this->publishesMigrations([
+                __DIR__.'/../database/migrations-subscriptions' => database_path('migrations'),
+            ], 'calendar-subscriptions');
+
             $this->commands([
                 ReconcileEventRemindersCommand::class,
+                SyncSubscriptionsCommand::class,
                 PurgeTrashedEventsCommand::class,
                 PullCategoriesCommand::class,
                 SeedWorkCategoriesCommand::class,

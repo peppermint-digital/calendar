@@ -1282,6 +1282,75 @@ Two status codes carry the distinction that matters:
 Listing the sources is *not* here. Which ones exist and how they appear — colour, order,
 label — is presentation, and that stays in the product.
 
+## Subscribed calendars
+
+A **source** reads another system's calendar live and stores nothing. A
+**subscription** is the other shape: an ICS address somebody entered, fetched
+once an hour, with its events stored here.
+
+The difference is not taste. An Outlook feed answers in seconds, not
+milliseconds, and nobody wants to wait for that before the calendar page
+appears. The price is that the stored copy ages — hence the reconciliation.
+
+```php
+'tables' => [
+    'subscriptions'     => 'external_calendars',
+    'subscribed_events' => 'external_calendar_events',
+],
+```
+
+```
+php artisan vendor:publish --tag=calendar-subscriptions
+php artisan migrate
+php artisan calendar:sync-subscriptions          # hourly, from your scheduler
+```
+
+Needs `sabre/vobject` (a `suggest`, not a `require` — a product without
+subscriptions should not carry an iCalendar parser). Without it the sync
+refuses out loud rather than reporting an empty feed, because an empty feed is
+what the reconciliation would act on.
+
+### It reconciles, it does not re-create
+
+This matters more than it sounds. The implementation this grew out of did
+`$calendar->events()->delete()` and then re-inserted everything, hourly. For
+display that is merely ugly — a window where the calendar is empty, and fresh
+ids for the same events.
+
+Together with **reminders** it is a defect. A reminder hangs off the row via
+`subject_id`. Delete and re-create the rows every hour and the reminder
+reconciliation removes the reminders as orphaned, then creates them again with
+`delivered_at` reset: **the same reminder, every hour, until the event is
+over.** At four-digit event counts that is a flood.
+
+So: create what is new, carry over what changed, remove what the feed no longer
+names. And on a failed fetch, remove **nothing** — a calendar that empties on
+every network hiccup looks like "no events" rather than "I could not look".
+
+### Reminders for subscribed events, without doubles
+
+`SubscribedEventReminders` reminds whoever subscribed — one person, so it is a
+plain `ErinnerungsAnlass` — with the same per-person lead as the own calendar.
+
+It also refuses to remind twice about the same appointment. An event created in
+your own system also appears in the attendees' Outlook, and therefore in the
+subscription. Measured on 29/10/2026 in one product: 21 upcoming own events
+against 1009 in one Outlook subscription — so this is the normal case, not an
+edge case.
+
+A subscribed event is skipped when the same person has an own upcoming event
+with the same source UID, or with the same title starting within one minute.
+The own event wins: only it has attendees, an RSVP and somewhere to jump to.
+
+### Floating times
+
+`DTSTART:20261030T140000` carries neither `Z` nor `TZID`. In iCalendar that is
+a *floating* time — 14:00 wherever the reader sits. Both the expansion and the
+property read get the application timezone handed in, so the wall clock stays
+put; a value with `Z` or `TZID` is still converted. Without that, every feed
+that omits zones would land an hour off (two in summer), and Outlook would not
+show it to you because Outlook sends `TZID`.
+
 ## Adopting an existing calendar
 
 An application that has kept a calendar for years has its own table and column
