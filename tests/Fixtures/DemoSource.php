@@ -22,6 +22,12 @@ class DemoSource extends EventSource
         return 'demo';
     }
 
+    /** Die Farbe des Systems — damit die Zeile sie mitbringt. */
+    public function colour(): ?string
+    {
+        return '#123456';
+    }
+
     public function label(): string
     {
         return 'Demo system';

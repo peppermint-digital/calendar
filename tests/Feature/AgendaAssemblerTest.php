@@ -197,3 +197,26 @@ it('nennt bei einem fremden Termin den Weg in sein Heimatsystem', function () {
 
     expect($zeile['url'])->toBe('https://elsewhere.test/events/42');
 });
+
+it('bringt die Farbe der fremden Quelle gleich mit', function () {
+    /*
+     * Hier stand bis zum 29.10.2026 `$daten['colour'] ?? null` — und das war
+     * IMMER null: Weder `ExternalEvent::toArray()` noch das Quellenverzeichnis
+     * trägt eine Farbe, die Quelle selbst kennt sie.
+     *
+     * Gemerkt hat es niemand, weil jedes Produkt die Farbe ohnehin selbst
+     * nachgesucht hat — AI Brain mit einem `sources.find()` je Zeile im
+     * Frontend. Ein Feld, das immer leer ist, erzeugt genau diese Art
+     * Doppelarbeit: Es sieht benutzt aus.
+     *
+     * Das ist nicht derselbe Fall wie bei den EIGENEN Zeilen: Dort bleibt
+     * `colour` mit Absicht leer, weil die Farbtafel der Terminarten im Produkt
+     * liegt. Eine Quelle dagegen beschreibt sich selbst — sie HAT eine Farbe,
+     * und die gehört in die Zeile.
+     */
+    DemoSource::$available = true;
+
+    $zeile = collect(app(AgendaAssembler::class)->rows(1))->firstWhere('title', 'Meeting elsewhere');
+
+    expect($zeile['colour'])->toBe('#123456');
+});

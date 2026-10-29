@@ -115,8 +115,27 @@ final class AgendaAssembler
         // lesen will.
         $namen = $sichtbare->map(fn ($quelle) => $quelle->label())->all();
 
+        /*
+         * Und ihre Farben, aus demselben Grund.
+         *
+         * Hier stand bis zum 29.10.2026 nur `$daten['colour'] ?? null` — und
+         * das war IMMER null: Weder `ExternalEvent::toArray()` noch das
+         * Quellenverzeichnis traegt eine Farbe, die Quelle selbst kennt sie
+         * (`EventSource::colour()`). Die Zeile sah also nach einer Weitergabe
+         * aus und gab nichts weiter.
+         *
+         * Gemerkt hat es niemand, weil jedes Produkt die Farbe ohnehin selbst
+         * nachgesucht hat — AI Brain mit einem `sources.find()` je Zeile im
+         * Frontend. Ein Feld, das immer leer ist, erzeugt genau diese Art
+         * Doppelarbeit: Es sieht benutzt aus.
+         *
+         * Eine Farbe am EINZELNEN Termin gewinnt weiter, falls eine Quelle sie
+         * mitgibt — die Quelle beschreibt sich, der Termin widerspricht.
+         */
+        $farben = $sichtbare->map(fn ($quelle) => $quelle->colour())->all();
+
         return collect($this->sources->collect($userId, $from, $to, $sichtbare->keys()->all()))
-            ->map(function ($event) use ($namen) {
+            ->map(function ($event) use ($namen, $farben) {
                 $daten = is_array($event) ? $event : $event->toArray();
 
                 $beginn = CarbonImmutable::parse($daten['starts_at']);
@@ -133,7 +152,7 @@ final class AgendaAssembler
                     'end' => $ganztags || $ende === null ? null : $ende->format('H:i'),
                     'title' => (string) ($daten['title'] ?? ''),
                     'location' => $daten['location'] ?? null,
-                    'colour' => $daten['colour'] ?? null,
+                    'colour' => $daten['colour'] ?? ($farben[$daten['source'] ?? ''] ?? null),
                     // Das Etikett nennt das SYSTEM, nicht die Terminart: Die Art
                     // drüben ist ein Begriff des anderen Systems, und sie hier
                     // anzuzeigen hiesse, sie zu erklären.
