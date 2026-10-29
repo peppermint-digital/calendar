@@ -164,3 +164,65 @@ describe('was die Zeile zeigt', () => {
         expect(screen.getByText('Nichts')).toBeTruthy();
     });
 });
+
+describe('eine Zeile ohne Ziel', () => {
+    /*
+     * Gemessen am 29.10.2026 in der Manager-Agenda: Ein Termin aus einem
+     * angebundenen System sah klickbar aus und reagierte nicht.
+     *
+     * Der Test weiter oben („sieht ohne onSelect nicht klickbar aus") deckt
+     * das NICHT ab, und das ist der lehrreiche Teil: Er prüft den Fall, in dem
+     * die ganze Liste kein Ziel hat. Eine echte Liste mischt aber — eigene
+     * Termine mit Einzelansicht, fremde ohne. `onSelect` gilt dann für alle,
+     * und der Zeigefinger hing am Prop statt an der Zeile.
+     *
+     * Ein Test, der die halbe Lage prüft, liest sich wie einer, der die ganze
+     * prüft.
+     */
+    it('reagiert nicht auf einen Klick', () => {
+        const gewaehlt = vi.fn();
+
+        render(
+            <AgendaList
+                rows={[zeile({ selectable: false })]}
+                dayLabel={tag}
+                onSelect={gewaehlt}
+            />,
+        );
+
+        fireEvent.click(screen.getByText('Zahnarzt'));
+
+        expect(gewaehlt).not.toHaveBeenCalled();
+    });
+
+    it('sieht auch nicht klickbar aus', () => {
+        render(
+            <AgendaList
+                rows={[zeile({ selectable: false })]}
+                dayLabel={tag}
+                onSelect={vi.fn()}
+            />,
+        );
+
+        expect(screen.getByText('Zahnarzt').parentElement?.className ?? '').not.toContain('cursor-pointer');
+    });
+
+    it('laesst die Zeilen MIT Ziel daneben unberuehrt', () => {
+        // Die Gegenprobe: Ohne sie wäre auch eine Fassung grün, die den Klick
+        // für die ganze Liste abschaltet.
+        const gewaehlt = vi.fn();
+
+        render(
+            <AgendaList
+                rows={[zeile({ selectable: false }), zeile({ key: 'z2', title: 'Eigener Termin' })]}
+                dayLabel={tag}
+                onSelect={gewaehlt}
+            />,
+        );
+
+        fireEvent.click(screen.getByText('Eigener Termin'));
+
+        expect(gewaehlt).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Eigener Termin').parentElement?.className ?? '').toContain('cursor-pointer');
+    });
+});

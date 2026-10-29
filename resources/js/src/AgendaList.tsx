@@ -18,6 +18,23 @@ export type AgendaRow<T = unknown> = {
     recurring?: boolean;
     /** Abgeblendet — vorbei, abgesagt, erledigt. Was es heisst, weiss das Produkt. */
     dimmed?: boolean;
+    /**
+     * Hat DIESE Zeile ein Ziel?
+     *
+     * Ohne Angabe: ja, sobald `onSelect` gesetzt ist. Das war bis zum
+     * 29.10.2026 die einzige Moeglichkeit — und sie ist zu grob: Eine Liste
+     * mischt in der Regel Zeilen MIT Einzelansicht (eigene Termine) und ohne
+     * (Termine aus einem anderen System, Feiertage). `onSelect` gilt dann fuer
+     * alle, also bekommt jede Zeile den Zeigefinger — auch die, bei der ein
+     * Klick nichts tut.
+     *
+     * Gemessen am 29.10.2026 in der Manager-Agenda: Ein Termin aus der Nabe
+     * sah klickbar aus und reagierte nicht. Das ist schlimmer als nicht
+     * klickbar — die Oberflaeche verspricht etwas, das sie nicht hat.
+     *
+     * Mit `selectable: false` bleibt die Zeile stumm UND sieht so aus.
+     */
+    selectable?: boolean;
 };
 
 export type AgendaListProps<T = unknown> = {
@@ -104,10 +121,12 @@ export function AgendaList<T = unknown>({
                                 key={row.key}
                                 className={
                                     'flex flex-wrap items-center gap-3 px-3 py-2 text-sm' +
-                                    (onSelect ? ' hover:bg-muted/50 cursor-pointer' : '') +
+                                    // Der Zeigefinger haengt an DIESER Zeile, nicht am Prop:
+                                    // Eine Liste mischt Zeilen mit und ohne Ziel.
+                                    (onSelect && row.selectable !== false ? ' hover:bg-muted/50 cursor-pointer' : '') +
                                     (row.dimmed ? ' opacity-50' : '')
                                 }
-                                onClick={onSelect ? () => onSelect(row) : undefined}
+                                onClick={onSelect && row.selectable !== false ? () => onSelect(row) : undefined}
                             >
                                 <span
                                     className="h-8 w-1 shrink-0 rounded"
