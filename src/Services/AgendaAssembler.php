@@ -35,6 +35,14 @@ final class AgendaAssembler
 {
     public function __construct(
         private readonly EventSourceRegistry $sources,
+        /**
+         * Wer was sehen darf — in den Worten des Produkts.
+         *
+         * Ohne Bindung gilt `visibleTo`: Eigentum oder Teilnahme. Siehe
+         * {@see AgendaSichtbarkeit} fuer den Grund, warum das ueberschreibbar
+         * sein muss und warum nicht per Unterklasse.
+         */
+        private readonly ?AgendaSichtbarkeit $sichtbarkeit = null,
     ) {}
 
     /**
@@ -66,19 +74,9 @@ final class AgendaAssembler
      */
     public function own(int $userId, DateTimeInterface $from, DateTimeInterface $to, array $hidden = [], ?string $timezone = null): Collection
     {
-        /*
-         * Die Termin-Klasse des PRODUKTS, nicht die des Pakets.
-         *
-         * Hier stand bis zum 29.10.2026 `CalendarEvent::query()`. Das trifft
-         * dieselbe Tabelle und ist trotzdem falsch: Es ist nicht die Klasse,
-         * die das Produkt instanziiert — ihr fehlen dessen Beziehungen, Casts
-         * und ihr Morph-Typ. In drei von vier Systemen fiel das nicht auf,
-         * weil dort beides dasselbe ist.
-         */
-        $klasse = (string) config('calendar.event_model', CalendarEvent::class);
+        $klasse = $this->terminKlasse();
 
-        return $klasse::query()
-            ->visibleTo($userId)
+        return $this->eigeneAbfrage($userId)
             ->inRange($from, $to)
             ->orderBy($klasse::column('starts_at'))
             // Die Kategorien mitladen, wenn es sie gibt: Ohne das fragt der
@@ -198,6 +196,60 @@ final class AgendaAssembler
             ->sortBy(fn (array $zeile) => $zeile['date'].' '.($zeile['start'] ?? ''))
             ->values()
             ->all();
+    }
+
+    /**
+     * Die Termin-Klasse des PRODUKTS, nicht die des Pakets.
+     *
+     * Hier stand bis zum 29.10.2026 `CalendarEvent::query()`. Das trifft
+     * dieselbe Tabelle und ist trotzdem falsch: Es ist nicht die Klasse, die
+     * das Produkt instanziiert — ihr fehlen dessen Beziehungen, Casts und ihr
+     * Morph-Typ. In drei von vier Systemen fiel das nicht auf, weil dort
+     * beides dasselbe ist.
+     *
+     * @return class-string<CalendarEvent>
+     */
+    protected function terminKlasse(): string
+    {
+        return (string) config('calendar.event_model', CalendarEvent::class);
+    }
+
+    /**
+     * Welche eigenen Termine ueberhaupt in Frage kommen — die Naht fuer ein
+     * Produkt mit einer breiteren Regel.
+     *
+     * ## Warum das ueberschreibbar ist
+     *
+     * `visibleTo` heisst in diesem Paket „Eigentum ODER Teilnahme". Das ist die
+     * richtige Vorgabe und fuer drei von vier Systemen die ganze Wahrheit.
+     *
+     * Der Peppermint Manager hat eine breitere: Termine ohne Eigner gelten fuer
+     * alle, eine Vorgesetzte sieht die ihrer Leute, und ein Zeitblock folgt der
+     * Sichtbarkeit seiner AUFGABE und nicht der des Termins. Gemessen am
+     * 29.10.2026 stand diese Regel dort ZWEIMAL — 819 Zeichen, zeichengleich,
+     * einmal im Kalender-Dienst und einmal in der Agenda.
+     *
+     * Dafuer genuegt NICHT, `scopeVisibleTo` im Produkt zu verbreitern: Daran
+     * haengen auch das MCP-Werkzeug, der ICS-Feed und die Kategorien. Wer die
+     * Agenda breiter machen will, wuerde dort Rechte mitverschieben — und zwar
+     * lautlos.
+     *
+     * Deshalb ein eigener Vertrag ({@see AgendaSichtbarkeit}) und kein
+     * Konfigurationswert: Ein Scope-Name in der Konfiguration faellt bei einem
+     * Tippfehler still auf die Vorgabe zurueck, eine fehlende Bindung an eine
+     * Schnittstelle nicht.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<CalendarEvent>
+     */
+    private function eigeneAbfrage(int $userId)
+    {
+        if ($this->sichtbarkeit !== null) {
+            return $this->sichtbarkeit->fuer($userId);
+        }
+
+        $klasse = $this->terminKlasse();
+
+        return $klasse::query()->visibleTo($userId);
     }
 
     /**

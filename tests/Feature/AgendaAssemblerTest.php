@@ -282,3 +282,38 @@ describe('die Zone, in der die Uhrzeit steht', function () {
             ->and($zeile['start'])->toBe('00:30');
     });
 });
+
+it('laesst ein Produkt mit breiterer Sichtbarkeit die Abfrage ersetzen', function () {
+    /*
+     * Die Naht für den Peppermint Manager. Dort gilt eine breitere Regel als
+     * „Eigentum ODER Teilnahme": Termine ohne Eigner gelten für alle, eine
+     * Vorgesetzte sieht die ihrer Leute, und ein Zeitblock folgt der
+     * Sichtbarkeit seiner AUFGABE.
+     *
+     * Dafür genügt NICHT, `scopeVisibleTo` im Produkt zu verbreitern: Daran
+     * hängen auch das MCP-Werkzeug, der ICS-Feed und die Kategorien — dort
+     * würde man Rechte mitverschieben, und zwar lautlos.
+     */
+    $fremder = agendaTermin(['owner_id' => 99, 'title' => 'Gehoert jemand anderem']);
+
+    // Mit der Vorgabe ist er unsichtbar.
+    expect(collect(app(AgendaAssembler::class)->rows(1))->pluck('title')->all())
+        ->not->toContain('Gehoert jemand anderem');
+
+    // Ein Produkt, das es breiter sieht, bekommt ihn — ueber den Vertrag, nicht
+    // ueber eine Unterklasse: Der Zusammensteller bleibt `final`, weil seine
+    // ZEILEN-Form nicht verhandelbar ist. Verhandelbar ist die Frage, wer was
+    // sehen darf.
+    $breit = new AgendaAssembler(
+        app(EventSourceRegistry::class),
+        new class implements \Peppermint\Calendar\Services\AgendaSichtbarkeit
+        {
+            public function fuer(int $userId): \Illuminate\Database\Eloquent\Builder
+            {
+                return CalendarEvent::query();
+            }
+        },
+    );
+
+    expect(collect($breit->rows(1))->pluck('title')->all())->toContain('Gehoert jemand anderem');
+});
