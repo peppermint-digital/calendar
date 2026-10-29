@@ -176,3 +176,78 @@ it('still writes correctly after being pointed back at the default table', funct
     expect($event->fresh()->getAttributes())
         ->toHaveKeys(['owner_id', 'starts_at', 'ends_at']);
 });
+
+it('baut die Agenda-Zeilen auf den uebernommenen Spalten', function () {
+    /*
+     * Hier lag der Grund, warum der Peppermint Manager seine Agenda bis zum
+     * 29.10.2026 selbst gebaut hat — er KONNTE die des Pakets nicht nehmen.
+     *
+     * `AgendaAssembler::row()` las `$event->starts_at`, `$event->ends_at`,
+     * `$event->title` und `$event->kind` direkt. In einer Anwendung, die ihre
+     * Spalten seit Jahren `start_datetime` nennt, ist `$event->starts_at`
+     * nicht „ein anderer Name fuer dasselbe", sondern `null` — und
+     * `null->toDateString()` ist ein Abbruch mitten in der Seite.
+     *
+     * Dass es in drei von vier Systemen lief, lag daran, dass dort die
+     * Paketnamen gelten. Genau so sieht ein Fehler aus, der nur das aelteste
+     * System trifft: Niemand, der am Paket arbeitet, begegnet ihm.
+     *
+     * Eine Zeile derselben Datei wusste es uebrigens besser —
+     * `$event->field('recurrence_rules')` stand schon richtig da.
+     */
+    $termin = adopted(['location' => 'Büro Hamburg']);
+
+    $zeilen = app(\Peppermint\Calendar\Services\AgendaAssembler::class)
+        ->own(1, CarbonImmutable::parse('2026-09-08 00:00'), CarbonImmutable::parse('2026-09-08 23:59'));
+
+    expect($zeilen)->toHaveCount(1);
+
+    $zeile = $zeilen->first();
+
+    expect($zeile['date'])->toBe('2026-09-08')
+        ->and($zeile['start'])->toBe('09:00')
+        ->and($zeile['end'])->toBe('10:00')
+        ->and($zeile['title'])->toBe('Jour Fixe')
+        ->and($zeile['location'])->toBe('Büro Hamburg')
+        ->and($zeile['kind'])->toBe('business')
+        ->and($zeile['id'])->toBe($termin->getKey());
+});
+
+it('nimmt in der Agenda das Termin-Modell des PRODUKTS, nicht das des Pakets', function () {
+    /*
+     * Der zweite Teil desselben Fehlers: `own()` fragte `CalendarEvent::query()`
+     * — die Paket-Klasse. Die trifft zwar dieselbe Tabelle, aber sie ist nicht
+     * die Klasse, die das Produkt instanziiert: Ihr fehlen dessen Beziehungen,
+     * Casts und ihr Morph-Typ.
+     *
+     * Geprueft wird deshalb die KLASSE der gelesenen Zeile, nicht ihr Inhalt.
+     * Ein Test auf den Inhalt waere hier gruen geblieben.
+     */
+    config()->set('calendar.event_model', AgendaProduktTermin::class);
+
+    adopted();
+
+    $zeilen = app(\Peppermint\Calendar\Services\AgendaAssembler::class)
+        ->own(1, CarbonImmutable::parse('2026-09-08 00:00'), CarbonImmutable::parse('2026-09-08 23:59'));
+
+    expect($zeilen)->toHaveCount(1)
+        ->and(AgendaProduktTermin::$gelesen)->toBeTrue();
+
+    config()->set('calendar.event_model', CalendarEvent::class);
+});
+
+/**
+ * Ein Termin-Modell, wie ein Produkt es mitbringt — es merkt sich nur, dass es
+ * benutzt wurde.
+ */
+class AgendaProduktTermin extends CalendarEvent
+{
+    public static bool $gelesen = false;
+
+    public function kindDefinition(): \Peppermint\Calendar\Kinds\EventKind
+    {
+        self::$gelesen = true;
+
+        return parent::kindDefinition();
+    }
+}

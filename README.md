@@ -1415,7 +1415,21 @@ shape, attendees, scopes, per-kind deletion, recurrence, iCalendar export, the
 time-blocking primitives, and remote calendars of other systems — read and
 write, over whatever transport the host provides.
 
-Not in place: CalDAV and invitation mails.
+Not in place: a CalDAV **client** — nothing here fetches a foreign calendar
+over CalDAV — and invitation mails.
+
+A word on CalDAV, because this line has already misled someone (29.10.2026).
+"Not in place" is true of this package and false of the installation: AI Brain
+runs a CalDAV **server** (`sabre/dav`), so a phone or Thunderbird can read and
+write the hub calendar. That is the opposite direction, and it lives in the
+host, not here.
+
+What this package does fetch is an **ICS subscription** — a published read-only
+address of a foreign calendar, pulled on a schedule and stored
+(`Subscriptions/`). It exists because the one provider our people actually use,
+Exchange Online, offers no CalDAV at all: measured on 29.10.2026,
+`outlook.office365.com/.well-known/caldav` answers 404, while iCloud answers
+401. A CalDAV client would not have reached them.
 
 ## License
 

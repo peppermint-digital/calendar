@@ -66,16 +66,27 @@ final class AgendaAssembler
      */
     public function own(int $userId, DateTimeInterface $from, DateTimeInterface $to, array $hidden = []): Collection
     {
-        return CalendarEvent::query()
+        /*
+         * Die Termin-Klasse des PRODUKTS, nicht die des Pakets.
+         *
+         * Hier stand bis zum 29.10.2026 `CalendarEvent::query()`. Das trifft
+         * dieselbe Tabelle und ist trotzdem falsch: Es ist nicht die Klasse,
+         * die das Produkt instanziiert — ihr fehlen dessen Beziehungen, Casts
+         * und ihr Morph-Typ. In drei von vier Systemen fiel das nicht auf,
+         * weil dort beides dasselbe ist.
+         */
+        $klasse = (string) config('calendar.event_model', CalendarEvent::class);
+
+        return $klasse::query()
             ->visibleTo($userId)
             ->inRange($from, $to)
-            ->orderBy(CalendarEvent::column('starts_at'))
+            ->orderBy($klasse::column('starts_at'))
             // Die Kategorien mitladen, wenn es sie gibt: Ohne das fragt der
             // Rueckfall in `EventKind::categories()` je Termin einzeln, und
             // hier laufen viele durch.
             ->with($this->mitKategorien())
             ->get()
-            ->reject(fn (CalendarEvent $event) => in_array($event->kind, $hidden, true))
+            ->reject(fn (CalendarEvent $event) => in_array($event->field('kind'), $hidden, true))
             ->map(fn (CalendarEvent $event) => $this->row($event))
             ->values();
     }
@@ -169,14 +180,32 @@ final class AgendaAssembler
     {
         $art = $event->kindDefinition();
 
+        /*
+         * Jedes Feld ueber `field()`, keines direkt.
+         *
+         * Hier stand bis zum 29.10.2026 `$event->starts_at` — und in einer
+         * Anwendung, die ihre Spalte seit Jahren `start_datetime` nennt, ist
+         * das nicht ein anderer Name fuer dasselbe, sondern `null`. Der Aufruf
+         * `null->toDateString()` bricht dann mitten in der Seite ab.
+         *
+         * Das war der Grund, warum der Peppermint Manager seine Agenda selbst
+         * gebaut hat: Er konnte diese hier nicht nehmen. Eine Zeile weiter
+         * unten stand es uebrigens schon richtig
+         * (`field('recurrence_rules')`) — ein halb angewandtes Muster ist
+         * schwerer zu sehen als ein fehlendes.
+         */
+        $beginn = $event->field('starts_at');
+        $ende = $event->field('ends_at');
+        $ganztags = (bool) $event->field('all_day');
+
         return [
-            'key' => (string) $event->id,
-            'id' => $event->id,
-            'date' => $event->starts_at->toDateString(),
-            'start' => $event->all_day ? null : $event->starts_at->format('H:i'),
-            'end' => $event->all_day || $event->ends_at === null ? null : $event->ends_at->format('H:i'),
-            'title' => (string) $event->title,
-            'location' => $event->location,
+            'key' => (string) $event->getKey(),
+            'id' => $event->getKey(),
+            'date' => $beginn->toDateString(),
+            'start' => $ganztags ? null : $beginn->format('H:i'),
+            'end' => $ganztags || $ende === null ? null : $ende->format('H:i'),
+            'title' => (string) $event->field('title'),
+            'location' => $event->field('location'),
             // KEINE Farbe: Die Farbtafel liegt im Produkt — der Manager hält
             // sie im Frontend, die Verwaltung im Controller. Die Zeile nennt
             // ihre Art, und das Produkt setzt die Farbe nach, mit derselben
@@ -189,10 +218,10 @@ final class AgendaAssembler
             // `false`, in allen vier Produkten, seit es das Feld gibt. Kein
             // Test hat es gemerkt, weil `false` eine plausible Antwort ist.
             'recurring' => $event->field('recurrence_rules') !== null,
-            'kind' => $event->kind,
+            'kind' => $event->field('kind'),
             // Vorbei ist abgeblendet. Was sonst noch abgeblendet gehört —
             // abgesagt, erledigt — weiss das Produkt und setzt es nach.
-            'dimmed' => $event->ends_at !== null && $event->ends_at->isPast(),
+            'dimmed' => $ende !== null && $ende->isPast(),
             'categories' => $art->categories($event),
         ];
     }
