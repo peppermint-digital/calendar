@@ -45,10 +45,8 @@ trait FindetHandelndePerson
      */
     protected function handelnde(): mixed
     {
-        $bruecke = '\\Peppermint\\AiBrainBridge\\Facades\\AiBrain';
-
-        if (class_exists($bruecke)) {
-            $adresse = $bruecke::actingUserEmail();
+        if ($this->brueckeEingerichtet()) {
+            $adresse = ('\\Peppermint\\AiBrainBridge\\Facades\\AiBrain')::actingUserEmail();
 
             if (is_string($adresse) && trim($adresse) !== '') {
                 $modell = (string) config('calendar.user_model');
@@ -60,5 +58,30 @@ trait FindetHandelndePerson
         }
 
         return auth()->user();
+    }
+
+    /**
+     * Ist die Bruecke EINGERICHTET — nicht bloss installiert?
+     *
+     * Der Unterschied hat am 18.10.2026 einen halben Tag gekostet, und ich bin
+     * am 29.10.2026 noch einmal hineingelaufen: `class_exists` sagt in AI Brain
+     * „ja", weil der Hub das Paket fuer die Umschaltleiste braucht — ohne es
+     * einzurichten. Der erste Aufruf wirft dann
+     * `BindingResolutionException: Unresolvable dependency … array $config`,
+     * und bei den fragenden Produkten kam das als „Something went wrong" an.
+     *
+     * Die Frage beantwortet deshalb das Bruecken-Paket selbst
+     * ({@see \Peppermint\AiBrainBridge\Verbund\Bruecke::eingerichtet()}) —
+     * es versucht, den Manager aufzuloesen, statt nach der Klasse zu fragen.
+     *
+     * `class_exists` bleibt davor stehen, aber auf der RICHTIGEN Klasse: Fuer
+     * dieses Paket ist `peppermint/ai-brain-bridge` ein `suggest` (Regel 7),
+     * es kann also ganz fehlen.
+     */
+    private function brueckeEingerichtet(): bool
+    {
+        $pruefung = '\\Peppermint\\AiBrainBridge\\Verbund\\Bruecke';
+
+        return class_exists($pruefung) && $pruefung::eingerichtet();
     }
 }

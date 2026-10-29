@@ -176,9 +176,23 @@ class BrainSubscribedEventSource extends EventSource
         );
     }
 
+    /**
+     * Ist die Bruecke EINGERICHTET — nicht bloss installiert?
+     *
+     * `class_exists` auf die Fassade waere die falsche Frage: AI Brain hat das
+     * Paket (fuer die Umschaltleiste), ohne es einzurichten, und der erste
+     * Aufruf wirft dort `BindingResolutionException`. Das Bruecken-Paket
+     * beantwortet die Frage selbst, indem es den Manager aufzuloesen versucht.
+     *
+     * Praktisch spielt es fuer DIESE Quelle keine Rolle — das Brain
+     * registriert keine Quellen, es ist die Nabe. Richtig ist es trotzdem, und
+     * die naechste Kopie dieser Zeile landet vielleicht woanders.
+     */
     protected function brueckeVorhanden(): bool
     {
-        return class_exists('\\Peppermint\\AiBrainBridge\\Facades\\AiBrain');
+        $pruefung = '\\Peppermint\\AiBrainBridge\\Verbund\\Bruecke';
+
+        return class_exists($pruefung) && $pruefung::eingerichtet();
     }
 
     /**
