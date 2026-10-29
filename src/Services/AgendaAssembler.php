@@ -64,7 +64,7 @@ final class AgendaAssembler
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function own(int $userId, DateTimeInterface $from, DateTimeInterface $to, array $hidden = []): Collection
+    public function own(int $userId, DateTimeInterface $from, DateTimeInterface $to, array $hidden = [], ?string $timezone = null): Collection
     {
         /*
          * Die Termin-Klasse des PRODUKTS, nicht die des Pakets.
@@ -87,7 +87,7 @@ final class AgendaAssembler
             ->with($this->mitKategorien())
             ->get()
             ->reject(fn (CalendarEvent $event) => in_array($event->field('kind'), $hidden, true))
-            ->map(fn (CalendarEvent $event) => $this->row($event))
+            ->map(fn (CalendarEvent $event) => $this->row($event, $timezone))
             ->values();
     }
 
@@ -101,7 +101,7 @@ final class AgendaAssembler
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function foreign(int $userId, DateTimeInterface $from, DateTimeInterface $to, array $hidden = []): Collection
+    public function foreign(int $userId, DateTimeInterface $from, DateTimeInterface $to, array $hidden = [], ?string $timezone = null): Collection
     {
         $sichtbare = collect($this->sources->available())
             ->reject(fn ($quelle, string $key) => in_array("source:{$key}", $hidden, true));
@@ -135,12 +135,12 @@ final class AgendaAssembler
         $farben = $sichtbare->map(fn ($quelle) => $quelle->colour())->all();
 
         return collect($this->sources->collect($userId, $from, $to, $sichtbare->keys()->all()))
-            ->map(function ($event) use ($namen, $farben) {
+            ->map(function ($event) use ($namen, $farben, $timezone) {
                 $daten = is_array($event) ? $event : $event->toArray();
 
-                $beginn = CarbonImmutable::parse($daten['starts_at']);
+                $beginn = $this->inZone(CarbonImmutable::parse($daten['starts_at']), $timezone);
                 $ende = isset($daten['ends_at']) && $daten['ends_at'] !== null
-                    ? CarbonImmutable::parse($daten['ends_at'])
+                    ? $this->inZone(CarbonImmutable::parse($daten['ends_at']), $timezone)
                     : null;
 
                 $ganztags = (bool) ($daten['all_day'] ?? false);
@@ -186,8 +186,8 @@ final class AgendaAssembler
     {
         [$from, $to] = $this->window($days, $timezone);
 
-        return $this->own($userId, $from, $to, $hidden)
-            ->concat($this->foreign($userId, $from, $to, $hidden))
+        return $this->own($userId, $from, $to, $hidden, $timezone)
+            ->concat($this->foreign($userId, $from, $to, $hidden, $timezone))
             // EIN zusammengesetzter Schlüssel, nicht zwei:
             // `sortBy([$a, $b])` sortierte hier nur nach dem ersten, und der
             // ganztägige Eintrag landete hinter dem um zehn. Lexikographisch
@@ -205,7 +205,7 @@ final class AgendaAssembler
      *
      * @return array<string, mixed>
      */
-    private function row(CalendarEvent $event): array
+    private function row(CalendarEvent $event, ?string $timezone = null): array
     {
         $art = $event->kindDefinition();
 
@@ -223,8 +223,8 @@ final class AgendaAssembler
          * (`field('recurrence_rules')`) — ein halb angewandtes Muster ist
          * schwerer zu sehen als ein fehlendes.
          */
-        $beginn = $event->field('starts_at');
-        $ende = $event->field('ends_at');
+        $beginn = $this->inZone($event->field('starts_at'), $timezone);
+        $ende = $this->inZone($event->field('ends_at'), $timezone);
         $ganztags = (bool) $event->field('all_day');
 
         return [
@@ -266,6 +266,36 @@ final class AgendaAssembler
             'dimmed' => $ende !== null && $ende->isPast(),
             'categories' => $art->categories($event),
         ];
+    }
+
+    /**
+     * Denselben Zeitpunkt in der Zone, in der er angezeigt wird.
+     *
+     * ## Warum das nicht nur das Fenster betrifft
+     *
+     * `rows()` nahm bis zum 29.10.2026 eine Zone und benutzte sie nur fuer das
+     * FENSTER. Formatiert wurde danach in der Zone der Anwendung — die Agenda
+     * suchte also die richtigen Termine und schrieb die falsche Uhrzeit daneben.
+     *
+     * Gefunden in AI Brain: Dort schreibt der Kalender-Speicher ausdruecklich
+     * in `Europe/Berlin`, die Anwendung laeuft auf UTC. Ein Termin um 09:00
+     * stand in der Agenda als 08:00.
+     *
+     * In CRM und Verwaltung fiel es nicht auf, und das ist kein Zufall: Dort
+     * schreibt und liest alles in derselben Zone, und ohne Angabe bleibt es
+     * genau dabei. Deshalb aendert dieser Fix dort nichts.
+     *
+     * Die ZONE betrifft auch das Datum: Ein Termin um 00:30 Berliner Zeit liegt
+     * in UTC am Tag davor. Wer nur die Uhrzeit umrechnet, haengt die Zeile unter
+     * die falsche Tagesueberschrift.
+     */
+    private function inZone(mixed $zeitpunkt, ?string $timezone): mixed
+    {
+        if ($zeitpunkt === null || $timezone === null) {
+            return $zeitpunkt;
+        }
+
+        return CarbonImmutable::parse($zeitpunkt)->setTimezone($timezone);
     }
 
     /**

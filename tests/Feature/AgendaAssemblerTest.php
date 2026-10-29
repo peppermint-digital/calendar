@@ -220,3 +220,65 @@ it('bringt die Farbe der fremden Quelle gleich mit', function () {
 
     expect($zeile['colour'])->toBe('#123456');
 });
+
+describe('die Zone, in der die Uhrzeit steht', function () {
+    /*
+     * `rows()` nahm bis zum 29.10.2026 eine Zone und benutzte sie nur fuer das
+     * FENSTER. Formatiert wurde in der Zone der Anwendung — die Agenda suchte
+     * also die richtigen Termine und schrieb die falsche Uhrzeit daneben.
+     *
+     * Gefunden in AI Brain: Dort schreibt der Kalender-Speicher ausdruecklich
+     * in Europe/Berlin, die Anwendung laeuft auf UTC. Ein Termin um 09:00 stand
+     * in der Agenda als 08:00 — und zwar erst, nachdem die Agenda dort auf das
+     * Paket umgestellt wurde. Vorher hat das Produkt selbst formatiert und es
+     * richtig gemacht; die Umstellung haette eine Verschlechterung gebracht,
+     * wenn der Test sie nicht gefangen haette.
+     */
+    it('formatiert in der gewuenschten Zone, nicht in der der Anwendung', function () {
+        // 09:00 Berliner Zeit im Oktober ist 08:00 UTC.
+        agendaTermin([
+            'title' => 'Berliner Termin',
+            'starts_at' => '2026-09-08 07:00',
+            'ends_at' => '2026-09-08 08:00',
+        ]);
+
+        $zeile = collect(app(AgendaAssembler::class)->rows(1, timezone: 'Europe/Berlin'))
+            ->firstWhere('title', 'Berliner Termin');
+
+        // 07:00 UTC = 09:00 in Berlin (Sommerzeit).
+        expect($zeile['start'])->toBe('09:00')
+            ->and($zeile['end'])->toBe('10:00');
+    });
+
+    it('laesst ohne Zonenangabe alles wie es war', function () {
+        // Die Bedingung dafuer, dass CRM und Verwaltung von dem Fix nichts
+        // merken: Sie geben keine Zone mit, und bei ihnen schreibt und liest
+        // alles in derselben.
+        agendaTermin([
+            'title' => 'Ohne Zone',
+            'starts_at' => '2026-09-08 07:00',
+            'ends_at' => '2026-09-08 08:00',
+        ]);
+
+        $zeile = collect(app(AgendaAssembler::class)->rows(1))->firstWhere('title', 'Ohne Zone');
+
+        expect($zeile['start'])->toBe('07:00');
+    });
+
+    it('haengt die Zeile unter die Tagesueberschrift der gewuenschten Zone', function () {
+        // Der Fall, den eine reine Uhrzeit-Umrechnung uebersieht: 00:30
+        // Berliner Zeit liegt in UTC am Tag DAVOR. Wer nur die Stunde dreht,
+        // schreibt die richtige Uhrzeit unter den falschen Tag.
+        agendaTermin([
+            'title' => 'Kurz nach Mitternacht',
+            'starts_at' => '2026-09-08 22:30',
+            'ends_at' => '2026-09-08 23:30',
+        ]);
+
+        $zeile = collect(app(AgendaAssembler::class)->rows(1, timezone: 'Europe/Berlin'))
+            ->firstWhere('title', 'Kurz nach Mitternacht');
+
+        expect($zeile['date'])->toBe('2026-09-09')
+            ->and($zeile['start'])->toBe('00:30');
+    });
+});
