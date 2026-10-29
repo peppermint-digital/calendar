@@ -17,7 +17,10 @@ class ReconcileEventRemindersCommand extends Command
 
     public function handle(): int
     {
-        if (! config('calendar.reminders.enabled', false)) {
+        $probelauf = (bool) $this->option('dry-run');
+        $eingeschaltet = (bool) config('calendar.reminders.enabled', false);
+
+        if (! $eingeschaltet && ! $probelauf) {
             // Nicht als Fehler: Abgeschaltet ist die Vorgabe, und ein Lauf,
             // der deswegen abbricht, laesst einen Zeitplan rot blinken fuer
             // eine Entscheidung, die jemand bewusst getroffen hat.
@@ -37,12 +40,16 @@ class ReconcileEventRemindersCommand extends Command
             );
         }
 
-        $probelauf = (bool) $this->option('dry-run');
-
         $bilanz = $probelauf ? $this->probelauf() : app(EventReminders::class)->reconcile();
 
         if ($probelauf) {
             $this->components->info('PROBELAUF — alles zurueckgerollt, nichts bleibt stehen.');
+        }
+
+        if ($probelauf && ! $eingeschaltet) {
+            $this->components->warn(
+                'Der Schalter steht auf AUS — gemessen wurde, was beim Einschalten passieren WUERDE.'
+            );
         }
 
         $this->components->twoColumnDetail('angelegt', (string) $bilanz['created']);
@@ -100,11 +107,34 @@ class ReconcileEventRemindersCommand extends Command
      * davon SOFORT faellig waeren — und das ist die Zahl, wegen der jemand
      * einen Probelauf verlangt.
      *
+     * ## Warum der Schalter hier umgelegt wird (29.10.2026)
+     *
+     * Weil er sonst genau die Frage verbietet, fuer die es den Probelauf gibt.
+     * Bis heute kehrte {@see EventReminders::reconcile()} bei
+     * `enabled = false` sofort mit Nullen um — und das ist der Zustand JEDES
+     * Produkts, das noch nicht scharf geschaltet ist. Der Probelauf meldete
+     * dort „0 angelegt, 0 sofort faellig", und das las sich wie eine
+     * Entwarnung. Es war keine: Es war die Antwort auf eine Frage, die nie
+     * gestellt wurde.
+     *
+     * Gefordert ist „vorher zaehlen, was beim ersten Lauf an echte Menschen
+     * rausginge". Diese Zahl gab es vorher erst NACH dem Einschalten — also
+     * nachdem das Risiko eingegangen war, gegen das sie schuetzen soll.
+     *
+     * Umgelegt wird nur im Speicher dieses einen Prozesses: `config()` schreibt
+     * keine Datei, und der Prozess endet mit dem Befehl. Die Transaktion rollt
+     * davon unabhaengig zurueck.
+     *
      * @return array{created: int, moved: int, removed: int, skipped: int, faellig_sofort: int, faellige_menschen: int}
      */
     private function probelauf(): array
     {
         DB::beginTransaction();
+
+        // Siehe Kopf: ohne das misst ein Probelauf bei ausgeschaltetem
+        // Schalter nichts und meldet trotzdem eine Zahl.
+        $vorher = config('calendar.reminders.enabled', false);
+        config(['calendar.reminders.enabled' => true]);
 
         try {
             $bilanz = app(EventReminders::class)->reconcile();
@@ -124,6 +154,12 @@ class ReconcileEventRemindersCommand extends Command
         } finally {
             // Im `finally`, damit auch eine Ausnahme nichts stehen laesst.
             DB::rollBack();
+
+            // Und der Schalter zurueck. Dass der Prozess gleich endet, ist
+            // kein Argument: Unter Octane bleibt die Anwendung stehen, und ein
+            // Befehl, der aus einem Auftrag heraus laeuft, haette den Riegel
+            // dann fuer alles danach geoeffnet.
+            config(['calendar.reminders.enabled' => $vorher]);
         }
     }
 }

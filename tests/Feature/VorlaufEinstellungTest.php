@@ -151,3 +151,58 @@ it('zaehlt im Probelauf, was SOFORT herausginge — und laesst nichts stehen', f
     // Nichts bleibt stehen — das ist der ganze Punkt.
     expect(Reminder::count())->toBe(0);
 });
+
+it('misst im Probelauf auch dann, wenn der Schalter noch auf AUS steht', function () {
+    // Der Fall JEDES Produkts, das noch nicht scharf geschaltet ist — und
+    // genau der, fuer den die Zahl verlangt wird. Vorher kehrte `reconcile()`
+    // bei `enabled = false` mit Nullen um: Der Probelauf meldete „0 sofort
+    // faellig" und las sich wie eine Entwarnung, obwohl er nichts gemessen
+    // hatte. Die Zahl gab es erst nach dem Einschalten, also nachdem das
+    // Risiko eingegangen war, gegen das sie schuetzen soll.
+    config()->set('calendar.reminders.enabled', false);
+
+    $gleich = CalendarEvent::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'In fuenf Minuten',
+        'starts_at' => now()->addMinutes(5),
+        'ends_at' => now()->addMinutes(35),
+    ]);
+    $gleich->attendees()->create(['user_id' => 2, 'email' => 'chris@example.test']);
+
+    expect(Artisan::call('calendar:reconcile-reminders', ['--dry-run' => true]))->toBe(0);
+
+    $ausgabe = Artisan::output();
+
+    expect(preg_match('/angelegt\D*2/', $ausgabe))->toBe(1);
+    expect(preg_match('/davon sofort faellig\D*2/', $ausgabe))->toBe(1);
+
+    // Und die Ausgabe sagt, dass gemessen und nicht gearbeitet wurde — sonst
+    // liest jemand die Zahl als „laeuft schon".
+    expect($ausgabe)->toContain('AUS');
+
+    // Der Schalter bleibt aus, und zwar ueber den Lauf hinaus: Umgelegt wird
+    // nur im Speicher des Probelaufs.
+    expect(config('calendar.reminders.enabled'))->toBeFalse();
+    expect(Reminder::count())->toBe(0);
+});
+
+it('laesst einen ECHTEN Lauf bei ausgeschaltetem Schalter weiter in Ruhe', function () {
+    // Die Gegenprobe zum Test darueber: Der Probelauf darf den Riegel oeffnen,
+    // der Echtlauf nicht. Ohne diesen Test waere die Lockerung oben eine
+    // Hintertuer, die niemand bemerkt.
+    config()->set('calendar.reminders.enabled', false);
+
+    CalendarEvent::create([
+        'kind' => 'business',
+        'owner_id' => 1,
+        'title' => 'In fuenf Minuten',
+        'starts_at' => now()->addMinutes(5),
+        'ends_at' => now()->addMinutes(35),
+    ]);
+
+    expect(Artisan::call('calendar:reconcile-reminders'))->toBe(0);
+
+    expect(Artisan::output())->toContain('abgeschaltet');
+    expect(Reminder::count())->toBe(0);
+});
