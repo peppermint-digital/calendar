@@ -152,3 +152,48 @@ it('nennt die Art und faerbt nicht selbst', function () {
 
     expect($zeile['kind'])->toBe('business')->and($zeile['colour'])->toBeNull();
 });
+
+/**
+ * Woran der Termin hängt — und wohin ein fremder führt.
+ *
+ * Beides stand bis zum 29.10.2026 nicht in der Zeile, und beides ist ein
+ * Begriff dieses Pakets: `subject_type`/`subject_id` sind Kernspalten, und
+ * `ExternalEvent::$url` ist ein Feld des Pakets.
+ *
+ * Die Folge: Jedes Produkt, das von der Agenda aus zur Sache springen wollte,
+ * holte sich die Angaben selbst aus den Rohdaten — AI Brain tat es in
+ * TypeScript, neben der Zeile, die das Paket schon gebaut hatte. Das ist die
+ * dritte Fassung derselben Abbildung.
+ */
+it('nennt den Gegenstand eines eigenen Termins', function () {
+    agendaTermin(['subject_type' => 'task', 'subject_id' => 77]);
+
+    $zeile = collect(app(AgendaAssembler::class)->rows(1))->firstWhere('title', 'Termin');
+
+    expect($zeile['subject_type'])->toBe('task')
+        ->and($zeile['subject_id'])->toBe(77);
+});
+
+it('laesst den Gegenstand leer, wenn der Termin an nichts haengt', function () {
+    // `null` ist hier die Antwort und kein Fehlen: Ein Termin ohne Gegenstand
+    // ist der Normalfall, und das Produkt muss die beiden Faelle
+    // unterscheiden koennen, ohne nachzufragen.
+    agendaTermin();
+
+    $zeile = collect(app(AgendaAssembler::class)->rows(1))->firstWhere('title', 'Termin');
+
+    expect($zeile)->toHaveKey('subject_type')
+        ->and($zeile['subject_type'])->toBeNull()
+        ->and($zeile['subject_id'])->toBeNull();
+});
+
+it('nennt bei einem fremden Termin den Weg in sein Heimatsystem', function () {
+    // Ein fremder Termin hat hier keine Einzelansicht. Ohne diese Adresse
+    // bleibt der Klick auf die Zeile ohne Ziel — oder das Produkt holt sie
+    // sich selbst, und dann gibt es die Abbildung zweimal.
+    DemoSource::$available = true;
+
+    $zeile = collect(app(AgendaAssembler::class)->rows(1))->firstWhere('title', 'Meeting elsewhere');
+
+    expect($zeile['url'])->toBe('https://elsewhere.test/events/42');
+});

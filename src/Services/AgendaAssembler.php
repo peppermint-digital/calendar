@@ -140,6 +140,16 @@ final class AgendaAssembler
                     'badge' => $namen[$daten['source'] ?? ''] ?? ($daten['source'] ?? null),
                     'recurring' => (bool) ($daten['recurring'] ?? false),
                     'foreign' => true,
+                    /*
+                     * Der Weg ins Heimatsystem. Ein fremder Termin hat hier
+                     * keine Einzelansicht — ein Klick auf die Zeile muss
+                     * dorthin fuehren, wo er gepflegt wird.
+                     *
+                     * `ExternalEvent` traegt das Feld schon; es fehlte nur in
+                     * der Zeile, und jedes Produkt hat es sich deshalb selbst
+                     * aus den Rohdaten geholt.
+                     */
+                    'url' => $daten['url'] ?? null,
                 ];
             })
             ->values();
@@ -219,6 +229,19 @@ final class AgendaAssembler
             // Test hat es gemerkt, weil `false` eine plausible Antwort ist.
             'recurring' => $event->field('recurrence_rules') !== null,
             'kind' => $event->field('kind'),
+            /*
+             * Woran der Termin haengt — eine Aufgabe, ein Vorgang, ein Ticket.
+             *
+             * Zwei KERNSPALTEN dieses Pakets, und deshalb gehoeren sie in die
+             * Zeile: Ohne sie muss jedes Produkt, das von der Agenda aus zur
+             * Sache springen will, die Termine ein zweites Mal laden und
+             * zuordnen. Das Brain tat genau das in TypeScript.
+             *
+             * Was die Verweise BEDEUTEN, steht weiter nicht hier: `task` ist
+             * ein Begriff des Produkts, und die Adresse dorthin kennt nur es.
+             */
+            'subject_type' => $event->field('subject_type'),
+            'subject_id' => $event->field('subject_id'),
             // Vorbei ist abgeblendet. Was sonst noch abgeblendet gehört —
             // abgesagt, erledigt — weiss das Produkt und setzt es nach.
             'dimmed' => $ende !== null && $ende->isPast(),

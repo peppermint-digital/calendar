@@ -46,6 +46,7 @@ class DemoSource extends EventSource
                 startsAt: CarbonImmutable::parse('2026-09-08 09:00'),
                 endsAt: CarbonImmutable::parse('2026-09-08 10:00'),
                 location: 'Remote',
+                url: 'https://elsewhere.test/events/42',
                 extra: self::$extra,
             ),
         ];
