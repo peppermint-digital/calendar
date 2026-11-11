@@ -1598,6 +1598,22 @@ Two status codes carry the distinction that matters:
 | **404** | the source is not (or no longer) writable | Not an error — it is the answer to "not enabled for you". Lose the tool or the grant over there and the system disappears here by itself. |
 | **502** | the operation failed over there | Not 500: this application is fine, the other one did not play along. The response names the source and the operation, because "something went wrong" sends the next person looking in the wrong place. |
 
+**Fetching the kinds answers 502 too**, since 11.11.2026 — it was the only one
+of the four that did not. A target that could not be reached answered 200 with
+an empty kind list, which is indistinguishable from "offers no kinds", and so
+`KindPicker`'s unreachable notice was unreachable code: the prop was built, the
+text stood, the package test was green, and no value ever arrived in production
+(Bug #1416).
+
+The line runs between a *list* and a *form*, not between reading and writing.
+`EventSourceRegistry::collect()` still swallows: a calendar that goes blank
+because another system is slow is worse than one that is incomplete — you can
+see the incompleteness, nobody can explain the empty page. An empty kind list
+is the opposite, because it lets the user act as if the kind did not exist.
+`events()` is therefore untouched and `RemoteEventSource::kinds()` raises
+`ExternalSourceFailed`. "Does not offer the operation" stays an empty list —
+that one is a real answer.
+
 Listing the sources is *not* here. Which ones exist and how they appear — colour, order,
 label — is presentation, and that stays in the product.
 

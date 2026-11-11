@@ -4,7 +4,10 @@ use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Route;
 use Peppermint\Calendar\Http\CalendarRoutes;
 use Peppermint\Calendar\Sources\EventSourceRegistry;
+use Peppermint\Calendar\Sources\RemoteEventSource;
+use Peppermint\Calendar\Sources\RemoteResult;
 use Peppermint\Calendar\Tests\Fixtures\DemoSource;
+use Peppermint\Calendar\Tests\Fixtures\FakeRemoteCalendar;
 use Peppermint\Calendar\Tests\Fixtures\WritableDemoSource;
 
 /**
@@ -149,6 +152,56 @@ it('gibt 404, sobald niemand mehr dort schreiben darf', function () {
     $this->actingAs($this->person)
         ->getJson('api/calendar/sources/writable-demo/kinds')
         ->assertNotFound();
+});
+
+/**
+ * Der ganze Weg bei einem unerreichbaren Zielsystem (Bug #1416).
+ *
+ * Absichtlich mit der ECHTEN {@see RemoteEventSource} und nicht mit der
+ * Vorrichtung: Geprueft werden soll die Kette, nicht die Zusage einer
+ * Attrappe — fremdes System antwortet nicht, Quelle wirft, Controller
+ * antwortet 502. Dreht man das alte `return []` in `kinds()` zurueck, faellt
+ * dieser Test mit 200 statt 502.
+ */
+it('macht aus einem unerreichbaren Zielsystem beim Artenabruf 502', function () {
+    // Dieser Abruf war der einzige der vier, der NICHT im 502-Weg lag: Ein
+    // unerreichbares Zielsystem beantwortete ihn mit 200 und einer leeren
+    // Artenliste. Die Maske konnte „nicht erreichbar" deshalb nie sagen — der
+    // Hinweis am KindPicker war unerreichbarer Code.
+    $fremd = new FakeRemoteCalendar;
+    $fremd->antworten['calendar.kinds.list'] = RemoteResult::failed('Zeitueberschreitung nach 5s', 'unreachable');
+
+    app(EventSourceRegistry::class)->register(new RemoteEventSource($fremd));
+
+    $this->actingAs($this->person)
+        ->getJson('api/calendar/sources/verwaltung/kinds')
+        ->assertStatus(502)
+        // Mit Quelle und Vorgang, damit die Oberflaeche sagen kann, WELCHES
+        // System bei WELCHEM Schritt nicht mitgespielt hat.
+        ->assertJsonPath('source', 'verwaltung')
+        ->assertJsonPath('operation', 'Terminarten holen');
+});
+
+/**
+ * Und die Gegenprobe zu der Annahme, an der Bug #1416 haengen geblieben war:
+ * Ein unerreichbares System faellt NICHT vorher aus der Liste der
+ * beschreibbaren Ziele heraus.
+ *
+ * Waere es so — die Vermutung im Bugtext —, waere die Antwort oben ein 404
+ * und kein 502. `isWritable()` fragt eine lokale Faehigkeitsliste und ein
+ * lokales Recht; es kennt die Erreichbarkeit gar nicht.
+ */
+it('laesst ein unerreichbares Ziel beschreibbar bleiben', function () {
+    $fremd = new FakeRemoteCalendar;
+    $fremd->antworten['calendar.kinds.list'] = RemoteResult::failed('Zeitueberschreitung', 'unreachable');
+
+    app(EventSourceRegistry::class)->register(new RemoteEventSource($fremd));
+
+    $this->actingAs($this->person)
+        ->getJson('api/calendar/sources/verwaltung/kinds')
+        ->assertStatus(502);
+
+    expect(array_keys(app(EventSourceRegistry::class)->writable()))->toContain('verwaltung');
 });
 
 it('macht aus einem Fehlschlag drueben 502 und nennt Quelle und Vorgang', function () {
