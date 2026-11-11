@@ -48,6 +48,11 @@ export { EventForm } from './EventForm';
 // Die vollstaendige Maske: Zielwahl, Felder, Speichern — damit ein Produkt den
 // Vorgang nicht zum fuenften Mal selbst zusammensetzt (#7765).
 export { EventComposer } from './EventComposer';
+// Der Kopf des Anlege-Assistenten. Steht hier, weil ein Produkt mit eigener
+// Schrittfolge dieselbe Kette zeichnen soll — nicht, weil der Composer sie
+// gereicht bekommen muesste; er baut sie selbst.
+export { ComposerSteps, defaultComposerStepsLabels } from './ComposerSteps';
+export type { ComposerStep, ComposerStepsLabels, ComposerStepsProps } from './ComposerSteps';
 // Die geplante Zeit an einem Gegenstand — Liste, Summe, Anlegen, Entfernen.
 export { PlannedBlocks } from './PlannedBlocks';
 export type { PlannedBlock, PlannedBlocksLabels, PlannedBlocksProps } from './PlannedBlocks';

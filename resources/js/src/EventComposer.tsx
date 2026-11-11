@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { ComposerSteps, type ComposerStep, type ComposerStepsLabels } from './ComposerSteps';
 import { DateField } from './DateField';
 import { EventForm, type EventFormErrors, type EventFormLabels } from './EventForm';
 import { PlannableSearch, type Plannable } from './PlannableSearch';
@@ -16,6 +17,13 @@ export type EventComposerLabels = {
     /** Die beiden Wege ueber der Maske. */
     modeEvent: string;
     modePlannable: string;
+    /** Was unter den beiden Wegen steht, damit die Wahl ohne Raten getroffen wird. */
+    modeEventHint: string;
+    modePlannableHint: string;
+    /** Die Beschriftungen der Schritte im Kopf des Assistenten. */
+    stepWhat: string;
+    stepFields: string;
+    stepPlannable: string;
     /** Ueber dem Zeitraum im Aufgaben-Weg. */
     plannableSlot: string;
     /** Ueber der Suche. */
@@ -32,6 +40,11 @@ const COMPOSER_DEFAULTS: EventComposerLabels = {
         'hier erscheint er danach als fremder Termin, angezeigt und nicht kopiert.',
     modeEvent: 'Termin',
     modePlannable: 'Aufgabe einplanen',
+    modeEventHint: 'Ein Termin mit Titel, Zeit und Ort.',
+    modePlannableHint: 'Eine Aufgabe, die es schon gibt, in den Kalender legen.',
+    stepWhat: 'Was',
+    stepFields: 'Angaben',
+    stepPlannable: 'Aufgabe und Zeitraum',
     plannableSlot: 'Wann',
     plannablePick: 'Was',
     plannableNew: 'Neue Aufgabe anlegen',
@@ -98,7 +111,12 @@ export type EventComposerProps = {
     submitting?: boolean;
     error?: string | null;
     fieldErrors?: EventFormErrors;
-    labels?: Partial<EventFormLabels & EventComposerLabels>;
+    /**
+     * Alle Beschriftungen dieser Maske in EINEM Objekt — die der Felder, die
+     * der Maske selbst und die der Schrittkette. Ein Produkt soll nicht
+     * nachsehen muessen, welches Wort zu welchem Bauteil gehoert.
+     */
+    labels?: Partial<EventFormLabels & EventComposerLabels & ComposerStepsLabels>;
 
     /**
      * Die Umhuellung der ABSCHNITTE, vom Produkt gestellt.
@@ -231,6 +249,11 @@ export function EventComposer({
 
     const [eigenerFehler, setEigenerFehler] = useState<string | null>(null);
 
+    // Eindeutig je Maske: Zwei Composer auf einer Seite duerfen nicht
+    // dieselben Kennungen vergeben, sonst zeigt `aria-describedby` auf den
+    // Hinweis der anderen.
+    const kennung = useId();
+
     const fremd = useRemoteTarget({
         sources: targets,
         basePath,
@@ -328,6 +351,60 @@ export function EventComposer({
 
     const aufgabenWeg = Boolean(plannable) && ! bearbeiten;
 
+    /**
+     * Die Schritte, die es in DIESER Maske gibt.
+     *
+     * Sie haengen daran, was das Produkt mitbringt — deshalb stehen sie hier und
+     * nicht in {@link ComposerSteps}. Ohne angestecktes Aufgabensystem gibt es
+     * nichts zu fragen, und dann bleibt ein Schritt uebrig: Die Kette zeichnet
+     * sich gar nicht, und niemand klickt sich durch eine Frage mit einer
+     * einzigen Antwort.
+     *
+     * Beim BEARBEITEN gibt es die Wahl ohnehin nicht — der Eintrag ist schon,
+     * was er ist. Ihn von einem Termin in eine eingeplante Aufgabe zu
+     * verwandeln waere ein anderer Vorgang als ihn zu aendern.
+     */
+    const schritte = useMemo<ComposerStep[]>(() => {
+        const liste: ComposerStep[] = [];
+
+        if (aufgabenWeg) {
+            liste.push({
+                key: 'was',
+                label: beschriftung.stepWhat,
+                chosen: weg === 'termin' ? beschriftung.modeEvent : beschriftung.modePlannable,
+            });
+        }
+
+        liste.push({
+            key: 'details',
+            label: weg === 'aufgabe' && aufgabenWeg ? beschriftung.stepPlannable : beschriftung.stepFields,
+        });
+
+        return liste;
+    }, [
+        aufgabenWeg,
+        beschriftung.modeEvent,
+        beschriftung.modePlannable,
+        beschriftung.stepFields,
+        beschriftung.stepPlannable,
+        beschriftung.stepWhat,
+        weg,
+    ]);
+
+    const [schritt, setSchritt] = useState<string>(() => (aufgabenWeg ? 'was' : 'details'));
+
+    /**
+     * Auf einem Schritt stehen, den es nicht mehr gibt, ist eine leere Maske.
+     *
+     * Passiert, sobald ein Produkt `plannable` erst nachliefert oder wieder
+     * wegnimmt — dann faellt „was" weg, waehrend es der offene Schritt ist.
+     */
+    useEffect(() => {
+        if (! schritte.some((eintrag) => eintrag.key === schritt)) {
+            setSchritt(schritte[0]!.key);
+        }
+    }, [schritt, schritte]);
+
     /** Die Umhuellung des Produkts — oder ein schlichter Rahmen. */
     const umhuellen = (kinder: ReactNode): ReactNode =>
         renderSection ? renderSection(kinder) : <div className="rounded-lg border p-4">{kinder}</div>;
@@ -335,12 +412,23 @@ export function EventComposer({
     return (
         <div className="space-y-4">
             {/*
+                Der Kopf des Assistenten. Er zeichnet sich selbst nicht, solange
+                es nur einen Schritt gibt — siehe ComposerSteps.
+            */}
+            <ComposerSteps steps={schritte} current={schritt} onGoTo={setSchritt} labels={labels} />
+
+            {/*
                 Die Zielwahl steht VOR der Maske und nur beim Anlegen: Ein
                 Termin, den es schon gibt, gehört bereits einem System. Ihn
                 umzuziehen wäre ein anderer Vorgang als ihn zu ändern, und die
                 Maske ließe beides gleich aussehen.
+
+                Und nur im Angaben-Schritt des Termin-Wegs: Über der Frage „Was
+                lege ich an?" stünde sonst eine Antwort auf „wo?", die für den
+                Aufgaben-Weg gar nicht gilt — dort entsteht der Zeitblock im
+                System der Aufgabe.
             */}
-            {!bearbeiten && fremd.writableSources.length > 0 && umhuellen(
+            {!bearbeiten && schritt === 'details' && weg === 'termin' && fremd.writableSources.length > 0 && umhuellen(
                 <div className="space-y-2">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                         <label htmlFor="event-composer-target" className="text-sm font-medium whitespace-nowrap">
@@ -373,31 +461,63 @@ export function EventComposer({
             )}
 
             {/*
-                Die Wahl steht VOR den Feldern, weil sie bestimmt, welche
-                gebraucht werden. Zwei Knoepfe, kein Dialog: Ein Dialog davor
-                waere ein Klick mehr fuer den haeufigeren der beiden Wege.
+                Schritt 1: die Weiche. Sie bestimmt, welche Felder danach
+                ueberhaupt gebraucht werden — deshalb steht sie davor und nicht
+                daneben.
+
+                Zwei grosse Flaechen statt zweier schmaler Knoepfe: Auf dieser
+                Stufe ist die Wahl das Einzige auf dem Schirm, und auf einem
+                Telefon ist eine Flaeche, die man trifft, mehr wert als eine,
+                die Platz spart. Jede traegt ihre Erklaerung, damit die Wahl
+                nicht aus zwei Wörtern geraten werden muss.
             */}
-            {aufgabenWeg && umhuellen(
-                <div className="flex gap-2">
-                    {(['termin', 'aufgabe'] as const).map((eintrag) => (
-                        <button
-                            key={eintrag}
-                            type="button"
-                            onClick={() => setWeg(eintrag)}
-                            aria-pressed={weg === eintrag}
-                            className={
-                                weg === eintrag
-                                    ? 'h-9 flex-1 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground'
-                                    : 'h-9 flex-1 rounded-md border px-3 text-sm font-medium hover:bg-muted'
-                            }
-                        >
-                            {eintrag === 'termin' ? beschriftung.modeEvent : beschriftung.modePlannable}
-                        </button>
-                    ))}
+            {schritt === 'was' && umhuellen(
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    {(['termin', 'aufgabe'] as const).map((eintrag) => {
+                        const name =
+                            eintrag === 'termin' ? beschriftung.modeEvent : beschriftung.modePlannable;
+                        const erklaerung =
+                            eintrag === 'termin'
+                                ? beschriftung.modeEventHint
+                                : beschriftung.modePlannableHint;
+
+                        return (
+                            <button
+                                key={eintrag}
+                                type="button"
+                                data-mode={eintrag}
+                                onClick={() => {
+                                    setWeg(eintrag);
+                                    setSchritt('details');
+                                }}
+                                aria-pressed={weg === eintrag}
+                                // Der Name ist das WORT, die Erklaerung eine
+                                // Beschreibung. Ohne diese Trennung zieht der
+                                // Knopf seinen ganzen Inhalt in den Namen, und
+                                // ein Vorleser sagt „Aufgabe einplanen Eine
+                                // Aufgabe, die es schon gibt, in den Kalender
+                                // legen" — als waere das der Name.
+                                aria-label={name}
+                                aria-describedby={`${kennung}-${eintrag}-hinweis`}
+                                className={
+                                    'flex-1 rounded-md border p-4 text-left hover:bg-muted ' +
+                                    (weg === eintrag ? 'border-primary' : '')
+                                }
+                            >
+                                <span className="block text-sm font-medium">{name}</span>
+                                <span
+                                    id={`${kennung}-${eintrag}-hinweis`}
+                                    className="mt-1 block text-xs text-muted-foreground"
+                                >
+                                    {erklaerung}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>,
             )}
 
-            {aufgabenWeg && weg === 'aufgabe'
+            {schritt !== 'details' ? null : aufgabenWeg && weg === 'aufgabe'
                 ? umhuellen(
                       <div className="space-y-4">
                           <div className="space-y-2">

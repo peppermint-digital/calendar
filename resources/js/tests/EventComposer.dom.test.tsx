@@ -364,7 +364,14 @@ describe('der Aufgaben-Weg', () => {
     });
 
     /** Im Termin-Weg bleibt die Maske, wie sie war. */
-    it('zeigt die Felder weiter, solange „Termin" gewaehlt ist', () => {
+    /**
+     * Bis zum 11.11.2026 stand das Formular sofort da und die Weiche darueber.
+     * Seit dem Assistenten ist die Weiche ein eigener Schritt: Erst die Wahl,
+     * dann die Felder — das ist der Zweck der Schritte und keine Nebenwirkung.
+     * Was unveraendert gilt, ist das Ziel des Tests: Der Termin-Weg fuehrt zu
+     * den Feldern, nicht zur Aufgabensuche.
+     */
+    it('zeigt die Felder, sobald „Termin" gewaehlt ist', () => {
         render(
             <EventComposer
                 kinds={EIGENE}
@@ -374,7 +381,63 @@ describe('der Aufgaben-Weg', () => {
             />,
         );
 
+        // Auf der ersten Stufe steht die Wahl allein — noch keine Felder.
+        expect(screen.queryByLabelText(/Titel/)).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Termin' }));
+
         expect(screen.getByLabelText(/Titel/)).toBeTruthy();
+    });
+
+    /**
+     * Ohne Aufgabensystem gibt es nichts zu fragen. Dann darf der Assistent
+     * nicht im Weg stehen: keine Kette, keine Stufe, direkt die Felder.
+     */
+    it('fragt nicht, wo es nur eine Antwort gibt', () => {
+        const { container } = render(
+            <EventComposer kinds={EIGENE} value={null} onSaveHere={() => {}} />,
+        );
+
+        expect(container.querySelector('[data-slot="composer-steps"]')).toBeNull();
+        expect(screen.getByLabelText(/Titel/)).toBeTruthy();
+    });
+
+    /** Beim Bearbeiten steht fest, was der Eintrag ist — kein Assistent. */
+    it('zeigt beim Bearbeiten keine Schritte', () => {
+        const { container } = render(
+            <EventComposer
+                kinds={EIGENE}
+                value={{ ...emptyDraft(), kind: 'crm_termin', title: 'Schon da' }}
+                onSaveHere={() => {}}
+                plannable={{ search: () => Promise.resolve(offen), onSchedule: () => {} }}
+            />,
+        );
+
+        expect(container.querySelector('[data-slot="composer-steps"]')).toBeNull();
+        expect(screen.getByLabelText(/Titel/)).toBeTruthy();
+    });
+
+    /**
+     * Der Rueckweg ist der Grund fuer die Kette. Von den Feldern zurueck auf die
+     * Weiche, und die getroffene Wahl steht dort noch.
+     */
+    it('laesst sich ueber die Kette zurueckspringen', () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={() => {}}
+                plannable={{ search: () => Promise.resolve(offen), onSchedule: () => {} }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Termin' }));
+        expect(screen.getByLabelText(/Titel/)).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Zurück zu: Was' }));
+
+        expect(screen.queryByLabelText(/Titel/)).toBeNull();
+        expect(screen.getByRole('button', { name: 'Aufgabe einplanen' })).toBeTruthy();
     });
 });
 
