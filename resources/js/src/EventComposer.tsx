@@ -56,15 +56,19 @@ export type EventComposerLabels = {
     /** Ueber dem Zeitraum im Aufgaben-Weg. */
     plannableSlot: string;
     /**
-     * Die Namen der drei Felder im Zeitraum — fuer Hilfsmittel.
+     * Die Beschriftungen der drei Felder im Zeitraum.
      *
-     * Ueber ihnen steht nur „Wann", und das gilt fuer alle drei zusammen. Ein
-     * Vorleser sagte hier „Textfeld, Auswahl, Auswahl, Auswahl, Auswahl";
-     * welches Paar der Beginn und welches das Ende war, stand nirgends (#9808).
+     * Sie stehen SICHTBAR ueber den Feldern und sind zugleich deren Name fuer
+     * Hilfsmittel. Bis zum 11.11.2026 stand hier nur „Wann" und darunter vier
+     * namenlose Felder — waehrend dieselben zwei Zeiten im normalen Formular
+     * „Von" und „Bis" ueber sich haben. Das war nicht nur ein Vorleser-Problem,
+     * sondern eine Ungleichheit: dieselbe Angabe einmal beschriftet, einmal
+     * nicht (#9808). Sichtbar beschriftet ist es fuer alle geloest, und die
+     * Stufe sieht aus wie der Rest der Maske.
      *
-     * Sie aendern das Aussehen NICHT: Die Felder stehen weiter in einer Zeile
-     * ohne sichtbare Beschriftung — wer aus dem Raster kommt, bestaetigt einen
-     * vorbelegten Zeitraum und soll dafuer keine Formularspalte lesen.
+     * Bei den beiden Uhrzeiten ist das Wort zugleich der Name der GRUPPE aus
+     * Stunden- und Minutenliste ({@link TimeField}) — darin heissen die Listen
+     * „Stunde" und „Minute".
      */
     plannableSlotDate: string;
     plannableSlotStart: string;
@@ -403,6 +407,15 @@ export function EventComposer({
     // dieselben Kennungen vergeben, sonst zeigt `aria-describedby` auf den
     // Hinweis der anderen.
     const kennung = useId();
+
+    /**
+     * Die Klassen der Feldbeschriftung — woertlich die des {@link EventForm}.
+     *
+     * Absichtlich dieselben: Die Zeitraum-Stufe soll aussehen wie der Rest der
+     * Maske. Dieselben zwei Zeiten einmal beschriftet und einmal nicht war die
+     * Ungleichheit, um die es ging (#9808).
+     */
+    const feldbeschriftung = 'mb-1 block text-xs font-medium text-muted-foreground';
 
     const fremd = useRemoteTarget({
         sources: targets,
@@ -1057,28 +1070,64 @@ export function EventComposer({
                                   </p>
                               )}
 
-                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                  {/* Die Namen stehen an den Feldern und nicht
-                                      sichtbar darueber: „Wann" gilt fuer alle
-                                      drei, und ohne eigene Namen war nicht zu
-                                      hoeren, welches Paar der Beginn ist
-                                      (#9808). */}
-                                  <DateField
-                                      label={beschriftung.plannableSlotDate}
-                                      value={zeitraum.date}
-                                      onChange={(datum) => setZeitraum((bisher) => ({ ...bisher, date: datum }))}
-                                      className="sm:w-40"
-                                  />
-                                  <TimeField
-                                      label={beschriftung.plannableSlotStart}
-                                      value={zeitraum.start}
-                                      onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, start: zeit }))}
-                                  />
-                                  <TimeField
-                                      label={beschriftung.plannableSlotEnd}
-                                      value={zeitraum.end}
-                                      onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, end: zeit }))}
-                                  />
+                              {/*
+                                  Die drei Felder sind BESCHRIFTET, sichtbar und
+                                  in derselben Sprache wie das Formular.
+
+                                  Bis zum 11.11.2026 stand hier nur „Wann" und
+                                  darunter vier namenlose Felder — waehrend
+                                  dieselben zwei Zeiten im normalen Formular
+                                  „Von" und „Bis" ueber sich haben. Das war
+                                  nicht nur ein Vorleser-Problem, sondern eine
+                                  Ungleichheit: dieselbe Angabe einmal
+                                  beschriftet, einmal nicht (#9808). Sichtbare
+                                  Beschriftungen loesen es fuer alle — sehend
+                                  und hoerend — und die Stufe sieht aus wie der
+                                  Rest der Maske.
+                              */}
+                              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                                  <div className="sm:w-40">
+                                      <label className={feldbeschriftung} htmlFor={`${kennung}-zeitraum-datum`}>
+                                          {beschriftung.plannableSlotDate}
+                                      </label>
+                                      <DateField
+                                          id={`${kennung}-zeitraum-datum`}
+                                          value={zeitraum.date}
+                                          onChange={(datum) => setZeitraum((bisher) => ({ ...bisher, date: datum }))}
+                                      />
+                                  </div>
+
+                                  {/*
+                                      Bei den Uhrzeiten KEIN `<label for>`,
+                                      sondern ein Wort daneben und derselbe Name
+                                      an der Gruppe: Beschriftet wird hier ein
+                                      zusammengesetztes Feld aus zwei Listen,
+                                      nicht ein Bedienelement. Ein `for` auf die
+                                      Stundenliste benannte die halbe Uhrzeit —
+                                      und das `aria-label` der Liste („Stunde")
+                                      gewaenne ohnehin dagegen.
+                                  */}
+                                  <div>
+                                      <span className={feldbeschriftung}>
+                                          {beschriftung.plannableSlotStart}
+                                      </span>
+                                      <TimeField
+                                          label={beschriftung.plannableSlotStart}
+                                          value={zeitraum.start}
+                                          onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, start: zeit }))}
+                                      />
+                                  </div>
+
+                                  <div>
+                                      <span className={feldbeschriftung}>
+                                          {beschriftung.plannableSlotEnd}
+                                      </span>
+                                      <TimeField
+                                          label={beschriftung.plannableSlotEnd}
+                                          value={zeitraum.end}
+                                          onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, end: zeit }))}
+                                      />
+                                  </div>
 
                                   <button
                                       type="button"

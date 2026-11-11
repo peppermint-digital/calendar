@@ -73,13 +73,11 @@ describe('der Name der Uhrzeit', () => {
     it('benennt die Gruppe und darin die beiden Listen', () => {
         render(<TimeField label="Beginn" value="09:30" />);
 
-        const gruppe = screen.getByLabelText('Beginn');
-        expect(gruppe.getAttribute('role')).toBe('group');
+        // `getByRole('group')` und nicht `getByLabelText`: Letzteres ist fuer
+        // Bedienelemente gedacht, und benannt ist hier das zusammengesetzte
+        // Feld.
+        const gruppe = screen.getByRole('group', { name: 'Beginn' });
         expect(gruppe.getAttribute('data-slot')).toBe('time-field');
-
-        // Und genau EIN Treffer auf den Namen: Ein Feld unter zwei Namen waere
-        // schlechter als eines unter einem.
-        expect(screen.getAllByLabelText('Beginn')).toHaveLength(1);
 
         expect(screen.getByLabelText('Stunde').textContent?.trim()).toBe('09');
         expect(screen.getByLabelText('Minute').textContent?.trim()).toBe('30');
@@ -94,14 +92,15 @@ describe('der Name der Uhrzeit', () => {
             </div>,
         );
 
-        expect(screen.getByLabelText('Beginn').textContent).toContain('14');
-        expect(screen.getByLabelText('Ende').textContent).toContain('15');
+        expect(screen.getByRole('group', { name: 'Beginn' }).textContent).toContain('14');
+        expect(screen.getByRole('group', { name: 'Ende' }).textContent).toContain('15');
     });
 
     /** Die Woerter gehoeren dem Produkt, wie alles andere im Paket. */
     it('laesst die Woerter ueberschreiben', () => {
         render(<TimeField label="Start" hourLabel="Std" minuteLabel="Min" value="08:05" />);
 
+        expect(screen.getByRole('group', { name: 'Start' })).toBeTruthy();
         expect(screen.getByLabelText('Std').textContent?.trim()).toBe('08');
         expect(screen.getByLabelText('Min').textContent?.trim()).toBe('05');
     });
@@ -125,8 +124,12 @@ describe('der Name der Uhrzeit', () => {
         expect(listen.map((liste) => liste.getAttribute('aria-label'))).toEqual([null, null]);
         expect(document.querySelector('[data-slot="time-field"]')?.getAttribute('role')).toBeNull();
 
-        // Die sichtbare Beschriftung benennt weiter die Stundenliste, und sie
-        // ist der einzige Treffer.
+        // Das `id` am ersten Ausloeser gibt es seit v0.46.0, und ein Produkt
+        // darf sein eigenes `label for` darauf setzen. Ein unbedingtes
+        // `aria-label` haette das ausgehebelt — `aria-label` gewinnt gegen ein
+        // verknuepftes `label`. Darum wirken die Namen der Listen nur MIT der
+        // Angabe, und hier benennt weiter das Produkt.
         expect(screen.getAllByLabelText('Von')).toHaveLength(1);
+        expect(screen.getByLabelText('Von')).toBe(listen[0]);
     });
 });

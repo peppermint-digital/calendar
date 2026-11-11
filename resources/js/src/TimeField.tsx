@@ -51,11 +51,12 @@ export interface TimeFieldProps {
      * („Beginn" → „Stunde", „Minute"). Ein Vorleser nennt die Gruppe beim
      * Betreten und danach die Liste, in der man steht.
      *
-     * Ohne diese Angabe bleibt alles, wie es war: In der Zeitraum-Stufe des
-     * Aufgaben-Wegs sagte ein Vorleser „Auswahl, Auswahl, Auswahl, Auswahl",
-     * und welches Paar der Beginn und welches das Ende war, stand nirgends
-     * (#9808). Sichtbar aendert sich nichts — ein Name fuer Hilfsmittel ist
-     * nicht dasselbe wie eine sichtbare Beschriftung.
+     * In der Zeitraum-Stufe des Aufgaben-Wegs sagte ein Vorleser „Auswahl,
+     * Auswahl, Auswahl, Auswahl", und welches Paar der Beginn und welches das
+     * Ende war, stand nirgends (#9808). Dort steht das Wort seit dem 11.11.2026
+     * zusaetzlich SICHTBAR daneben — und es ist dasselbe Wort: Ein `<label
+     * for>` waere dort falsch, weil es die halbe Uhrzeit benannte (die
+     * Stundenliste traegt das `id`), waehrend der Name dem ganzen Feld gehoert.
      *
      * Erst MIT ihr bekommen die beiden Listen ihre eigenen Namen. Das ist kein
      * Geiz, sondern Ruecksicht: Wo heute eine sichtbare Beschriftung ueber
@@ -63,11 +64,12 @@ export interface TimeFieldProps {
      * sie still verdraengen. Ein Produkt, das diese Angabe nicht gibt, behaelt
      * genau das Verhalten von vorher.
      *
-     * Und darum gibt das {@link EventForm} sie NICHT: Dort ist jedes Feld
-     * sichtbar beschriftet, und ein Name an der Gruppe kaeme zu dem an der
-     * Stundenliste hinzu — am 11.11.2026 gemessen: `getByLabelText('Von')`
-     * findet dann zwei Dinge (die Gruppe und die Stundenliste) statt einem.
-     * Ein Feld unter zwei Namen ist schlechter als eines unter einem.
+     * Und darum gibt das {@link EventForm} sie NICHT: Dort haengt die sichtbare
+     * Beschriftung ueber `htmlFor` an der Stundenliste, und ein Name an der
+     * Gruppe kaeme zu ihr hinzu — am 11.11.2026 gemessen: `getByLabelText('Von')`
+     * findet dann zwei Dinge (die Gruppe und die Stundenliste) statt einem. Ein
+     * Feld unter zwei Namen ist schlechter als eines unter einem. Dasselbe gilt
+     * fuer jedes Produkt, das sein eigenes `label for` auf das `id` setzt.
      */
     label?: string;
     /** Der Name der Stundenliste innerhalb der Gruppe. Wirkt nur mit {@link label}. */
