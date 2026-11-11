@@ -43,12 +43,12 @@ import { cn } from './ui/utils';
 export interface TimeFieldProps {
     id?: string;
     /**
-     * Der Name der ganzen Uhrzeit fuer Hilfsmittel — „Beginn", „Ende".
+     * Der Name der ganzen Uhrzeit fuer Hilfsmittel — „Von", „Bis".
      *
      * Er steht an der HUELLE, die damit zur Gruppe wird, und nicht an den
      * beiden Listen: Eine Uhrzeit ist hier ein zusammengesetztes Feld, und das
      * uebliche Muster dafuer ist eine benannte Gruppe mit benannten Teilen
-     * („Beginn" → „Stunde", „Minute"). Ein Vorleser nennt die Gruppe beim
+     * („Von" → „Stunde", „Minute"). Ein Vorleser nennt die Gruppe beim
      * Betreten und danach die Liste, in der man steht.
      *
      * In der Zeitraum-Stufe des Aufgaben-Wegs sagte ein Vorleser „Auswahl,

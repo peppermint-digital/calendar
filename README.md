@@ -794,8 +794,8 @@ searching someone else's tasks would invite an operation the target system has
 to refuse.
 
 The time-range step is **labelled**, in the same words as the normal form:
-`plannableSlotDate`, `plannableSlotStart`, `plannableSlotEnd` ("Datum",
-"Beginn", "Ende") stand visibly above the three fields. Until 11.11.2026 only
+`plannableSlotDate`, `plannableSlotStart`, `plannableSlotEnd` — "Datum", "Von",
+"Bis", the form's own words — stand visibly above the three fields. Until 11.11.2026 only
 "Wann" stood there and the four controls below it had no names at all — while
 the same two times carry "Von" and "Bis" in the normal form. That was not only
 a screen-reader problem but an inequality: the same entry labelled on one route
@@ -808,7 +808,11 @@ name (`role="group"`), and the lists carry "Stunde" and "Minute" inside it. A
 `aria-label` would win against it anyway, which is also why those inner names
 appear only when a `label` is passed: a product's own `label for` on the hour
 list's `id` must keep working. Find the field with
-`getByRole('group', { name: /Beginn/ })`, not `getByLabelText`.
+`getByRole('group', { name: /Von/ })`, not `getByLabelText`.
+
+The words are the form's deliberately: a step that says "Beginn" where the form
+says "Von" looks like something else again, and a better word found later would
+have to be found in two places instead of one. Overridable either way.
 
 #### Three states that are not the same thing
 

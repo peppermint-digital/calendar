@@ -1111,12 +1111,13 @@ describe('die Aufgaben-Stufen', () => {
      * sagte „Textfeld, Auswahl, Auswahl, Auswahl, Auswahl" — welches Paar der
      * Beginn und welches das Ende war, stand nirgends.
      *
-     * Und zwar SICHTBAR beschriftet: Dieselben zwei Zeiten haben im normalen
-     * Formular „Von" und „Bis" ueber sich. Einmal beschriftet und einmal nicht
-     * war nicht nur ein Vorleser-Problem, sondern eine Ungleichheit — gelöst
-     * ist sie erst, wenn beide Wege gleich aussehen.
+     * Und zwar SICHTBAR beschriftet, mit DENSELBEN Woertern wie dort: Die
+     * beiden Zeiten heissen im normalen Formular „Von" und „Bis". Einmal
+     * beschriftet und einmal nicht war nicht nur ein Vorleser-Problem, sondern
+     * eine Ungleichheit — und zwei Woerter fuer dieselbe Sache waeren die
+     * naechste. Geloest ist sie erst, wenn beide Wege gleich aussehen.
      */
-    it('beschriftet Datum, Beginn und Ende im Zeitraum', async () => {
+    it('beschriftet Datum, Von und Bis im Zeitraum', async () => {
         render(
             <EventComposer
                 kinds={EIGENE}
@@ -1133,10 +1134,11 @@ describe('die Aufgaben-Stufen', () => {
 
         const stufe = document.querySelector('[data-slot="plannable-slot"]');
 
-        // Sichtbar: drei Woerter, die man lesen kann.
+        // Sichtbar: drei Woerter, die man lesen kann — und es sind die des
+        // Formulars.
         expect(stufe?.textContent).toContain('Datum');
-        expect(stufe?.textContent).toContain('Beginn');
-        expect(stufe?.textContent).toContain('Ende');
+        expect(stufe?.textContent).toContain('Von');
+        expect(stufe?.textContent).toContain('Bis');
 
         // Beim Datum ist das sichtbare Wort ueber `for` mit dem Feld
         // verknuepft — derselbe Weg wie im Formular. Genau „Datum" und nicht
@@ -1149,8 +1151,8 @@ describe('die Aufgaben-Stufen', () => {
         // Bei den Uhrzeiten benennt das Wort die GRUPPE aus beiden Listen —
         // `getByRole('group')` und nicht `getByLabelText`, das fuer
         // Bedienelemente gedacht ist.
-        expect(screen.getByRole('group', { name: /Beginn/ }).textContent).toContain('14');
-        expect(screen.getByRole('group', { name: /Ende/ }).textContent).toContain('15');
+        expect(screen.getByRole('group', { name: /Von/ }).textContent).toContain('14');
+        expect(screen.getByRole('group', { name: /Bis/ }).textContent).toContain('15');
 
         // Und darin tragen die beiden Listen ihre Rolle.
         expect(screen.getAllByLabelText('Stunde')).toHaveLength(2);

@@ -66,6 +66,11 @@ export type EventComposerLabels = {
      * nicht (#9808). Sichtbar beschriftet ist es fuer alle geloest, und die
      * Stufe sieht aus wie der Rest der Maske.
      *
+     * Deshalb auch DIESELBEN Woerter wie dort — „Datum", „Von", „Bis". Eine
+     * Stufe, die „Beginn" sagt, wo das Formular „Von" sagt, sieht wieder aus
+     * wie etwas anderes; und ein spaeter besseres Wort muesste an zwei Stellen
+     * gefunden werden statt an einer.
+     *
      * Bei den beiden Uhrzeiten ist das Wort zugleich der Name der GRUPPE aus
      * Stunden- und Minutenliste ({@link TimeField}) — darin heissen die Listen
      * „Stunde" und „Minute".
@@ -103,9 +108,14 @@ const COMPOSER_DEFAULTS: EventComposerLabels = {
     stepTask: 'Aufgabe',
     stepSlot: 'Zeitraum',
     plannableSlot: 'Wann',
+    // Woertlich die des Formulars (`EventForm`: date, from, to) und nicht
+    // „Beginn"/„Ende": Zwei Woerter fuer dieselbe Sache zerlegen genau das,
+    // was diese Stufe erreichen soll — dass sie aussieht wie der Rest der
+    // Maske. Und waere „Von"/„Bis" einmal das falsche Wort, ist es an beiden
+    // Stellen falsch und wird an beiden geaendert.
     plannableSlotDate: 'Datum',
-    plannableSlotStart: 'Beginn',
-    plannableSlotEnd: 'Ende',
+    plannableSlotStart: 'Von',
+    plannableSlotEnd: 'Bis',
     plannablePick: 'Welche Aufgabe?',
     plannableSchedule: 'Einplanen',
     plannableNew: 'Neue Aufgabe anlegen',
