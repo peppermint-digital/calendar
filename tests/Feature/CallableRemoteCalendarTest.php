@@ -111,6 +111,24 @@ it('faellt bei der Meldung auf die Fehlerklasse zurueck', function () {
     expect($ergebnis->message)->toBe('unreachable');
 });
 
+it('liest ein ok, das kein echtes true ist, als Fehlschlag', function () {
+    // Der Fall, um den es geht, ist nicht erfunden: `(bool) 'false'` ist
+    // `true`. Lose gelesen gilt so eine Antwort als Erfolg, `data` ist dann
+    // keine Liste, `rows()` ist leer — und heraus kommt eine leere
+    // Terminliste, die sich als vollstaendige Auskunft ausgibt. Beim Anlegen
+    // ist es ein gemeldeter Termin, den die Gegenstelle abgelehnt hat.
+    //
+    // Alles Truthy-aber-kein-Bool ist eine KAPUTTE Antwort, und eine kaputte
+    // Antwort ist kein Erfolg. Wer das wieder lockert, will diese leere Liste.
+    expect(RemoteResult::fromArray(['ok' => 'false'])->ok)->toBeFalse()
+        ->and(RemoteResult::fromArray(['ok' => 1])->ok)->toBeFalse()
+        ->and(RemoteResult::fromArray(['ok' => '1'])->ok)->toBeFalse()
+        ->and(RemoteResult::fromArray(['ok' => 'yes'])->ok)->toBeFalse()
+        ->and(RemoteResult::fromArray([])->ok)->toBeFalse()
+        // Gegenprobe: Ohne sie waere der Test auch bei „alles ist falsch" gruen.
+        ->and(RemoteResult::fromArray(['ok' => true])->ok)->toBeTrue();
+});
+
 it('haelt ein data, das keine Liste ist, fuer keines', function () {
     // Eine Gegenstelle, die `data: "fertig"` schickt, darf nicht zu einer
     // Zeile werden, die niemand lesen kann.

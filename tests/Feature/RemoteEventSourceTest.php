@@ -132,6 +132,67 @@ it('schlaegt beim Anlegen laut fehl und nennt den Vorgang', function () {
     }
 });
 
+it('laesst eine kaputte Antwort beim Anlegen nicht als Erfolg durchgehen', function () {
+    // Dasselbe eine Ebene hoeher, an der Stelle, wo der Schaden entstuende:
+    // `['ok' => 'false']` galt bis zum 11.11.2026 als Erfolg, weil
+    // `(bool) 'false' === true` ist. Dann meldet die Quelle einen angelegten
+    // Termin, den die Gegenstelle ABGELEHNT hat — und der Riegel
+    // (`ExternalSourceFailed` bis in die Oberflaeche) greift nie, weil er erst
+    // hinter `ok` steht.
+    //
+    // ⚠️ Die Antwort traegt mit Absicht eine LESBARE Zeile. Mit `data: null`
+    // waere dieser Test auch unter der alten Lesart gruen gewesen — dann
+    // scheitert `create()` naemlich erst daran, dass nichts Lesbares
+    // zurueckkam, und zwar mit demselben Ausnahmetyp und demselben Vorgang.
+    // Gepruefte Ablehnung sieht dann aus wie „angelegt, aber unlesbar", und der
+    // Test haette die Lesart nicht gemessen, sondern ihr Nebenprodukt. Dass
+    // eine Ablehnung etwas mitschickt, ist der Normalfall und kein Kunstgriff:
+    // Ein Vorgang kann fehlschlagen und trotzdem eine Fassung mitgeben.
+    $this->fremd->antworten['calendar.events.create'] = RemoteResult::fromArray([
+        'ok' => 'false',
+        'data' => [
+            'id' => 4711,
+            'title' => 'Kundenbesuch',
+            'starts_at' => '2026-10-13T09:00:00+02:00',
+            'ends_at' => '2026-10-13T10:00:00+02:00',
+        ],
+    ]);
+
+    $entwurf = new NewExternalEvent(
+        kind: 'verwaltung_termin',
+        title: 'Kundenbesuch',
+        startsAt: CarbonImmutable::parse('2026-10-13T09:00:00+02:00'),
+        endsAt: CarbonImmutable::parse('2026-10-13T10:00:00+02:00'),
+    );
+
+    try {
+        $termin = $this->quelle->create(7, $entwurf);
+        $this->fail('Eine abgelehnte Anlage wurde als Termin gemeldet: '.$termin->id);
+    } catch (ExternalSourceFailed $e) {
+        expect($e->vorgang)->toBe('anlegen')
+            ->and($e->sourceKey)->toBe('verwaltung')
+            // Und es ist der Fehlschlag, nicht die Verlegenheit danach: Eine
+            // Meldung, die „hat den Termin angelegt" sagt, waere hier falsch —
+            // die Gegenstelle hat ihn gerade nicht angelegt.
+            ->and($e->getMessage())->not->toContain('angelegt');
+    }
+
+    // Gegenprobe mit einem echten `true`: Die strenge Lesart darf das Anlegen
+    // nicht verschlossen haben. Ohne sie waere dieser Test auch dann gruen,
+    // wenn jede Antwort als Fehlschlag gilt.
+    $this->fremd->antworten['calendar.events.create'] = RemoteResult::fromArray([
+        'ok' => true,
+        'data' => [
+            'id' => 4711,
+            'title' => 'Kundenbesuch',
+            'starts_at' => '2026-10-13T09:00:00+02:00',
+            'ends_at' => '2026-10-13T10:00:00+02:00',
+        ],
+    ]);
+
+    expect($this->quelle->create(7, $entwurf)->id)->toBe('4711');
+});
+
 it('behaelt die neue Position erst, wenn das Zielsystem sie bestaetigt', function () {
     // Anders als beim Anlegen ist die Antwort hier nicht Beiwerk: Kommt nichts
     // Lesbares zurueck, ist das ein Fehlschlag und keine Gelegenheit, die
