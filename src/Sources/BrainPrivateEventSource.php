@@ -334,6 +334,10 @@ class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbw
                 $zeile['key'],
                 (string) ($zeile['label'] ?? $zeile['key']),
                 array_values(array_filter((array) ($zeile['requires'] ?? []), 'is_string')),
+                // Die Nabe nennt heute nur anlegbare Arten. Durchgereicht wird
+                // es trotzdem, statt es hier auf `true` zu setzen: Sagt sie es
+                // einmal, gilt ihre Angabe — und nicht unsere Annahme darueber.
+                creatable: ($zeile['creatable'] ?? true) !== false,
             );
         }, $antwort)));
     }

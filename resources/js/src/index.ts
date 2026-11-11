@@ -45,9 +45,13 @@ export type { TimeFieldProps } from './TimeField';
 export { EventDetail } from './EventDetail';
 export type { EventDetailData, EventDetailLabels, EventDetailProps } from './EventDetail';
 export { EventForm } from './EventForm';
-// Die vollstaendige Maske: Zielwahl, Felder, Speichern — damit ein Produkt den
+// Die vollstaendige Maske: Terminart, Felder, Speichern — damit ein Produkt den
 // Vorgang nicht zum fuenften Mal selbst zusammensetzt (#7765).
 export { EventComposer } from './EventComposer';
+// Die Wahl der Terminart — alle Arten aller Systeme in EINER Liste. Steht hier,
+// weil ein Produkt mit eigener Schrittfolge dieselbe Liste zeichnen soll.
+export { KindPicker, defaultKindPickerLabels } from './KindPicker';
+export type { KindOption, KindPickerLabels, KindPickerProps } from './KindPicker';
 // Der Kopf des Anlege-Assistenten. Steht hier, weil ein Produkt mit eigener
 // Schrittfolge dieselbe Kette zeichnen soll — nicht, weil der Composer sie
 // gereicht bekommen muesste; er baut sie selbst.

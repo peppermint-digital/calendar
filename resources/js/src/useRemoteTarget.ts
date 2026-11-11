@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EventKind } from './types';
 
 /**
@@ -81,6 +81,17 @@ export interface UseRemoteTargetOptions {
      * mit Nachladen springt er zurueck.
      */
     onDone?: () => void;
+    /**
+     * Die Arten ALLER beschreibbaren Ziele schon beim Oeffnen holen.
+     *
+     * Ausdruecklich ein Schalter und kein Dauerverhalten. Wer eine Art aus
+     * einer Liste aller Systeme waehlt, braucht sie vor der ersten Wahl — wer
+     * im Raster nur verschiebt und loescht, braucht sie nie. Das Brain nutzt
+     * diesen Haken auf seiner Kalenderseite genau dafuer; dort waere das ein
+     * Netzaufruf je Quelle bei jedem Seitenaufbau, und dieselbe Schleife ist
+     * hier schon einmal aufgefallen, bis das andere System zu drosseln anfing.
+     */
+    preloadKinds?: boolean;
 }
 
 /**
@@ -119,12 +130,43 @@ export function useRemoteTarget({
     headers,
     onError,
     onDone,
+    preloadKinds = false,
 }: UseRemoteTargetOptions) {
     /** Leer heisst: der eigene Kalender. */
     const [target, setTarget] = useState('');
     const [targetKinds, setTargetKinds] = useState<RemoteKind[]>([]);
     const [targetKind, setTargetKind] = useState('');
     const [busy, setBusy] = useState(false);
+
+    /**
+     * Die Arten je Ziel, sobald sie einmal geholt wurden.
+     *
+     * Der Speicher, an dem die zweite Abfrage haengt: Wer die Liste aller
+     * Arten gesehen hat, hat die seines Ziels schon — ein Netzweg beim
+     * Anklicken waere derselbe Aufruf ein zweites Mal.
+     */
+    const [kindsBySource, setKindsBySource] = useState<Record<string, RemoteKind[]>>({});
+
+    /**
+     * Ziele, die nicht geantwortet haben.
+     *
+     * Getrennt von „hat keine Arten" gefuehrt, und das ist der ganze Zweck:
+     * „Niemand ist zuständig" und „ich konnte nicht nachsehen" sind zwei
+     * Aussagen (Wiki #595). Ein Systemausfall, der als leere Liste erscheint,
+     * sieht aus wie eine Antwort.
+     */
+    const [unreachableSources, setUnreachableSources] = useState<string[]>([]);
+
+    /**
+     * Schon von der ERSTEN Zeichnung an wahr, wenn vorgeladen wird.
+     *
+     * Sonst gaebe es ein Fenster von einem Rendern, in dem noch keine fremden
+     * Arten da sind und auch nichts laedt — eine Oberflaeche, die daran eine
+     * Stufe ueberspringt, springt sie gleich danach wieder auf.
+     */
+    const [loadingKinds, setLoadingKinds] = useState(
+        () => preloadKinds && sources.some((quelle) => quelle.writable === true),
+    );
 
     const kopf = useCallback(
         () => ({ 'Content-Type': 'application/json', Accept: 'application/json', ...(headers?.() ?? {}) }),
@@ -139,15 +181,52 @@ export function useRemoteTarget({
     );
 
     /**
+     * Die Arten EINES Ziels holen.
+     *
+     * Gibt `null` zurueck, wenn das andere System nicht geantwortet hat — und
+     * das ist nicht dasselbe wie eine leere Liste. Wer beides gleich
+     * behandelt, zeigt einen Ausfall als Auskunft.
+     */
+    const artenHolen = useCallback(
+        async (key: string): Promise<{ kinds: RemoteKind[] } | { fehler: string }> => {
+            try {
+                const antwort = await fetch(`${basePath}/sources/${key}/kinds`, {
+                    headers: { Accept: 'application/json', ...(headers?.() ?? {}) },
+                });
+
+                if (!antwort.ok) {
+                    return { fehler: 'Die Terminarten des anderen Systems sind gerade nicht abrufbar.' };
+                }
+
+                const daten = (await antwort.json()) as { kinds?: RemoteKind[] };
+
+                return { kinds: daten.kinds ?? [] };
+            } catch {
+                return { fehler: 'Das andere System hat nicht geantwortet.' };
+            }
+        },
+        [basePath, headers],
+    );
+
+    /**
      * Ein Ziel waehlen und seine Terminarten holen.
      *
-     * Die Arten kommen erst beim Auswaehlen, nicht beim Laden der Seite: Der
-     * Aufruf geht in ein anderes System und hat im Kalenderladen nichts
-     * verloren — er wuerde jede Seite langsamer machen, auch die von jemandem,
-     * der nie woanders anlegt.
+     * Ohne `preloadKinds` kommen die Arten erst beim Auswaehlen, nicht beim
+     * Laden der Seite: Der Aufruf geht in ein anderes System und hat im
+     * Kalenderladen nichts verloren — er wuerde jede Seite langsamer machen,
+     * auch die von jemandem, der nie woanders anlegt.
+     *
+     * Sind sie dagegen schon geholt, wird der Weg NICHT zweimal gegangen. Das
+     * ist kein Feinschliff: Die Artenliste des Assistenten zeigt alle Systeme
+     * auf einmal, und ein Aufruf bei jedem Anklicken waere derselbe Aufruf
+     * noch einmal — in einem fremden System, das irgendwann drosselt.
+     *
+     * `kind` ist die Art, die gewaehlt werden soll. Ohne Angabe die erste:
+     * Eine Liste ohne Auswahl fuehrt zu einer Maske, die beim Abschicken nach
+     * etwas fragt, das man schon sieht.
      */
     const chooseTarget = useCallback(
-        async (key: string): Promise<void> => {
+        async (key: string, kind?: string): Promise<void> => {
             setTarget(key);
             setTargetKind('');
             setTargetKinds([]);
@@ -156,31 +235,85 @@ export function useRemoteTarget({
                 return;
             }
 
-            try {
-                const antwort = await fetch(`${basePath}/sources/${key}/kinds`, {
-                    headers: { Accept: 'application/json', ...(headers?.() ?? {}) },
-                });
+            const schon = kindsBySource[key];
 
-                if (!antwort.ok) {
-                    melden('Die Terminarten des anderen Systems sind gerade nicht abrufbar.');
+            if (schon !== undefined) {
+                setTargetKinds(schon);
+                setTargetKind(kind ?? schon[0]?.key ?? '');
 
-                    return;
+                return;
+            }
+
+            const ergebnis = await artenHolen(key);
+
+            if ('fehler' in ergebnis) {
+                melden(ergebnis.fehler);
+                setUnreachableSources((bisher) => (bisher.includes(key) ? bisher : [...bisher, key]));
+
+                return;
+            }
+
+            setKindsBySource((bisher) => ({ ...bisher, [key]: ergebnis.kinds }));
+            setTargetKinds(ergebnis.kinds);
+            setTargetKind(kind ?? ergebnis.kinds[0]?.key ?? '');
+        },
+        [artenHolen, kindsBySource, melden],
+    );
+
+    /** Die Ziele, die Termine annehmen. */
+    const writableSources = sources.filter((quelle) => quelle.writable === true);
+
+    /**
+     * Der Satz Ziele, als EIN Wort — der Griff, an dem das Vorladen haengt.
+     *
+     * Nicht die Liste selbst: Die ist bei jedem Rendern ein neues Objekt, und
+     * ein Effekt, der daran haengt, laeuft bei jedem Rendern erneut. Genau das
+     * war der Fehler, bis das andere System zu drosseln anfing.
+     */
+    const zielsatz = writableSources.map((quelle) => quelle.key).join(',');
+    const geladenFuer = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (! preloadKinds || zielsatz === '' || geladenFuer.current === zielsatz) {
+            return;
+        }
+
+        // Vor dem Holen vermerkt, nicht danach: Zwischen Start und Antwort
+        // liegen Renderdurchlaeufe, und jeder davon wuerde den Aufruf sonst
+        // noch einmal auslösen.
+        geladenFuer.current = zielsatz;
+        setLoadingKinds(true);
+
+        void (async () => {
+            // Parallel, nicht hintereinander: Vier Systeme nacheinander zu
+            // fragen heisst, viermal auf das langsamste zu warten.
+            const ergebnisse = await Promise.all(
+                zielsatz.split(',').map(async (key) => [key, await artenHolen(key)] as const),
+            );
+
+            const gefunden: Record<string, RemoteKind[]> = {};
+            const ausgefallen: string[] = [];
+
+            for (const [key, ergebnis] of ergebnisse) {
+                if ('fehler' in ergebnis) {
+                    ausgefallen.push(key);
+
+                    continue;
                 }
 
-                const daten = (await antwort.json()) as { kinds?: RemoteKind[] };
-                const arten = daten.kinds ?? [];
-
-                setTargetKinds(arten);
-                // Die erste Art vorauswaehlen: Eine Liste ohne Auswahl fuehrt
-                // zu einer Maske, die beim Abschicken nach etwas fragt, das
-                // man schon sieht.
-                setTargetKind(arten[0]?.key ?? '');
-            } catch {
-                melden('Das andere System hat nicht geantwortet.');
+                gefunden[key] = ergebnis.kinds;
             }
-        },
-        [basePath, headers, melden],
-    );
+
+            setKindsBySource((bisher) => ({ ...bisher, ...gefunden }));
+            // Hier wird NICHT `melden` gerufen. Ein ausgefallenes Ziel ist
+            // beim Vorladen kein Fehler des Vorgangs, den jemand ausgeloest
+            // hat — es ist ein Hinweis an der Liste: Diese Arten fehlen, die
+            // uebrigen gelten. Eine rote Meldung ueber der Maske waere eine
+            // Fehlermeldung fuer etwas, das noch niemand versucht hat.
+            setUnreachableSources(ausgefallen);
+            setLoadingKinds(false);
+        })();
+    }, [artenHolen, preloadKinds, zielsatz]);
 
     /** Ob dieses System Termine von aussen annimmt. */
     const isWritable = useCallback(
@@ -330,6 +463,12 @@ export function useRemoteTarget({
         /** Laeuft gerade ein Vorgang gegen ein anderes System? */
         busy,
         /** Die Ziele, die Termine annehmen. */
-        writableSources: sources.filter((quelle) => quelle.writable === true),
+        writableSources,
+        /** Die Arten je Ziel, soweit geholt. Nur mit `preloadKinds` vollstaendig. */
+        kindsBySource,
+        /** Die Schluessel der Ziele, die nicht geantwortet haben. */
+        unreachableSources,
+        /** Laeuft das Vorladen der Arten noch? */
+        loadingKinds,
     };
 }

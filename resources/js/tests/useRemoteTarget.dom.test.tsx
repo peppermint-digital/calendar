@@ -135,6 +135,155 @@ describe('das Ziel wählen', () => {
     });
 });
 
+/**
+ * Die Arten ALLER Ziele beim Oeffnen (#9796).
+ *
+ * Gebraucht von der Artenliste, die alle Systeme auf einmal zeigt. Ein
+ * Schalter und kein Dauerverhalten: Wer im Raster nur verschiebt und loescht,
+ * braucht die Arten nie.
+ */
+describe('die Arten vorladen', () => {
+    it('passiert ohne den Schalter gar nicht', async () => {
+        vi.stubGlobal('fetch', (url: string) => {
+            anfragen.push({ url });
+
+            return antwortet({ kinds: [] });
+        });
+
+        renderHook(() => useRemoteTarget({ sources: QUELLEN }));
+
+        // Dasselbe Versprechen wie vorher: Der Aufruf geht in ein anderes
+        // System und hat im Kalenderladen nichts verloren.
+        await waitFor(() => expect(anfragen).toHaveLength(0));
+    });
+
+    it('fragt jedes beschreibbare Ziel genau einmal', async () => {
+        vi.stubGlobal('fetch', (url: string) => {
+            anfragen.push({ url });
+
+            return antwortet({ kinds: [{ key: 'business', label: 'Geschäftlich' }] });
+        });
+
+        const { result, rerender } = renderHook(() =>
+            useRemoteTarget({ sources: QUELLEN, preloadKinds: true }),
+        );
+
+        await waitFor(() => expect(result.current.loadingKinds).toBe(false));
+
+        // Zwei beschreibbare Quellen, zwei Aufrufe — und die nur lesende wird
+        // nicht gefragt.
+        expect(anfragen.map((a) => a.url)).toEqual([
+            '/api/calendar/sources/manager/kinds',
+            '/api/calendar/sources/verwaltung/kinds',
+        ]);
+
+        rerender();
+        rerender();
+
+        // Ein Netzweg je Rendern war ein echter Fehler, bis das andere System
+        // zu drosseln anfing.
+        expect(anfragen).toHaveLength(2);
+    });
+
+    it('legt die Arten unter ihrem Ziel ab', async () => {
+        vi.stubGlobal('fetch', (url: string) =>
+            antwortet({
+                kinds: url.includes('manager')
+                    ? [{ key: 'business', label: 'Geschäftlich' }]
+                    : [{ key: 'verwaltungstermin', label: 'Verwaltungstermin' }],
+            }),
+        );
+
+        const { result } = renderHook(() => useRemoteTarget({ sources: QUELLEN, preloadKinds: true }));
+
+        await waitFor(() => expect(result.current.loadingKinds).toBe(false));
+
+        expect(result.current.kindsBySource.manager?.[0]?.key).toBe('business');
+        expect(result.current.kindsBySource.verwaltung?.[0]?.key).toBe('verwaltungstermin');
+    });
+
+    it('nennt ein Ziel, das nicht geantwortet hat, statt es leer zu zeigen', async () => {
+        vi.stubGlobal('fetch', (url: string) =>
+            url.includes('verwaltung')
+                ? antwortet(null, false, 503)
+                : antwortet({ kinds: [{ key: 'business', label: 'Geschäftlich' }] }),
+        );
+
+        const gemeldet: string[] = [];
+        const { result } = renderHook(() =>
+            useRemoteTarget({ sources: QUELLEN, preloadKinds: true, onError: (m) => gemeldet.push(m) }),
+        );
+
+        await waitFor(() => expect(result.current.loadingKinds).toBe(false));
+
+        // „Niemand ist zustaendig" und „ich konnte nicht nachsehen" sind zwei
+        // Aussagen (Wiki #595) — deshalb eine eigene Liste und kein stilles
+        // Fehlen.
+        expect(result.current.unreachableSources).toEqual(['verwaltung']);
+        expect(result.current.kindsBySource.manager).toHaveLength(1);
+        expect(result.current.kindsBySource.verwaltung).toBeUndefined();
+
+        // Und KEINE Fehlermeldung ueber der Maske: Beim Vorladen hat noch
+        // niemand etwas versucht, was scheitern konnte.
+        expect(gemeldet).toEqual([]);
+    });
+
+    it('geht beim Auswaehlen nicht ein zweites Mal ins Netz', async () => {
+        vi.stubGlobal('fetch', (url: string) => {
+            anfragen.push({ url });
+
+            return antwortet({
+                kinds: [
+                    { key: 'business', label: 'Geschäftlich' },
+                    { key: 'deadline', label: 'Frist' },
+                ],
+            });
+        });
+
+        const { result } = renderHook(() => useRemoteTarget({ sources: QUELLEN, preloadKinds: true }));
+
+        await waitFor(() => expect(result.current.loadingKinds).toBe(false));
+        expect(anfragen).toHaveLength(2);
+
+        await act(async () => {
+            await result.current.chooseTarget('manager', 'deadline');
+        });
+
+        expect(anfragen).toHaveLength(2);
+        expect(result.current.target).toBe('manager');
+        // Die GENANNTE Art, nicht die erste: Wer sie aus der Liste gewaehlt
+        // hat, hat sie gewaehlt.
+        expect(result.current.targetKind).toBe('deadline');
+        expect(result.current.targetKinds).toHaveLength(2);
+    });
+
+    it('bleibt beim Laden stehen, solange noch nichts da ist', () => {
+        vi.stubGlobal('fetch', () => new Promise<Response>(() => {}));
+
+        const { result } = renderHook(() => useRemoteTarget({ sources: QUELLEN, preloadKinds: true }));
+
+        // Schon von der ERSTEN Zeichnung an: Sonst gaebe es ein Fenster, in
+        // dem nichts da ist und auch nichts laedt — und eine Oberflaeche, die
+        // daran eine Stufe ueberspringt, springt sie gleich wieder auf.
+        expect(result.current.loadingKinds).toBe(true);
+    });
+
+    it('laedt nicht, wenn es gar kein beschreibbares Ziel gibt', () => {
+        vi.stubGlobal('fetch', (url: string) => {
+            anfragen.push({ url });
+
+            return antwortet({ kinds: [] });
+        });
+
+        const { result } = renderHook(() =>
+            useRemoteTarget({ sources: [{ key: 'abo', label: 'Feiertage' }], preloadKinds: true }),
+        );
+
+        expect(result.current.loadingKinds).toBe(false);
+        expect(anfragen).toHaveLength(0);
+    });
+});
+
 describe('welche Ziele überhaupt annehmen', () => {
     it('nennt nur die beschreibbaren Quellen', () => {
         const { result } = renderHook(() => useRemoteTarget({ sources: QUELLEN }));

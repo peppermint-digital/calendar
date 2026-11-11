@@ -1,18 +1,28 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ComposerSteps, type ComposerStep, type ComposerStepsLabels } from './ComposerSteps';
 import { DateField } from './DateField';
 import { EventForm, type EventFormErrors, type EventFormLabels } from './EventForm';
+import { KindPicker, type KindOption, type KindPickerLabels } from './KindPicker';
 import { PlannableSearch, type Plannable } from './PlannableSearch';
 import { TimeField } from './TimeField';
 import { emptyDraft, type EventCategory, type EventDraft, type EventKind } from './types';
 import { useRemoteTarget, type RemoteSource } from './useRemoteTarget';
 
 export type EventComposerLabels = {
-    /** Beschriftung der Zielwahl. */
+    /**
+     * Die drei Wörter der alten Zielwahl.
+     *
+     * Sie werden seit dem 11.11.2026 NICHT mehr gezeichnet: Das System wird
+     * nicht vorher gewählt, es ergibt sich aus der Terminart und steht klein an
+     * deren Zeile ({@link KindPicker}). Sie bleiben im Typ, damit ein Produkt,
+     * das sie noch übergibt, nicht bricht — mehr sind sie nicht.
+     *
+     * @deprecated Ohne Wirkung. Die Terminart trägt das System.
+     */
     target: string;
-    /** Der Eintrag für den eigenen Kalender. */
+    /** @deprecated Ohne Wirkung. Siehe {@link EventComposerLabels.target}. */
     ownCalendar: string;
-    /** Erklärung unter der Zielwahl. `{system}` wird ersetzt. */
+    /** @deprecated Ohne Wirkung. Siehe {@link EventComposerLabels.target}. */
     targetHint: string;
     /** Die beiden Wege ueber der Maske. */
     modeEvent: string;
@@ -22,6 +32,7 @@ export type EventComposerLabels = {
     modePlannableHint: string;
     /** Die Beschriftungen der Schritte im Kopf des Assistenten. */
     stepWhat: string;
+    stepKind: string;
     stepFields: string;
     stepPlannable: string;
     /** Ueber dem Zeitraum im Aufgaben-Weg. */
@@ -43,6 +54,7 @@ const COMPOSER_DEFAULTS: EventComposerLabels = {
     modeEventHint: 'Ein Termin mit Titel, Zeit und Ort.',
     modePlannableHint: 'Eine Aufgabe, die es schon gibt, in den Kalender legen.',
     stepWhat: 'Was',
+    stepKind: 'Terminart',
     stepFields: 'Angaben',
     stepPlannable: 'Aufgabe und Zeitraum',
     plannableSlot: 'Wann',
@@ -116,7 +128,7 @@ export type EventComposerProps = {
      * der Maske selbst und die der Schrittkette. Ein Produkt soll nicht
      * nachsehen muessen, welches Wort zu welchem Bauteil gehoert.
      */
-    labels?: Partial<EventFormLabels & EventComposerLabels & ComposerStepsLabels>;
+    labels?: Partial<EventFormLabels & EventComposerLabels & ComposerStepsLabels & KindPickerLabels>;
 
     /**
      * Die Umhuellung der ABSCHNITTE, vom Produkt gestellt.
@@ -162,7 +174,7 @@ export type EventComposerProps = {
 };
 
 /**
- * Die vollständige Terminmaske: Zielwahl, Felder, Speichern.
+ * Die vollständige Terminmaske: Terminart, Felder, Speichern.
  *
  * ## Warum das hier liegt und nicht in jedem Produkt
  *
@@ -179,6 +191,17 @@ export type EventComposerProps = {
  *
  * Hier liegt der Vorgang **einmal**. Ein Produkt liefert vier Dinge: seine
  * Arten, seine Ziele, seinen eigenen Speicherweg und seine Zusatzfelder.
+ *
+ * ## Wie das Ziel gewählt wird — und warum nicht mehr vorher
+ *
+ * Bis zum 11.11.2026 stand über der Maske eine Klappliste „Anlegen in": erst
+ * das System, dann dessen Arten. Das verlangte eine Entscheidung, die niemand
+ * treffen kann — in welchem System „Geschäftstermin" geführt wird, ist eine
+ * Eigenschaft der Art und keine Frage an den Menschen.
+ *
+ * Jetzt steht zwischen „Was" und „Angaben" eine Stufe mit ALLEN anlegbaren
+ * Arten aller Systeme in einer Liste ({@link KindPicker}); das System steht
+ * klein an der Zeile. **Man wählt die Art, das Ziel ergibt sich daraus.**
  *
  * ## Was bei einem fremden Ziel anders ist
  *
@@ -233,9 +256,30 @@ export function EventComposer({
     const beschriftung = { ...COMPOSER_DEFAULTS, ...labels };
     const bearbeiten = value !== null;
 
+    /**
+     * Die eigenen Arten, die ein Mensch auch waehlen DARF.
+     *
+     * Der Filter steht hier und nicht in vier Produkten. `creatable` reiste
+     * vorher die ganze Strecke und wurde nirgends gelesen: PHP schickt es seit
+     * je mit (`EventKind::toArray()`), der Typ fuehrt es, und die Maske gab die
+     * Liste ungefiltert weiter — ein Platz, aus dem niemand liest, ist
+     * dasselbe Uebel wie einer, den niemand fuellt (Wiki #595). Die Folge war
+     * eine Auswahl, in der „Urlaub" und „Ressourcenbuchung" standen, obwohl
+     * beide beim Speichern abgelehnt werden.
+     *
+     * `!== false` und nicht `=== true`: Eine Art ohne Angabe ist anlegbar, so
+     * wie die PHP-Vorgabe es sagt. Alles andere liesse eine fehlende Angabe wie
+     * ein Verbot aussehen.
+     */
+    const eigeneArten = kinds.filter((art) => art.creatable !== false);
+
     // Eigener Zustand nur, wenn das Produkt keinen mitbringt.
     const [innerer, setInnerer] = useState<EventDraft>(() =>
-        value ?? { ...emptyDraft(kinds[0]?.key), ...preset },
+        // Vorbelegt mit der ersten ANLEGBAREN Art, nicht mit der ersten
+        // ueberhaupt: Ein Produkt, das seine Liste in Registry-Reihenfolge
+        // hereingibt, hat vorne vielleicht „Urlaub" stehen — und dann traegt
+        // der Entwurf eine Art, die beim Speichern abgelehnt wird.
+        value ?? { ...emptyDraft(eigeneArten[0]?.key), ...preset },
     );
     const gesteuert = draft !== undefined;
     const entwurf = gesteuert ? draft : innerer;
@@ -260,36 +304,226 @@ export function EventComposer({
         headers,
         onError: setEigenerFehler,
         onDone: () => onSavedThere?.(),
+        // Die Arten ALLER Ziele schon beim Oeffnen, nicht erst beim Auswaehlen:
+        // Die Artenliste zeigt sie alle auf einmal, und sie nacheinander zu
+        // holen hiesse, sie erst nach der Wahl zu haben. Nur beim Anlegen —
+        // beim Bearbeiten steht das System des Termins schon fest, und ein
+        // Netzaufruf je Ziel waere dort fuer nichts.
+        preloadKinds: ! bearbeiten,
     });
 
-    // Das Startziel einmal waehlen, nicht bei jedem Rendern: `chooseTarget`
-    // holt die Arten des Zielsystems, und das ist ein Netzweg.
-    const [startzielGewaehlt, setStartzielGewaehlt] = useState(false);
+    const fremdesZiel = fremd.target !== '';
+
+    /**
+     * Welcher der beiden Wege gerade offen ist.
+     *
+     * Beim Bearbeiten gibt es die Wahl nicht: Da steht schon fest, was der
+     * Eintrag ist. Ihn von einem Termin in eine eingeplante Aufgabe zu
+     * verwandeln waere ein anderer Vorgang als ihn zu aendern — dieselbe
+     * Begruendung wie bei der Terminart darunter.
+     */
+    const [weg, setWeg] = useState<'termin' | 'aufgabe'>('termin');
+
+    /**
+     * Der Zeitraum fuer den Aufgaben-Weg.
+     *
+     * Eigener Zustand neben dem Entwurf der Maske, weil hier nur drei Felder
+     * gebraucht werden — Art, Titel, Ort und Beschreibung kommen aus der
+     * Aufgabe. Eine Maske, die beide Saetze zeigt, fragt die Haelfte umsonst.
+     */
+    const [zeitraum, setZeitraum] = useState(() => ({
+        // Aus dem Entwurf, nicht nur aus `preset`: Ein Produkt, das seinen
+        // Entwurf selbst haelt (`draft`), gibt die Vorgabe schon dort hinein
+        // — der markierte Zeitraum stuende sonst im Termin-Weg und fehlte im
+        // Aufgaben-Weg daneben.
+        date: entwurf.date || preset?.date || heute(),
+        start: entwurf.start || preset?.start || '09:00',
+        end: entwurf.end || preset?.end || '10:00',
+    }));
+
+    const aufgabenWeg = Boolean(plannable) && ! bearbeiten;
+
+
+    /**
+     * Ein vorgewaehltes Ziel engt die LISTE ein, es nimmt keine Stufe weg.
+     *
+     * So uebersetzt sich `initialTarget` in die neue Welt: Wer aus einem
+     * Auswahldialog mit angeklicktem System kommt, waehlt das System nicht
+     * wieder — er sieht nur noch die Arten dieses Systems. Die Art muss er
+     * weiter waehlen, denn danach hat ihn niemand gefragt. Hat das System genau
+     * eine, faellt die Stufe von selbst weg.
+     */
+    const nurEinZiel = initialTarget !== undefined && initialTarget !== '';
+
+    /**
+     * Alle waehlbaren Arten in EINER Liste — die eigenen zuerst, dann die
+     * fremden in der Reihenfolge, in der das Produkt seine Ziele nennt.
+     *
+     * Bewusst nicht nach System sortiert und ohne Gruppenkoepfe: Das zerlegte
+     * die Liste wieder in die Produktkaestchen, die sie gerade aufloest
+     * (Wiki #595). Das System ist Beschriftung, nicht Gliederung.
+     */
+    const artenwahl: KindOption[] = [];
+
+    if (! nurEinZiel) {
+        for (const art of eigeneArten) {
+            artenwahl.push({ source: '', system: '', kind: art });
+        }
+    }
+
+    for (const ziel of fremd.writableSources) {
+        if (nurEinZiel && ziel.key !== initialTarget) {
+            continue;
+        }
+
+        for (const art of fremd.kindsBySource[ziel.key] ?? []) {
+            if (art.creatable === false) {
+                continue;
+            }
+
+            // Der Systemname kommt aus der LOKALEN Beschriftung der Quelle,
+            // nie aus der Antwort des fremden Systems: Die Herkunft setzt der
+            // Fragende, nicht der Befragte (Wiki #595).
+            artenwahl.push({ source: ziel.key, system: ziel.label, kind: art });
+        }
+    }
+
+    /** Ausgefallene Ziele — mit Namen, nicht mit Schluessel. */
+    const ausgefalleneZiele = fremd.unreachableSources
+        .filter((schluessel) => ! nurEinZiel || schluessel === initialTarget)
+        .map((schluessel) => targets.find((ziel) => ziel.key === schluessel)?.label ?? schluessel);
+
+    /**
+     * Gibt es die Stufe „Terminart" ueberhaupt?
+     *
+     * Drei Gruende, sie zu zeigen, und der dritte ist der wichtige:
+     *
+     * 1. Es gibt mehr als eine Art — dann ist etwas zu waehlen.
+     * 2. Die Arten der fremden Systeme sind noch unterwegs. Waere sie hier
+     *    weg, sprang sie nach dem Laden nachtraeglich auf, waehrend der Mensch
+     *    schon im Formular tippt.
+     * 3. Ein Ziel hat nicht geantwortet. Dann MUSS die Stufe stehen, auch wenn
+     *    nur eine Art uebrig ist: Ein uebersprungener Schritt verschweigt den
+     *    Ausfall, und „ich konnte nicht nachsehen" ist eine eigene Aussage
+     *    (Wiki #595).
+     *
+     * Beim Bearbeiten nie: Der Termin hat seine Art schon. Und im Aufgaben-Weg
+     * nie — dort entsteht ein Zeitblock im System der Aufgabe.
+     */
+    const artSchritt =
+        ! bearbeiten &&
+        weg === 'termin' &&
+        (artenwahl.length > 1 || fremd.loadingKinds || ausgefalleneZiele.length > 0);
+
+    /** Die getroffene Wahl, in der Form, in der die Liste sie fuehrt. */
+    const gewaehlt = {
+        source: fremd.target,
+        kind: fremdesZiel ? fremd.targetKind : entwurf.kind,
+    };
+
+    const gewaehlteArt = artenwahl.find(
+        (eintrag) => eintrag.source === gewaehlt.source && eintrag.kind.key === gewaehlt.kind,
+    );
+
+    /** Was im Kopf des Assistenten steht — „Geschaeftlich (Manager)". */
+    const gewaehlterName = gewaehlteArt
+        ? gewaehlteArt.system === ''
+            ? gewaehlteArt.kind.label
+            : `${gewaehlteArt.kind.label} (${gewaehlteArt.system})`
+        : undefined;
+
+    /**
+     * Eine Art waehlen — und damit auch das System, in dem sie gefuehrt wird.
+     *
+     * Das ist die ganze Umkehrung: Vorher waehlte man ein System und bekam
+     * dessen Arten, jetzt waehlt man eine Art und das System ergibt sich.
+     * Nach aussen bleibt es derselbe Zustand wie vorher (`target` und
+     * `targetKind` in {@link useRemoteTarget}) — sonst gaebe es die Angabe
+     * zweimal, und das Anlegen drueben liest nur eine davon.
+     */
+    const artWaehlen = (eintrag: KindOption, weiter = true) => {
+        if (eintrag.source === '') {
+            // Zurueck auf den eigenen Kalender: Sonst stuende die Art eines
+            // fremden Systems an einem eigenen Termin.
+            void fremd.chooseTarget('');
+            setEntwurf({ ...entwurf, kind: eintrag.kind.key });
+        } else {
+            // Kein zweiter Netzweg: Die Arten dieses Ziels sind vorgeladen,
+            // `chooseTarget` nimmt sie aus dem Speicher.
+            void fremd.chooseTarget(eintrag.source, eintrag.kind.key);
+        }
+
+        if (weiter) {
+            setSchritt('details');
+        }
+    };
+
+    /**
+     * Eine Stufe mit einer einzigen Antwort wird nicht gestellt — sie wird
+     * beantwortet.
+     *
+     * Der Fall, auf den es ankommt: Verwaltung und CRM fuehren je EINE
+     * anlegbare Art. Eine Liste mit einem Eintrag ist eine Frage, die keine
+     * ist. Dasselbe, wenn ein `initialTarget` auf ein System zeigt, das nur
+     * eine Art hat.
+     *
+     * Der Haken merkt sich, was er zuletzt gesetzt hat: Ohne das rief er sich
+     * nach jedem Rendern erneut, weil `artenwahl` jedes Mal neu entsteht.
+     */
+    const artAutomatisch = useRef('');
 
     useEffect(() => {
-        if (startzielGewaehlt || ! initialTarget) {
+        if (bearbeiten || artSchritt || artenwahl.length !== 1) {
             return;
         }
 
-        setStartzielGewaehlt(true);
-        void fremd.chooseTarget(initialTarget);
-    }, [fremd, initialTarget, startzielGewaehlt]);
+        const einzige = artenwahl[0]!;
+        const griff = `${einzige.source}:${einzige.kind.key}`;
 
-    const fremdesZiel = fremd.target !== '';
+        if (artAutomatisch.current === griff) {
+            return;
+        }
+
+        if (einzige.source === gewaehlt.source && einzige.kind.key === gewaehlt.kind) {
+            return;
+        }
+
+        artAutomatisch.current = griff;
+        artWaehlen(einzige, false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [artSchritt, artenwahl.length, bearbeiten, gewaehlt.kind, gewaehlt.source]);
 
     /**
      * Nach WELCHER Art zeichnet die Maske?
      *
      * Bei fremdem Ziel nach dessen Art — sonst zeigte sie die eigenen Felder,
-     * während drüben ganz andere gelten. Die Artenwahl der Maske IST dann die
-     * Wahl der Zielart; eine zweite Auswahlliste daneben liefe auseinander,
-     * sobald jemand nur eine davon anfasst.
+     * während drüben ganz andere gelten. Welche Felder sie trägt, sagt
+     * `requires`/`forbids` der gewählten Art.
      */
-    const sichtbareArten = fremdesZiel ? fremd.targetKinds : kinds;
     const sichtbarerEntwurf = useMemo(
         () => (fremdesZiel ? { ...entwurf, kind: fremd.targetKind } : entwurf),
         [entwurf, fremd.targetKind, fremdesZiel],
     );
+
+    /**
+     * Was das Formular als Artenliste bekommt.
+     *
+     * Beim ANLEGEN genau die gewaehlte Art — und damit verbirgt `EventForm`
+     * seine Auswahlliste von selbst (sie erscheint erst ab zwei Eintraegen).
+     * Das ist der Sinn des Schritts: Wer die Art gerade gewaehlt hat, soll sie
+     * nicht gleich darunter noch einmal waehlen.
+     *
+     * Beim BEARBEITEN die ganze Liste — dort ist die Art zu aendern ein
+     * gueltiger Vorgang. Gefiltert, ABER die Art des Termins bleibt drin, auch
+     * wenn sie nicht anlegbar ist: `creatable` sagt „darf man das auswaehlen",
+     * nicht „darf das existieren". Ein eingeplanter Block, dessen Art aus der
+     * Liste faellt, waere ein Formular ohne Regeln — und ohne Felder.
+     */
+    const formularArten = bearbeiten
+        ? kinds.filter((art) => art.creatable !== false || art.key === entwurf.kind)
+        : gewaehlteArt
+          ? [gewaehlteArt.kind]
+          : (fremdesZiel ? fremd.targetKinds : eigeneArten).filter((art) => art.creatable !== false);
 
     const geaendert = (naechster: EventDraft) => {
         setEntwurf(naechster);
@@ -320,49 +554,17 @@ export function EventComposer({
         onSaveHere(entwurf);
     };
 
-    const zielname = targets.find((ziel) => ziel.key === fremd.target)?.label ?? '';
-
-    /**
-     * Welcher der beiden Wege gerade offen ist.
-     *
-     * Beim Bearbeiten gibt es die Wahl nicht: Da steht schon fest, was der
-     * Eintrag ist. Ihn von einem Termin in eine eingeplante Aufgabe zu
-     * verwandeln waere ein anderer Vorgang als ihn zu aendern — dieselbe
-     * Begruendung wie bei der Zielwahl darueber.
-     */
-    const [weg, setWeg] = useState<'termin' | 'aufgabe'>('termin');
-
-    /**
-     * Der Zeitraum fuer den Aufgaben-Weg.
-     *
-     * Eigener Zustand neben dem Entwurf der Maske, weil hier nur drei Felder
-     * gebraucht werden — Art, Titel, Ort und Beschreibung kommen aus der
-     * Aufgabe. Eine Maske, die beide Saetze zeigt, fragt die Haelfte umsonst.
-     */
-    const [zeitraum, setZeitraum] = useState(() => ({
-        // Aus dem Entwurf, nicht nur aus `preset`: Ein Produkt, das seinen
-        // Entwurf selbst haelt (`draft`), gibt die Vorgabe schon dort hinein
-        // — der markierte Zeitraum stuende sonst im Termin-Weg und fehlte im
-        // Aufgaben-Weg daneben.
-        date: entwurf.date || preset?.date || heute(),
-        start: entwurf.start || preset?.start || '09:00',
-        end: entwurf.end || preset?.end || '10:00',
-    }));
-
-    const aufgabenWeg = Boolean(plannable) && ! bearbeiten;
-
     /**
      * Die Schritte, die es in DIESER Maske gibt.
      *
-     * Sie haengen daran, was das Produkt mitbringt — deshalb stehen sie hier und
-     * nicht in {@link ComposerSteps}. Ohne angestecktes Aufgabensystem gibt es
-     * nichts zu fragen, und dann bleibt ein Schritt uebrig: Die Kette zeichnet
-     * sich gar nicht, und niemand klickt sich durch eine Frage mit einer
-     * einzigen Antwort.
+     * Sie haengen daran, was das Produkt mitbringt und was gewaehlt wurde —
+     * deshalb stehen sie hier und nicht in {@link ComposerSteps}. Ohne
+     * angestecktes Aufgabensystem gibt es nichts zu fragen, und bei einer
+     * einzigen Art nichts zu waehlen; bleibt ein Schritt uebrig, zeichnet sich
+     * die Kette gar nicht.
      *
      * Beim BEARBEITEN gibt es die Wahl ohnehin nicht — der Eintrag ist schon,
-     * was er ist. Ihn von einem Termin in eine eingeplante Aufgabe zu
-     * verwandeln waere ein anderer Vorgang als ihn zu aendern.
+     * was er ist.
      */
     const schritte = useMemo<ComposerStep[]>(() => {
         const liste: ComposerStep[] = [];
@@ -375,6 +577,10 @@ export function EventComposer({
             });
         }
 
+        if (artSchritt) {
+            liste.push({ key: 'art', label: beschriftung.stepKind, chosen: gewaehlterName });
+        }
+
         liste.push({
             key: 'details',
             label: weg === 'aufgabe' && aufgabenWeg ? beschriftung.stepPlannable : beschriftung.stepFields,
@@ -382,26 +588,38 @@ export function EventComposer({
 
         return liste;
     }, [
+        artSchritt,
         aufgabenWeg,
         beschriftung.modeEvent,
         beschriftung.modePlannable,
         beschriftung.stepFields,
+        beschriftung.stepKind,
         beschriftung.stepPlannable,
         beschriftung.stepWhat,
+        gewaehlterName,
         weg,
     ]);
 
-    const [schritt, setSchritt] = useState<string>(() => (aufgabenWeg ? 'was' : 'details'));
+    const [schritt, setSchritt] = useState<string>(() =>
+        aufgabenWeg ? 'was' : artSchritt ? 'art' : 'details',
+    );
 
     /**
      * Auf einem Schritt stehen, den es nicht mehr gibt, ist eine leere Maske.
      *
      * Passiert, sobald ein Produkt `plannable` erst nachliefert oder wieder
-     * wegnimmt — dann faellt „was" weg, waehrend es der offene Schritt ist.
+     * wegnimmt, und seit dem 11.11.2026 auch, wenn die Terminart-Stufe
+     * wegfaellt, weil am Ende nur eine Art uebrig blieb.
+     *
+     * Ausgewichen wird nach VORN, auf die letzte Stufe. Nach hinten waere
+     * falsch: Eine Stufe verschwindet, weil es dort nichts mehr zu fragen gibt
+     * — wer auf ihr stand, ist weiter, nicht zurueck. Und bei drei Stufen
+     * schickte der Sprung auf die erste jemanden von der Terminart zurueck zur
+     * Weiche, die er gerade beantwortet hat.
      */
     useEffect(() => {
         if (! schritte.some((eintrag) => eintrag.key === schritt)) {
-            setSchritt(schritte[0]!.key);
+            setSchritt(schritte[schritte.length - 1]!.key);
         }
     }, [schritt, schritte]);
 
@@ -416,49 +634,6 @@ export function EventComposer({
                 es nur einen Schritt gibt — siehe ComposerSteps.
             */}
             <ComposerSteps steps={schritte} current={schritt} onGoTo={setSchritt} labels={labels} />
-
-            {/*
-                Die Zielwahl steht VOR der Maske und nur beim Anlegen: Ein
-                Termin, den es schon gibt, gehört bereits einem System. Ihn
-                umzuziehen wäre ein anderer Vorgang als ihn zu ändern, und die
-                Maske ließe beides gleich aussehen.
-
-                Und nur im Angaben-Schritt des Termin-Wegs: Über der Frage „Was
-                lege ich an?" stünde sonst eine Antwort auf „wo?", die für den
-                Aufgaben-Weg gar nicht gilt — dort entsteht der Zeitblock im
-                System der Aufgabe.
-            */}
-            {!bearbeiten && schritt === 'details' && weg === 'termin' && fremd.writableSources.length > 0 && umhuellen(
-                <div className="space-y-2">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                        <label htmlFor="event-composer-target" className="text-sm font-medium whitespace-nowrap">
-                            {beschriftung.target}
-                        </label>
-                        <select
-                            id="event-composer-target"
-                            value={fremd.target}
-                            onChange={(ereignis) => void fremd.chooseTarget(ereignis.target.value)}
-                            // `bg-background`, nicht `bg-transparent`: Ein
-                            // durchsichtiges Auswahlfeld nimmt im Dunkelmodus die
-                            // Farbe dessen an, was zufaellig dahinterliegt.
-                            className="h-9 w-full rounded-md border bg-background px-2 text-sm sm:max-w-xs"
-                        >
-                            <option value="">{beschriftung.ownCalendar}</option>
-                            {fremd.writableSources.map((ziel) => (
-                                <option key={ziel.key} value={ziel.key}>
-                                    {ziel.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {fremdesZiel && (
-                        <p className="text-xs text-muted-foreground">
-                            {beschriftung.targetHint.replace('{system}', zielname)}
-                        </p>
-                    )}
-                </div>,
-            )}
 
             {/*
                 Schritt 1: die Weiche. Sie bestimmt, welche Felder danach
@@ -488,7 +663,12 @@ export function EventComposer({
                                 data-mode={eintrag}
                                 onClick={() => {
                                     setWeg(eintrag);
-                                    setSchritt('details');
+                                    // Der Termin-Weg fuehrt auf die Terminart,
+                                    // wenn es dort etwas zu waehlen gibt — der
+                                    // Aufgaben-Weg nie: Dort entsteht ein
+                                    // Zeitblock im System der Aufgabe, und eine
+                                    // Terminart hat er nicht.
+                                    setSchritt(eintrag === 'termin' && artSchritt ? 'art' : 'details');
                                 }}
                                 aria-pressed={weg === eintrag}
                                 // Der Name ist das WORT, die Erklaerung eine
@@ -515,6 +695,28 @@ export function EventComposer({
                         );
                     })}
                 </div>,
+            )}
+
+            {/*
+                Schritt „Terminart": alle Arten aller Systeme in EINER Liste.
+
+                Hier stand bis zum 11.11.2026 eine Klappliste „Anlegen in" ueber
+                dem Formular — erst das System, dann dessen Arten. Die Reihenfolge
+                war falsch herum: Wer einen Geschaeftstermin anlegen will, weiss,
+                dass es ein Geschaeftstermin ist; in welchem System diese Art
+                gefuehrt wird, ist eine Eigenschaft der Art und keine Frage an den
+                Menschen. Jetzt waehlt er die Art, und das System steht klein
+                daneben.
+            */}
+            {schritt === 'art' && umhuellen(
+                <KindPicker
+                    options={artenwahl}
+                    value={gewaehlt}
+                    onPick={artWaehlen}
+                    unreachable={ausgefalleneZiele}
+                    loading={fremd.loadingKinds}
+                    labels={labels}
+                />,
             )}
 
             {schritt !== 'details' ? null : aufgabenWeg && weg === 'aufgabe'
@@ -565,7 +767,7 @@ export function EventComposer({
                   )
                 : umhuellen(
                 <EventForm
-                    kinds={sichtbareArten}
+                    kinds={formularArten}
                     categories={categories}
                     categoryMode={categoryMode}
                     multiDay={multiDay}

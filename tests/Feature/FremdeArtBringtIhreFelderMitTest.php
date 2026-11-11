@@ -65,11 +65,17 @@ it('traegt die Verbote einer fremden Art, nicht nur ihre Pflichten', function ()
         forbids: ['location'],
     );
 
+    // `creatable` seit dem 11.11.2026 (#9796) mit in der Drahtform: Die Maske
+    // siebt die Arten, die niemand von Hand waehlen darf, selbst aus — und bis
+    // dahin kam der Schluessel bei FREMDEN Arten gar nicht an. Ein Platz, aus
+    // dem jemand liest und den niemand fuellt, liefert einen leeren Wert, der
+    // wie ein gueltiger aussieht (Wiki #595).
     expect($art->toArray())->toBe([
         'key' => 'meeting_digital',
         'label' => 'Meeting digital',
         'requires' => ['meeting_url'],
         'forbids' => ['location'],
+        'creatable' => true,
     ]);
 });
 
@@ -82,5 +88,19 @@ it('kommt ohne Angaben mit leeren Listen aus', function () {
         'label' => 'Geschäftlich',
         'requires' => [],
         'forbids' => [],
+        // Die Vorgabe ist `true`, genau wie bei einer eigenen Art
+        // (`EventKind::isUserCreatable()`). Alles andere liesse eine fehlende
+        // Angabe wie ein Verbot aussehen.
+        'creatable' => true,
     ]);
+});
+
+it('nennt eine Art, die drueben nicht von Hand anlegbar ist, als solche', function () {
+    // Der Fall, fuer den der Schluessel da ist: Die Ticket-Zeitblock-Art der
+    // Verwaltung entsteht aus einem Ticket. Stand sie in der Auswahl, waere
+    // das eine Einladung in eine Ablehnung.
+    $art = new ExternalKind('ticket_block', 'Ticket-Zeitblock', creatable: false);
+
+    expect($art->creatable)->toBeFalse()
+        ->and($art->toArray()['creatable'])->toBeFalse();
 });

@@ -25,12 +25,15 @@ final class ExternalKind
      *                                        Eingaben an, die beim Speichern
      *                                        verfallen — und niemand erfuehre,
      *                                        warum die Notiz verschwunden ist.
+     * @param  bool  $creatable  Darf ein Mensch diese Art von Hand waehlen?
+     *                           Vorgabe `true`, wie {@see \Peppermint\Calendar\Kinds\EventKind::isUserCreatable()}.
      */
     public function __construct(
         public readonly string $key,
         public readonly string $label,
         public readonly array $requires = [],
         public readonly array $forbids = [],
+        public readonly bool $creatable = true,
     ) {}
 
     /** @return array<string, mixed> */
@@ -41,6 +44,12 @@ final class ExternalKind
             'label' => $this->label,
             'requires' => $this->requires,
             'forbids' => $this->forbids,
+            // Mitgeschickt, weil die Maske es LIEST: Sie siebt die Arten, die
+            // niemand von Hand waehlen darf, selbst aus — und ein Platz, aus
+            // dem jemand liest und den niemand fuellt, liefert einen leeren
+            // Wert, der wie ein gueltiger aussieht (Wiki #595). Die eigenen
+            // Arten fuehren den Schluessel seit je, die fremden fehlten.
+            'creatable' => $this->creatable,
         ];
     }
 }

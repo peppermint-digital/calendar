@@ -47,6 +47,22 @@ it('nennt die Terminarten des Zielsystems', function () {
         ->assertJsonPath('kinds.0.requires', ['location']);
 });
 
+it('schickt mit, ob eine fremde Art von Hand anlegbar ist', function () {
+    // Die Gegenprobe zur Lesestelle, und sie ist der Zweck des Tests: Die
+    // Artenliste der Maske siebt mit `creatable` (#9796). Kommt der Schluessel
+    // hier nicht an, liest sie einen leeren Wert, der wie ein gueltiger
+    // aussieht — nichts wird rot, und eine Art, die beim Speichern abgelehnt
+    // wird, steht trotzdem zur Wahl (Wiki #595).
+    $antwort = $this->actingAs($this->person)->getJson('api/calendar/sources/writable-demo/kinds');
+
+    $antwort->assertOk()->assertJsonPath('kinds.0.creatable', true);
+
+    // Und zwar an JEDER Art, nicht nur an der ersten.
+    foreach ($antwort->json('kinds') as $art) {
+        expect($art)->toHaveKey('creatable');
+    }
+});
+
 it('legt drueben an und zeigt die Fassung des Zielsystems', function () {
     // Das andere System rundet auf die volle Stunde. Angezeigt werden muss
     // SEINE Antwort — sonst steht im Kalender etwas anderes als drueben.

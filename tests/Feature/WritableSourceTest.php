@@ -51,11 +51,14 @@ it('nennt die Terminarten des anderen Systems samt Pflicht- und Verbotsfeldern',
     // beim Speichern, ohne dass jemand erfuehre, warum.
     $kinds = app(EventSourceRegistry::class)->writable()['writable-demo']->kinds();
 
+    // `creatable` gehoert seit dem 11.11.2026 (#9796) dazu — die Maske liest
+    // es, um Arten auszusieben, die beim Speichern ohnehin abgelehnt werden.
     expect($kinds[0]->toArray())->toBe([
         'key' => 'business',
         'label' => 'Business',
         'requires' => ['location'],
         'forbids' => [],
+        'creatable' => true,
     ]);
 });
 

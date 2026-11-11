@@ -31,7 +31,7 @@ the design as what it does, so here is the shape all four systems share.
 │ Display          another system's events in the same grid              │
 │ Collector        the source registry                                   │
 │ Comparisons      collisions, slot finder                               │
-│ Entry forms      EventForm, EventComposer — the latter also            │
+│ Entry forms      EventForm, KindPicker, EventComposer — the last also  │
 │                  writes into another system                            │
 │                                                                        │
 │ ┌─ the one table it does bring ──────────────────────────────────────┐ │
@@ -411,7 +411,7 @@ kind needs to do something of its own.
 ## The whole form, in one component
 
 `EventForm` draws the fields. `EventComposer` draws **the whole task**: pick the
-target system, draw that system's fields, save here or over there.
+kind, draw that kind's fields, save here or over there.
 
 ```tsx
 <EventComposer
@@ -426,9 +426,62 @@ target system, draw that system's fields, save here or over there.
 ```
 
 Your app supplies four things: its kinds, its targets, its own save path, and its
-own extra fields. Everything else lives in the package — the target picker, the
+own extra fields. Everything else lives in the package — the kind step, the
 switch to the other system's kinds, the draft state, the error line, the remote
 create.
+
+### You pick the kind. The system follows from it.
+
+Until 11.11.2026 a dropdown above the form asked *where* first („create in") and
+offered that system's kinds afterwards. The order was backwards: someone who
+wants to create a business appointment knows it is a business appointment — which
+of the four systems keeps that kind is a property of the kind, not a question for
+a human. Bastian, on the day it changed: „So that I always see all the kinds
+right away."
+
+So the wizard asks **one** step instead of two. `KindPicker` lists every
+creatable kind of every system in ONE flat list, own kinds first, each foreign
+one with its system's name small beside it:
+
+```
+Termin
+Geschäftlich      (Manager)
+Meeting digital   (Manager)
+Privat            (AI Brain)
+```
+
+Three rules hold that list together:
+
+- **No grouping, no sorting by system.** That would break the list back into the
+  product boxes it just dissolved. The system is a label, not a structure.
+- **The asking side sets the origin.** The system's name comes from the local
+  `RemoteSource.label` your app passes in `targets` — never from the answer of
+  the far system. A system does not know under which short name it is kept
+  elsewhere; if it could name itself, four interfaces would show four different
+  words for the same system.
+- **Own kinds carry no name at all.** The label answers „where does this get
+  created?", and for your own kinds the answer is „here" — the default needs no
+  sign. The package does not even know this system's name; only foreign sources
+  carry a label.
+
+It holds because the list is short: measured across all four systems on
+11.11.2026 there are **ten** creatable kinds (Manager 6, AI Brain 2, CRM 1,
+Verwaltung 1). Everything else is time blocks and mirrored entries, which come
+into being through another action and are never in the picker anyway.
+
+**`creatable` is what does the sieving, and it is read now.** It travelled the
+whole way and nobody looked at it: PHP has always sent it (`EventKind::toArray()`),
+the TypeScript type carried it, and the composer handed its list on unfiltered —
+so „Urlaub" and „Ressourcenbuchung" stood in a picker that rejects them on save.
+The filter now sits in the package, once, instead of in four products. Since
+11.11.2026 `ExternalKind::toArray()` sends it too: a slot someone *reads* and
+nobody *fills* returns an empty value that looks like a valid one.
+
+**A step with one answer is not asked.** Verwaltung and CRM keep one creatable
+kind each; with no foreign targets the step disappears and the kind is set. The
+one exception is a target that did not answer — then the step stays, because
+„nobody is responsible" and „I could not look" are two different statements, and
+skipping the step would hide the outage.
 
 **Why this is a component and not a recipe.** Until 15.10.2026 every system
 assembled the same pieces itself — `useRemoteTarget`, `emptyDraft`, the picker,
@@ -456,9 +509,11 @@ Both follow from one sentence — **over there, the other system's rules apply**
 2. `extraFields` disappear. Creating from the CRM into the Manager, there is no
    deal over there — a field for it would take input that arrives nowhere.
 
-The kind picker inside the form *is* the target-kind picker while a foreign
-target is selected. A second list beside it drifts the moment someone touches
-only one of them.
+The kind step *is* the target-kind choice: picking „Geschäftlich (Manager)" sets
+the target and the kind in one move. A second list beside it drifts the moment
+someone touches only one of them — which is why the form itself no longer shows a
+kind dropdown while creating. It receives exactly the chosen kind, and
+`EventForm` hides a list of one on its own.
 
 ### When your app needs to hold the draft
 
@@ -482,9 +537,22 @@ person already picked the system and should not pick it again in the form. The
 Manager used to route that path into a *separate little dialog with its own axios
 calls* — the fifth copy of the same form. Now it routes into the same one.
 
-The target is chosen **once**, not on every render: `chooseTarget` fetches the
-other system's kinds, and a network call per render is a loop nobody notices
-until the other system starts throttling.
+Since the system is no longer a question, `initialTarget` **narrows the list**
+instead of answering a dropdown: only that system's kinds are offered. The kind
+still has to be picked — nobody was asked about that — unless the system keeps
+exactly one, in which case the step disappears.
+
+The kinds of every writable target are fetched **once, in parallel, when the
+form opens** (`preloadKinds` on `useRemoteTarget`) — the list shows all of them
+at once, so they have to be there before the first choice. Deliberately a switch
+and not the hook's default: a page that only moves and deletes events in the grid
+never needs them, and one call per source on every page build is exactly the loop
+nobody notices until the other system starts throttling. Picking a kind
+afterwards goes to no network at all; the kinds are already in hand.
+
+A target that does not answer is a **visible note naming the system**, and the
+remaining kinds stay pickable. An outage shown as an empty list looks like an
+answer.
 
 ### Making it look like your app
 
@@ -496,8 +564,8 @@ get along. That must not mean the form looks foreign:
 renderSection={(children) => <Card><CardContent>{children}</CardContent></Card>}
 ```
 
-Both sections — target picker and form — go through it. In a dialog, pass the
-children straight through: the dialog *is* the wrapper.
+Every section — the mode switch, the kind list, the form — goes through it. In a
+dialog, pass the children straight through: the dialog *is* the wrapper.
 
 ### What stays with your app
 
