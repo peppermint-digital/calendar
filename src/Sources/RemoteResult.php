@@ -58,12 +58,40 @@ class RemoteResult
      * — „nicht erreichbar: " ist schlimmer als „nicht erreichbar:
      * unreachable".
      *
+     * ## `ok` wird STRENG gelesen, und das ist keine Stilfrage
+     *
+     * Nur ein echtes `true` zaehlt. Bis zum 11.11.2026 stand hier
+     * `(bool) ($antwort['ok'] ?? false)`, und der Fall, den diese Lesart
+     * falsch beantwortet, ist dieser:
+     *
+     *     ['ok' => 'false', 'data' => null]   // (bool) 'false' === true
+     *
+     * Eine so antwortende Gegenstelle gilt damit als ERFOLG. `data` ist dann
+     * keine Liste, `rows()` ist leer — und heraus kommt eine leere
+     * Terminliste, die sich als vollstaendige Auskunft ausgibt.
+     *
+     * Beim Anlegen ist es schlimmer: Dort entscheidet dieselbe Zeile, und
+     * {@see RemoteEventSource::durchgefallen()} laesst eine ABGELEHNTE Anlage
+     * als Erfolg durch. `ExternalSourceFailed` greift nicht mehr — die
+     * Vorkehrung gegen „ein Termin, den jemand angelegt zu haben glaubt und
+     * den es nirgends gibt" wird von der einen Zeile ausgehebelt, die sie
+     * tragen sollte.
+     *
+     * Dasselbe gilt fuer `1`, `'1'`, `'yes'` und jedes andere Truthy, das kein
+     * Bool ist: Alle sind eine KAPUTTE Antwort, und eine kaputte Antwort ist
+     * kein Erfolg. Streng gelesen kostet ein sich falsch verhaltendes System
+     * eine Fehlermeldung; lose gelesen kostet es eine falsche Auskunft, die
+     * niemand sieht.
+     *
+     * Wer das wieder lockern will, will diese leere Liste — und beim Anlegen
+     * diesen Termin, den es nicht gibt.
+     *
      * @param  array<string, mixed>  $antwort
      */
     public static function fromArray(array $antwort): self
     {
         return new self(
-            ok: (bool) ($antwort['ok'] ?? false),
+            ok: ($antwort['ok'] ?? null) === true,
             data: is_array($antwort['data'] ?? null) ? $antwort['data'] : null,
             message: $antwort['message'] ?? $antwort['error'] ?? null,
             error: $antwort['error'] ?? null,
