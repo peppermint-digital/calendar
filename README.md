@@ -19,6 +19,89 @@ calendar_events                  title, time range, all-day, location,
   └── <your profile table>  1:1  your columns, your constraints
 ```
 
+## How the whole thing is built
+
+The package is one third of the picture. What it does *not* hold is as much of
+the design as what it does, so here is the shape all four systems share.
+
+```
+┌─ THE PACKAGE   peppermint/calendar + @peppermint-digital/calendar ─────┐
+│ UI               the grid, the agenda, the toolbar                     │
+│ Basics           recurrence, visibility, attendees, ICS export         │
+│ Display          another system's events in the same grid              │
+│ Collector        the source registry                                   │
+│ Comparisons      collisions, slot finder                               │
+│ Entry forms      EventForm, EventComposer — the latter also            │
+│                  writes into another system                            │
+│                                                                        │
+│ ┌─ the one table it does bring ──────────────────────────────────────┐ │
+│ │ calendar_events   title · time range · all-day · location ·        │ │
+│ │                   recurrence · owner · visibility · kind · uid     │ │
+│ └────────────────────────────────────────────────────────────────────┘ │
+│                                                                        │
+│ It knows not one single event kind.                                    │
+└────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     │  every system installs it
+                                     ▼
+┌─ THE SYSTEMS ──────────────────────────────────────────────────────────┐
+│ Each one installs the package. Each one keeps its own events           │
+│ in its own database.                                                   │
+│                                                                        │
+│ ┌─ AI Brain — the hub ───────────────────────────────────────────────┐ │
+│ │ Holds what belongs to the PERSON rather than to a product:         │ │
+│ │                                                                    │ │
+│ │   the category list    maintained here; the others pull it         │ │
+│ │                        in with calendar:pull-categories            │ │
+│ │   private events                                                   │ │
+│ │   ICS subscriptions    Outlook, Google, any ICS address            │ │
+│ │   the CalDAV server    one address for phone and Thunderbird       │ │
+│ └────────────────────────────────────────────────────────────────────┘ │
+│                                                                        │
+│ Verwaltung    CRM    Manager                                           │
+│                                                                        │
+│ … and a new one needs no line in any of the others: a product          │
+│ offering calendar.events.list becomes a source by itself.              │
+└────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     │  each brings its own
+                                     ▼
+┌─ WHAT EACH SYSTEM BRINGS ITSELF ───────────────────────────────────────┐
+│ ┌─ event kinds ──────────────────────────────────────────────────────┐ │
+│ │ One class per kind — it decides which fields an event has.         │ │
+│ │                                                                    │ │
+│ │   Brain 5    Verwaltung 2    CRM 3    Manager 10                   │ │
+│ │                                                                    │ │
+│ │ A category is NOT a kind: if it changes no field, it is a row      │ │
+│ │ in a table, not a class in a release.                              │ │
+│ └────────────────────────────────────────────────────────────────────┘ │
+│                                                                        │
+│ ┌─ storage ──────────────────────────────────────────────────────────┐ │
+│ │ own events      its own calendar_events in its own database —      │ │
+│ │                 the schema comes from the package                  │ │
+│ │ own fields      the kind's profile table, never a core column      │ │
+│ │ foreign events  NEVER copied                                       │ │
+│ └────────────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Two rules the boxes do not show.
+
+**Federation.** Every system displays the others' calendars — read live, never
+as a copy. Writing works too: an event in the Manager, created from the CRM,
+belongs to the Manager from the first moment. For *displaying*, no side is the
+centre. The hub is the centre only for the four things listed above, not for
+the products' events.
+
+**Add-ons and plugins.** The dependency runs *towards* the calendar, never away
+from it: `tasks` → `calendar`. The calendar does not know what a task is; it
+holds `subject_type` / `subject_id` and nothing more. A module hangs itself on
+as a satellite (`calendar_event_notes`) without any event kind knowing it
+exists.
+
+The drawing this was reconciled against lives in the AI Brain vault as
+`Skizzierung_System.excalidraw`.
+
 ## The interface
 
 The package ships its front end in the same repository: `composer.json` for the PHP core,
@@ -26,7 +109,7 @@ The package ships its front end in the same repository: `composer.json` for the 
 
 ```
 composer require peppermint/calendar
-npm install github:peppermint-digital/calendar#v0.34.0
+npm install github:peppermint-digital/calendar#v0.95.0
 ```
 
 ```tsx
@@ -1407,13 +1490,23 @@ vendor/bin/pest
 ## Status
 
 In production in four systems — Peppermint Manager, AI Brain, Peppermint
-Verwaltung and Peppermint CRM — with 228 tests.
+Verwaltung and Peppermint CRM — with 795 tests: 498 on the PHP side
+(`vendor/bin/pest`) and 297 on the front end (`npm test`).
 
-In place: kinds and profiles, satellites, flat profile fields (so a field can
-leave a shared core table without rewriting every caller), the planned-block
-shape, attendees, scopes, per-kind deletion, recurrence, iCalendar export, the
-time-blocking primitives, and remote calendars of other systems — read and
-write, over whatever transport the host provides.
+In place, on the PHP side: kinds and profiles, satellites, flat profile fields
+(so a field can leave a shared core table without rewriting every caller), the
+planned-block shape, attendees, scopes, per-kind deletion, recurrence,
+iCalendar export, the time-blocking primitives, the free-slot and conflict
+finders, categories with a pulled-in shared list, event reminders with a
+per-person lead time, ICS subscriptions, MCP tools for the lead time and the
+subscribed events, and remote calendars of other systems — read and write, over
+whatever transport the host provides.
+
+In place, on the front end: the grid and its toolbar, the agenda, the filter
+panel, the user switcher, the event form and the composer that also writes into
+another system, the detail view, the page frame around all of it, the
+draggable list and the search for things still to be scheduled, and the slot
+finder. Plain elements with Tailwind class names — no component library.
 
 Not in place: a CalDAV **client** — nothing here fetches a foreign calendar
 over CalDAV — and invitation mails.
