@@ -712,9 +712,17 @@ describe('die Vollstaendigkeit', () => {
  *
  * Mit `failed` ist ein Name aus der Ernte-Form verschwunden, und das ist
  * Absicht: Wer ihn liest, soll einen Compilerfehler bekommen und kein stummes
- * „[object Object]". Die Array-Form ist davon NICHT betroffen — sie sagte ueber
- * die Systeme ohnehin nichts, und die Produkte geben heute genau sie herein.
- * Dieser Test haelt fest, dass das so bleibt.
+ * „[object Object]".
+ *
+ * Warum das die Array-Form nicht beruehren KANN, und zwar nicht nur gerade
+ * nicht: **`failed` lebte allein im Objektzweig. Der Array-Zweig setzt `ernte`
+ * auf `null` und liest von der Antwort nichts als die Treffer selbst — es gibt
+ * also keinen Pfad, auf dem das Entfernen eines Ernte-Feldes bei ihm ankommt.**
+ * Die Union `Plannable[] | PlannableHarvest` und die Weiche `Array.isArray`
+ * stehen unveraendert.
+ *
+ * Die Produkte geben heute genau diese Form herein. Diese Tests halten fest,
+ * dass das so bleibt.
  */
 describe('die alte Array-Form', () => {
     it('nimmt einen nackten Treffer-Array an', async () => {
@@ -742,6 +750,22 @@ describe('die alte Array-Form', () => {
         );
 
         expect(await screen.findByText('Nichts offen.')).toBeTruthy();
+        expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    /**
+     * Der Satz selbst, festgehalten: Die Array-Form kommt am Ausfall-Teil gar
+     * nicht vorbei. `ernte` ist `null`, also gibt es keine Ausfallzeile und
+     * keinen Wiederhol-Knopf — unabhaengig davon, wie die Ernte-Form heute
+     * heisst oder morgen heisst.
+     */
+    it('kommt an den Ausfaellen gar nicht vorbei', async () => {
+        render(<PlannableSearch search={async () => offen} onPick={() => {}} />);
+
+        await screen.findByText('Abgabe vorbereiten');
+
+        expect(document.querySelector('[data-slot="plannable-failed"]')).toBeNull();
+        expect(document.querySelector('[data-action="retry"]')).toBeNull();
         expect(screen.queryByRole('status')).toBeNull();
     });
 });

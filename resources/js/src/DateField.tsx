@@ -47,22 +47,19 @@ import { cn } from './ui/utils';
 export interface DateFieldProps {
     id?: string;
     /**
-     * Der Name des Feldes fuer Hilfsmittel.
+     * Der Name des Feldes fuer Hilfsmittel — fuer Stellen OHNE sichtbare
+     * Beschriftung.
      *
-     * Gebraucht, wo keine sichtbare Beschriftung danebensteht — in der
-     * Zeitraum-Stufe des Aufgaben-Wegs steht ueber den drei Feldern nur „Wann",
-     * und ein Vorleser sagte dort „Textfeld" und sonst nichts (#9808). Ein Name
-     * fuer Hilfsmittel ist NICHT dasselbe wie eine sichtbare Beschriftung: Das
-     * Aussehen bleibt, wie es ist.
+     * Wo eine steht, ist `htmlFor` der Weg: So macht es das {@link EventForm},
+     * und seit dem 11.11.2026 auch die Zeitraum-Stufe des Aufgaben-Wegs, wo
+     * vorher nur „Wann" ueber drei namenlosen Feldern stand (#9808). Dieses
+     * `aria-label` wuerde eine verknuepfte Beschriftung verdraengen und das
+     * Feld unter zwei Namen fuehren — es ist der Weg fuer ein Feld, das allein
+     * steht.
      *
-     * Die Angabe gehoert hierher und nicht an den Aufrufort, weil das Feld sie
-     * tragen kann — dann wirkt sie ueberall, wo es steht, und nicht nur dort, wo
+     * Die Angabe gehoert ans Feld und nicht an den Aufrufort, weil das Feld sie
+     * tragen kann: Dann wirkt sie ueberall, wo es steht, und nicht nur dort, wo
      * jemand daran gedacht hat.
-     *
-     * Wo schon eine sichtbare Beschriftung ueber `htmlFor` daran haengt — im
-     * {@link EventForm} ist jedes Feld beschriftet —, wird sie NICHT gegeben:
-     * Dieses `aria-label` wuerde die sichtbare verdraengen und dasselbe Feld
-     * unter zwei Namen fuehren. Gebraucht wird sie dort, wo keine steht.
      */
     label?: string;
     /** `YYYY-MM-DD`, oder leer. */

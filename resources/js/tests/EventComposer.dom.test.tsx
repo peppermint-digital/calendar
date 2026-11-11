@@ -1105,18 +1105,19 @@ describe('die Aufgaben-Stufen', () => {
     });
 
     /**
-     * Die drei Felder im Zeitraum haben Namen (#9808).
+     * Die drei Felder im Zeitraum sind beschriftet (#9808).
      *
-     * Ueber ihnen steht nur „Wann", und das gilt fuer alle drei zusammen. In
-     * der Abnahme (#9799) sagte ein Vorleser hier „Textfeld, Auswahl, Auswahl,
-     * Auswahl, Auswahl" — welches Paar der Beginn und welches das Ende war,
-     * stand nirgends.
+     * In der Abnahme (#9799) stand ueber ihnen nur „Wann", und ein Vorleser
+     * sagte „Textfeld, Auswahl, Auswahl, Auswahl, Auswahl" — welches Paar der
+     * Beginn und welches das Ende war, stand nirgends.
      *
-     * Sichtbar bleibt die Zeile, wie sie war: Wer aus dem Raster kommt,
-     * bestaetigt einen vorbelegten Zeitraum und soll dafuer keine
-     * Formularspalte lesen.
+     * Und zwar SICHTBAR beschriftet, mit DENSELBEN Woertern wie dort: Die
+     * beiden Zeiten heissen im normalen Formular „Von" und „Bis". Einmal
+     * beschriftet und einmal nicht war nicht nur ein Vorleser-Problem, sondern
+     * eine Ungleichheit — und zwei Woerter fuer dieselbe Sache waeren die
+     * naechste. Geloest ist sie erst, wenn beide Wege gleich aussehen.
      */
-    it('benennt Datum, Beginn und Ende im Zeitraum', async () => {
+    it('beschriftet Datum, Von und Bis im Zeitraum', async () => {
         render(
             <EventComposer
                 kinds={EIGENE}
@@ -1131,18 +1132,33 @@ describe('die Aufgaben-Stufen', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Verwaltung' }));
         fireEvent.click(await screen.findByText('Ticket beantworten'));
 
-        // Genau „Datum" und nicht /Datum/: Der Knopf daneben heisst „Datum
-        // auswaehlen" und ist eine zweite Handlung mit eigenem Namen.
+        const stufe = document.querySelector('[data-slot="plannable-slot"]');
+
+        // Sichtbar: drei Woerter, die man lesen kann — und es sind die des
+        // Formulars.
+        expect(stufe?.textContent).toContain('Datum');
+        expect(stufe?.textContent).toContain('Von');
+        expect(stufe?.textContent).toContain('Bis');
+
+        // Beim Datum ist das sichtbare Wort ueber `for` mit dem Feld
+        // verknuepft — derselbe Weg wie im Formular. Genau „Datum" und nicht
+        // /Datum/: Der Knopf daneben heisst „Datum auswaehlen" und ist eine
+        // zweite Handlung mit eigenem Namen.
         const datum = screen.getByLabelText('Datum');
         expect((datum as HTMLInputElement).value).toBe('12.03.2026');
+        expect(datum.getAttribute('data-slot')).toBe('date-field');
 
-        // Und die beiden Uhrzeiten sind auseinanderzuhalten — darum ging es.
-        expect(screen.getByLabelText(/Beginn/).textContent).toContain('14');
-        expect(screen.getByLabelText(/Ende/).textContent).toContain('15');
+        // Bei den Uhrzeiten benennt das Wort die GRUPPE aus beiden Listen —
+        // `getByRole('group')` und nicht `getByLabelText`, das fuer
+        // Bedienelemente gedacht ist.
+        expect(screen.getByRole('group', { name: /Von/ }).textContent).toContain('14');
+        expect(screen.getByRole('group', { name: /Bis/ }).textContent).toContain('15');
 
-        // Sichtbar steht ueber den drei Feldern weiter nur das eine Wort.
-        const stufe = document.querySelector('[data-slot="plannable-slot"]');
-        expect(stufe?.querySelectorAll('label')).toHaveLength(0);
+        // Und darin tragen die beiden Listen ihre Rolle.
+        expect(screen.getAllByLabelText('Stunde')).toHaveLength(2);
+        expect(screen.getAllByLabelText('Minute')).toHaveLength(2);
+
+        // Die Ueberschrift der Stufe bleibt daneben stehen.
         expect(stufe?.textContent).toContain('Wann');
     });
 
@@ -1162,8 +1178,10 @@ describe('die Aufgaben-Stufen', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Verwaltung' }));
         fireEvent.click(await screen.findByText('Ticket beantworten'));
 
-        expect(screen.getByLabelText('Von wann')).toBeTruthy();
-        expect(screen.getByLabelText('Bis wann')).toBeTruthy();
+        // Sichtbar und als Name der Gruppe — ein Wort, beides.
+        expect(screen.getByRole('group', { name: 'Von wann' })).toBeTruthy();
+        expect(screen.getByRole('group', { name: 'Bis wann' })).toBeTruthy();
+        expect(document.querySelector('[data-slot="plannable-slot"]')?.textContent).toContain('Von wann');
     });
 
     it('nennt im Kopf, welches System und welche Aufgabe gewaehlt sind', async () => {
