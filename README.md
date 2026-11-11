@@ -123,6 +123,36 @@ composer require peppermint/calendar
 npm install github:peppermint-digital/calendar#v0.95.0
 ```
 
+### Updating is not `npm install`
+
+The two halves update differently, and only one of them says so.
+
+```bash
+composer update peppermint/calendar      # pulls the new commit ✓
+npm install                              # does NOT pull the new commit ✗
+npm update @peppermint-digital/calendar  # this one does ✓
+```
+
+A git dependency **without a committish** — which is how all four consumers carry it —
+counts as satisfied once anything is installed. `npm install` sees "it's there" and leaves
+the frozen copy alone. Nothing warns, and the build succeeds.
+
+Measured on 11.11.2026 after `composer update` + `npm install`: the Manager was running
+composer `194bc93` against npm `15ca8856`, the CRM against `e655a974`. **New PHP, old
+TSX** — the whole step wizard was missing from the installed `dist`, and the acceptance
+run was about to be measured against an interface that no longer existed.
+
+So the check belongs in the rollout, not in someone's memory:
+
+```bash
+grep -A3 '"name": "peppermint/calendar"' composer.lock | grep reference
+grep -o 'peppermint-digital/calendar.git#[a-f0-9]*' package-lock.json | head -1
+```
+
+Two different hashes mean the rollout is half done. This is the same failure the package
+warns about elsewhere — something is sent, nothing receives it — one layer up, in the
+deployment rather than in a payload.
+
 ```tsx
 import { AgendaList, EventForm, emptyDraft } from '@peppermint-digital/calendar';
 
