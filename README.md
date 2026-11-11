@@ -49,13 +49,15 @@ the design as what it does, so here is the shape all four systems share.
 │ in its own database.                                                   │
 │                                                                        │
 │ ┌─ AI Brain — the hub ───────────────────────────────────────────────┐ │
-│ │ Holds what belongs to the PERSON rather than to a product:         │ │
+│ │ What ONLY the hub holds:                                           │ │
 │ │                                                                    │ │
 │ │   the category list    maintained here; the others pull it         │ │
 │ │                        in with calendar:pull-categories            │ │
-│ │   private events                                                   │ │
 │ │   ICS subscriptions    Outlook, Google, any ICS address            │ │
 │ │   the CalDAV server    one address for phone and Thunderbird       │ │
+│ │                                                                    │ │
+│ │ Events it holds like any other system: in its own event            │ │
+│ │ kinds. "private" is one of them.                                   │ │
 │ └────────────────────────────────────────────────────────────────────┘ │
 │                                                                        │
 │ Verwaltung    CRM    Manager                                           │
@@ -90,8 +92,17 @@ Two rules the boxes do not show.
 **Federation.** Every system displays the others' calendars — read live, never
 as a copy. Writing works too: an event in the Manager, created from the CRM,
 belongs to the Manager from the first moment. For *displaying*, no side is the
-centre. The hub is the centre only for the four things listed above, not for
+centre. The hub is the centre only for the three things listed above, not for
 the products' events.
+
+Private events are federation too, not hub machinery — and the distinction is
+easy to lose. `private` is an ordinary event kind in the AI Brain
+(`PrivateEventKind`, its own profile table), and the products only read it.
+What differs is the *route*: the products' calendars arrive through the
+capability registry (`calendar.events.list`), the private ones through
+`list-calendar-bundle-tool`, because the AI Brain is not a connected product of
+itself and appears in no provider list. That is why `BrainPrivateEventSource`
+lives in this package rather than in one product.
 
 **Add-ons and plugins.** The dependency runs *towards* the calendar, never away
 from it: `tasks` → `calendar`. The calendar does not know what a task is; it
