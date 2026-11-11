@@ -421,8 +421,9 @@ export function PlannableSearch({
      *
      * 1. Das System hat geantwortet und nichts gemeldet — das ist eine Antwort,
      *    und sie wird hingeschrieben.
-     * 2. Das System steht in `failed` — dann steht der Grund da, nicht die
-     *    Leermeldung. Ein Ausfall darf nicht als leere Liste erscheinen.
+     * 2. Das System steht in `failures` — dann steht der Satz zu seinem Grund
+     *    da, nicht die Leermeldung. Ein Ausfall darf nicht als leere Liste
+     *    erscheinen.
      * 3. Niemand hat geantwortet, ohne dass ein Ausfall gemeldet waere. Dann
      *    wissen wir nichts, und dann steht hier nichts. Eine Leermeldung waere
      *    eine Auskunft, die keiner geprueft hat.
