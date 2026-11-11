@@ -170,3 +170,34 @@ describe('die Auswahl ueber den Knopf', () => {
         expect(nativ(container).tabIndex).toBe(-1);
     });
 });
+
+/**
+ * Ein Name fuer Hilfsmittel (#9808) — siehe {@link TimeField}, gleicher Grund:
+ * In der Zeitraum-Stufe stand ueber dem Datumsfeld nur „Wann", und ein Vorleser
+ * sagte „Textfeld".
+ */
+describe('der Name des Datumsfeldes', () => {
+    it('benennt das Eingabefeld, nicht die Huelle', () => {
+        render(<DateField label="Datum" value="2026-03-12" onChange={() => {}} />);
+
+        const feld = screen.getByLabelText('Datum');
+        expect(feld.tagName).toBe('INPUT');
+        expect(feld.getAttribute('data-slot')).toBe('date-field');
+
+        // Sichtbar bleibt es das deutsche Feld — der Name aendert die Anzeige
+        // nicht.
+        expect((feld as HTMLInputElement).value).toBe('12.03.2026');
+    });
+
+    it('benennt ohne Angabe nichts — und verdraengt so keine sichtbare Beschriftung', () => {
+        render(
+            <div>
+                <label htmlFor="d">Datum</label>
+                <DateField id="d" value="" onChange={() => {}} />
+            </div>,
+        );
+
+        expect(screen.getAllByLabelText('Datum')).toHaveLength(1);
+        expect(screen.getByLabelText('Datum').getAttribute('aria-label')).toBeNull();
+    });
+});

@@ -42,6 +42,38 @@ import { cn } from './ui/utils';
 
 export interface TimeFieldProps {
     id?: string;
+    /**
+     * Der Name der ganzen Uhrzeit fuer Hilfsmittel — „Beginn", „Ende".
+     *
+     * Er steht an der HUELLE, die damit zur Gruppe wird, und nicht an den
+     * beiden Listen: Eine Uhrzeit ist hier ein zusammengesetztes Feld, und das
+     * uebliche Muster dafuer ist eine benannte Gruppe mit benannten Teilen
+     * („Beginn" → „Stunde", „Minute"). Ein Vorleser nennt die Gruppe beim
+     * Betreten und danach die Liste, in der man steht.
+     *
+     * Ohne diese Angabe bleibt alles, wie es war: In der Zeitraum-Stufe des
+     * Aufgaben-Wegs sagte ein Vorleser „Auswahl, Auswahl, Auswahl, Auswahl",
+     * und welches Paar der Beginn und welches das Ende war, stand nirgends
+     * (#9808). Sichtbar aendert sich nichts — ein Name fuer Hilfsmittel ist
+     * nicht dasselbe wie eine sichtbare Beschriftung.
+     *
+     * Erst MIT ihr bekommen die beiden Listen ihre eigenen Namen. Das ist kein
+     * Geiz, sondern Ruecksicht: Wo heute eine sichtbare Beschriftung ueber
+     * `htmlFor` an der Stundenliste haengt, wuerde ein unbedingtes `aria-label`
+     * sie still verdraengen. Ein Produkt, das diese Angabe nicht gibt, behaelt
+     * genau das Verhalten von vorher.
+     *
+     * Und darum gibt das {@link EventForm} sie NICHT: Dort ist jedes Feld
+     * sichtbar beschriftet, und ein Name an der Gruppe kaeme zu dem an der
+     * Stundenliste hinzu — am 11.11.2026 gemessen: `getByLabelText('Von')`
+     * findet dann zwei Dinge (die Gruppe und die Stundenliste) statt einem.
+     * Ein Feld unter zwei Namen ist schlechter als eines unter einem.
+     */
+    label?: string;
+    /** Der Name der Stundenliste innerhalb der Gruppe. Wirkt nur mit {@link label}. */
+    hourLabel?: string;
+    /** Der Name der Minutenliste innerhalb der Gruppe. Wirkt nur mit {@link label}. */
+    minuteLabel?: string;
     /** „HH:MM" oder „HH:MM:SS"; leer zeigt in beiden Listen den Platzhalter. */
     value?: string;
     onChange?: (value: string) => void;
@@ -75,7 +107,18 @@ function zerlege(value: string): { stunde: string; minute: string } {
 
 const stunden = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
 
-export function TimeField({ id, value = '', onChange, className, disabled, minuteStep = 5, title }: TimeFieldProps) {
+export function TimeField({
+    id,
+    label,
+    hourLabel = 'Stunde',
+    minuteLabel = 'Minute',
+    value = '',
+    onChange,
+    className,
+    disabled,
+    minuteStep = 5,
+    title,
+}: TimeFieldProps) {
     const { stunde, minute } = useMemo(() => zerlege(value), [value]);
 
     const minuten = useMemo(() => {
@@ -95,9 +138,18 @@ export function TimeField({ id, value = '', onChange, className, disabled, minut
     }, [minuteStep, minute]);
 
     return (
-        <div className={cn('flex items-center gap-1', className)} data-slot="time-field" title={title}>
+        <div
+            className={cn('flex items-center gap-1', className)}
+            data-slot="time-field"
+            title={title}
+            // Die Gruppe nur, wenn sie auch einen Namen hat: Eine namenlose
+            // Gruppe ist eine Schachtel mehr, die ein Vorleser ansagt, ohne
+            // dass sie etwas sagt.
+            role={label ? 'group' : undefined}
+            aria-label={label}
+        >
             <Select value={stunde} onValueChange={(neu) => onChange?.(`${neu}:${minute || '00'}`)} disabled={disabled}>
-                <SelectTrigger className="w-[70px]" id={id}>
+                <SelectTrigger className="w-[70px]" id={id} aria-label={label ? hourLabel : undefined}>
                     <SelectValue placeholder="--" />
                 </SelectTrigger>
                 <SelectContent>
@@ -112,7 +164,7 @@ export function TimeField({ id, value = '', onChange, className, disabled, minut
             <span className="font-medium text-muted-foreground">:</span>
 
             <Select value={minute} onValueChange={(neu) => onChange?.(`${stunde || '00'}:${neu}`)} disabled={disabled}>
-                <SelectTrigger className="w-[70px]">
+                <SelectTrigger className="w-[70px]" aria-label={label ? minuteLabel : undefined}>
                     <SelectValue placeholder="--" />
                 </SelectTrigger>
                 <SelectContent>

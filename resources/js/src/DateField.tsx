@@ -46,6 +46,25 @@ import { cn } from './ui/utils';
 
 export interface DateFieldProps {
     id?: string;
+    /**
+     * Der Name des Feldes fuer Hilfsmittel.
+     *
+     * Gebraucht, wo keine sichtbare Beschriftung danebensteht — in der
+     * Zeitraum-Stufe des Aufgaben-Wegs steht ueber den drei Feldern nur „Wann",
+     * und ein Vorleser sagte dort „Textfeld" und sonst nichts (#9808). Ein Name
+     * fuer Hilfsmittel ist NICHT dasselbe wie eine sichtbare Beschriftung: Das
+     * Aussehen bleibt, wie es ist.
+     *
+     * Die Angabe gehoert hierher und nicht an den Aufrufort, weil das Feld sie
+     * tragen kann — dann wirkt sie ueberall, wo es steht, und nicht nur dort, wo
+     * jemand daran gedacht hat.
+     *
+     * Wo schon eine sichtbare Beschriftung ueber `htmlFor` daran haengt — im
+     * {@link EventForm} ist jedes Feld beschriftet —, wird sie NICHT gegeben:
+     * Dieses `aria-label` wuerde die sichtbare verdraengen und dasselbe Feld
+     * unter zwei Namen fuehren. Gebraucht wird sie dort, wo keine steht.
+     */
+    label?: string;
     /** `YYYY-MM-DD`, oder leer. */
     value: string;
     onChange: (iso: string) => void;
@@ -96,7 +115,7 @@ function alsIso(eingabe: string): string {
     return `${vollesJahr}-${monat.padStart(2, '0')}-${tag.padStart(2, '0')}`;
 }
 
-export function DateField({ id, value, onChange, className, disabled, required, title }: DateFieldProps) {
+export function DateField({ id, label, value, onChange, className, disabled, required, title }: DateFieldProps) {
     const [text, setText] = useState(() => alsDeutsch(value));
     const [bekannt, setBekannt] = useState(value);
     const feld = useRef<HTMLInputElement>(null);
@@ -134,6 +153,7 @@ export function DateField({ id, value, onChange, className, disabled, required, 
             <Input
                 ref={feld}
                 id={id}
+                aria-label={label}
                 className={cn('pr-10', className)}
             disabled={disabled}
             required={required}

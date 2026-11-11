@@ -55,6 +55,20 @@ export type EventComposerLabels = {
     stepSlot: string;
     /** Ueber dem Zeitraum im Aufgaben-Weg. */
     plannableSlot: string;
+    /**
+     * Die Namen der drei Felder im Zeitraum — fuer Hilfsmittel.
+     *
+     * Ueber ihnen steht nur „Wann", und das gilt fuer alle drei zusammen. Ein
+     * Vorleser sagte hier „Textfeld, Auswahl, Auswahl, Auswahl, Auswahl";
+     * welches Paar der Beginn und welches das Ende war, stand nirgends (#9808).
+     *
+     * Sie aendern das Aussehen NICHT: Die Felder stehen weiter in einer Zeile
+     * ohne sichtbare Beschriftung — wer aus dem Raster kommt, bestaetigt einen
+     * vorbelegten Zeitraum und soll dafuer keine Formularspalte lesen.
+     */
+    plannableSlotDate: string;
+    plannableSlotStart: string;
+    plannableSlotEnd: string;
     /** Ueber der Suche. */
     plannablePick: string;
     /** Der Knopf, der die Aufgabe wirklich einplant. */
@@ -85,6 +99,9 @@ const COMPOSER_DEFAULTS: EventComposerLabels = {
     stepTask: 'Aufgabe',
     stepSlot: 'Zeitraum',
     plannableSlot: 'Wann',
+    plannableSlotDate: 'Datum',
+    plannableSlotStart: 'Beginn',
+    plannableSlotEnd: 'Ende',
     plannablePick: 'Welche Aufgabe?',
     plannableSchedule: 'Einplanen',
     plannableNew: 'Neue Aufgabe anlegen',
@@ -1041,16 +1058,24 @@ export function EventComposer({
                               )}
 
                               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                  {/* Die Namen stehen an den Feldern und nicht
+                                      sichtbar darueber: „Wann" gilt fuer alle
+                                      drei, und ohne eigene Namen war nicht zu
+                                      hoeren, welches Paar der Beginn ist
+                                      (#9808). */}
                                   <DateField
+                                      label={beschriftung.plannableSlotDate}
                                       value={zeitraum.date}
                                       onChange={(datum) => setZeitraum((bisher) => ({ ...bisher, date: datum }))}
                                       className="sm:w-40"
                                   />
                                   <TimeField
+                                      label={beschriftung.plannableSlotStart}
                                       value={zeitraum.start}
                                       onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, start: zeit }))}
                                   />
                                   <TimeField
+                                      label={beschriftung.plannableSlotEnd}
                                       value={zeitraum.end}
                                       onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, end: zeit }))}
                                   />
