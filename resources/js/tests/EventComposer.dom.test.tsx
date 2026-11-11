@@ -1282,10 +1282,22 @@ describe('die Aufgaben-Stufen', () => {
                 onSaveHere={vi.fn()}
                 plannable={{
                     sources: SYSTEME,
+                    // Umgeschrieben am 11.11.2026 (#9810): Der Ausfall ist
+                    // ein Objekt mit typisiertem Grund (`failures`) statt eines
+                    // Satzes (`failed`). Festgehalten wird weiter dasselbe —
+                    // der Name kommt aus der LOKALEN Beschriftung, nicht aus
+                    // der Antwort der Gegenstelle.
                     search: async () => ({
                         tasks: [],
                         ok: [],
-                        failed: { verwaltung: 'Zeitüberschreitung nach 5s' },
+                        failures: {
+                            verwaltung: {
+                                source: 'verwaltung',
+                                reason: 'unreachable',
+                                message: 'Zeitüberschreitung nach 5s',
+                                may_retry: true,
+                            },
+                        },
                     }),
                     onSchedule: vi.fn(),
                 }}

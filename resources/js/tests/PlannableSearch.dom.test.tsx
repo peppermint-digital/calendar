@@ -1,10 +1,15 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { PlannableSearch, type Plannable } from '../src/PlannableSearch';
+import {
+    PlannableSearch,
+    type Plannable,
+    type PlannableFailure,
+    type PlannableFailureReason,
+} from '../src/PlannableSearch';
 
 afterEach(cleanup);
 
@@ -256,13 +261,30 @@ describe('die drei Zustaende', () => {
         expect(screen.queryByRole('status')).toBeNull();
     });
 
+    /**
+     * Umgeschrieben am 11.11.2026 (#9810): Der Ausfall war ein Satz
+     * (`failed: {schluessel: text}`) und ist jetzt ein Objekt mit typisiertem
+     * Grund (`failures`). Das neue Verhalten ist richtig, weil ein Satz die
+     * vier Lagen zusammenwirft — und eine Maske, die sie nicht auseinanderhalten
+     * kann, bietet ein Wiederholen fuer eine fehlende Berechtigung an.
+     *
+     * Was dieser Test festhaelt, ist unveraendert: Es steht der WORTLAUT der
+     * Gegenstelle da, und der LOKALE Name des Systems.
+     */
     it('sagt den GRUND, wenn das System nicht geantwortet hat', async () => {
         render(
             <PlannableSearch
                 search={async () => ({
                     tasks: [],
                     ok: [],
-                    failed: { manager: 'Verbindung abgelehnt' },
+                    failures: {
+                        manager: {
+                            source: 'manager',
+                            reason: 'unreachable',
+                            message: 'Verbindung abgelehnt',
+                            may_retry: true,
+                        },
+                    },
                 })}
                 source="manager"
                 sourceNames={{ manager: 'Manager' }}
@@ -311,7 +333,17 @@ describe('die drei Zustaende', () => {
                         { id: 1, title: 'Aus dem Brain', sourceKey: 'brain' },
                     ],
                     ok: ['manager', 'brain'],
-                    failed: { verwaltung: 'Zeitüberschreitung' },
+                    // Dieselbe Umschreibung wie oben (#9810): Objekt statt
+                    // Satz. Festgehalten wird weiter, dass ein Ausfall
+                    // niemandem die Liste wegnimmt.
+                    failures: {
+                        verwaltung: {
+                            source: 'verwaltung',
+                            reason: 'unreachable',
+                            message: 'Zeitüberschreitung',
+                            may_retry: true,
+                        },
+                    },
                 })}
                 sourceNames={{ verwaltung: 'Verwaltung' }}
                 onPick={() => {}}
@@ -408,5 +440,308 @@ describe('was an einem Treffer steht', () => {
 
         await screen.findByText('Rechnung pruefen');
         expect(screen.queryByRole('link')).toBeNull();
+    });
+});
+
+/**
+ * Die vier Gruende sind vier naechste Schritte (#9810).
+ *
+ * Bis zum 11.11.2026 trug die Ernte `failed: {schluessel: satz}` — ein Satz fuer
+ * jede Lage. Drueben im Aufgabenpaket unterscheidet `SourceFailure` aber vier:
+ * „nicht angeboten", „nicht erlaubt", „nicht erreichbar", „der Dienst hat einen
+ * Fehler gemeldet". Sie fuehren zu vier verschiedenen Dingen — abwarten, eine
+ * Berechtigung holen, das andere System ansehen, es melden —, und eine Zeile
+ * fuer alle vier sagt „etwas ist schiefgelaufen" und damit nichts.
+ *
+ * Die Namen sind hier dieselben wie dort, damit das Produkt durchreicht und
+ * nichts uebersetzt.
+ */
+describe('die vier Ausfallgruende', () => {
+    /** Ein Ausfall, wie die Gegenstelle ihn schickt. */
+    function ausfall(
+        reason: PlannableFailureReason | null,
+        message: string,
+        may_retry = false,
+    ): Record<string, PlannableFailure> {
+        return { verwaltung: { source: 'verwaltung', reason, message, may_retry } };
+    }
+
+    function zeige(failures: Record<string, PlannableFailure>) {
+        return render(
+            <PlannableSearch
+                search={async () => ({ tasks: [], ok: [], failures })}
+                source="verwaltung"
+                sourceNames={{ verwaltung: 'Verwaltung' }}
+                onPick={() => {}}
+                emptyText="Nichts offen."
+            />,
+        );
+    }
+
+    /** „Bietet keine Aufgaben an" ist kein Fehler, sondern eine Auskunft. */
+    it('sagt bei not_offered, dass das System keine Aufgaben fuehrt', async () => {
+        zeige(ausfall('not_offered', 'tasks.list wird nicht angeboten'));
+
+        const hinweis = await screen.findByRole('status');
+        expect(hinweis.textContent).toContain('Verwaltung bietet keine Aufgaben an.');
+
+        // Und kein Wiederholen: Daran aendert Warten nichts.
+        expect(hinweis.querySelector('[data-action="retry"]')).toBeNull();
+    });
+
+    /** Fehlende Berechtigung wird durch Warten nicht besser. */
+    it('sagt bei not_allowed, dass die Berechtigung fehlt', async () => {
+        zeige(ausfall('not_allowed', 'Kein Zugriff auf tasks.list'));
+
+        const hinweis = await screen.findByRole('status');
+        expect(hinweis.textContent).toContain('Keine Berechtigung für Verwaltung');
+        expect(hinweis.textContent).toContain('Kein Zugriff auf tasks.list');
+        expect(hinweis.querySelector('[data-action="retry"]')).toBeNull();
+    });
+
+    it('sagt bei unreachable, dass niemand geantwortet hat', async () => {
+        zeige(ausfall('unreachable', 'Zeitüberschreitung nach 5s', true));
+
+        const hinweis = await screen.findByRole('status');
+        expect(hinweis.textContent).toContain('Nicht erreichbar: Verwaltung');
+        expect(hinweis.textContent).toContain('Zeitüberschreitung nach 5s');
+    });
+
+    it('sagt bei tool_failed, dass der Dienst selbst einen Fehler gemeldet hat', async () => {
+        zeige(ausfall('tool_failed', 'SQLSTATE[42S02]', true));
+
+        const hinweis = await screen.findByRole('status');
+        expect(hinweis.textContent).toContain('Verwaltung hat einen Fehler gemeldet');
+        expect(hinweis.textContent).toContain('SQLSTATE[42S02]');
+    });
+
+    /**
+     * Ohne genannten Grund steht der WORTLAUT da — er ist das Einzige, was
+     * dann etwas sagt.
+     *
+     * Und darum gibt es kein fuenftes „unknown": Das waere ein Grund, der wie
+     * einer aussieht und keiner ist. Er bekaeme in der Tabelle einen Satz, und
+     * der Satz sagte nichts. `null` zwingt auf den Wortlaut.
+     */
+    it('zeigt bei reason null den Wortlaut der Gegenstelle', async () => {
+        zeige(ausfall(null, 'Verwaltung antwortet nicht: Host unbekannt'));
+
+        const hinweis = await screen.findByRole('status');
+        expect(hinweis.textContent).toContain('Verwaltung antwortet nicht: Host unbekannt');
+
+        // „Nicht erreichbar" waere schon mehr, als geprueft ist.
+        expect(hinweis.textContent).not.toContain('Nicht erreichbar');
+        expect(hinweis.querySelector('p')?.getAttribute('data-reason')).toBe('');
+    });
+
+    /** Fuer eine Maske, die „nicht angeboten" anders zeichnen will als einen Fehler. */
+    it('schreibt den Grund auch an das Element', async () => {
+        zeige(ausfall('tool_failed', 'kaputt'));
+
+        const hinweis = await screen.findByRole('status');
+        // Innerhalb der Meldung gesucht: Die Huelle der Suche traegt dasselbe
+        // `data-source`, weil dort das gewaehlte System steht.
+        expect(hinweis.querySelector('[data-source="verwaltung"]')?.getAttribute('data-reason')).toBe(
+            'tool_failed',
+        );
+    });
+
+    it('laesst jeden der Saetze ueberschreiben', async () => {
+        render(
+            <PlannableSearch
+                search={async () => ({
+                    tasks: [],
+                    ok: [],
+                    failures: { verwaltung: { source: 'verwaltung', reason: 'not_offered', message: 'x', may_retry: false } },
+                })}
+                source="verwaltung"
+                sourceNames={{ verwaltung: 'Verwaltung' }}
+                onPick={() => {}}
+                notOfferedText="{system} plant hier nichts ein."
+            />,
+        );
+
+        expect(await screen.findByText('Verwaltung plant hier nichts ein.')).toBeTruthy();
+    });
+});
+
+/**
+ * `may_retry` wird DURCHGEREICHT, nicht nachgerechnet (#9810).
+ *
+ * Die Regel „Warten hilft" gehoert dem Zielsystem
+ * (`SourceFailure::mightPassByItself()`). Eine Maske, die sie aus dem Grund
+ * nachbaut, muss ein zweites Mal korrigiert werden, sobald ein fuenfter Grund
+ * dazukommt — und widerspricht dem Zielsystem in der Zwischenzeit.
+ */
+describe('das Wiederholen', () => {
+    it('bietet es an, wo das Zielsystem es erlaubt', async () => {
+        render(
+            <PlannableSearch
+                search={async () => ({
+                    tasks: [],
+                    ok: [],
+                    failures: {
+                        verwaltung: {
+                            source: 'verwaltung',
+                            reason: 'unreachable',
+                            message: 'Zeitüberschreitung',
+                            may_retry: true,
+                        },
+                    },
+                })}
+                source="verwaltung"
+                onPick={() => {}}
+                retryText="Nochmal"
+            />,
+        );
+
+        expect(await screen.findByRole('button', { name: 'Nochmal' })).toBeTruthy();
+    });
+
+    /**
+     * Der Fall, der das Nachrechnen von Durchreichen unterscheidet: Der Grund
+     * sagt „aussichtslos", das Zielsystem sagt „versuch es". Es gilt das
+     * Zielsystem.
+     */
+    it('folgt dem Zielsystem und nicht dem Grund', async () => {
+        render(
+            <PlannableSearch
+                search={async () => ({
+                    tasks: [],
+                    ok: [],
+                    failures: {
+                        verwaltung: {
+                            source: 'verwaltung',
+                            // Nach der Regel des Aufgabenpakets waere das NICHT
+                            // wiederholbar. Hier sagt die Antwort etwas anderes.
+                            reason: 'not_allowed',
+                            message: 'Berechtigung wird gerade erteilt',
+                            may_retry: true,
+                        },
+                    },
+                })}
+                source="verwaltung"
+                onPick={() => {}}
+            />,
+        );
+
+        expect(await screen.findByRole('button', { name: 'Erneut versuchen' })).toBeTruthy();
+    });
+
+    /**
+     * Und der Klick fragt wirklich nochmal — ueber dieselbe `search`-Funktion,
+     * die das Produkt ohnehin gibt. Kein zweiter Weg zu derselben Stelle.
+     */
+    it('fragt beim Klick noch einmal — und nimmt die Meldung zurueck, solange gefragt wird', async () => {
+        let runde = 0;
+        const suche = vi.fn(async () => {
+            runde += 1;
+
+            return runde === 1
+                ? {
+                      tasks: [],
+                      ok: [],
+                      failures: {
+                          verwaltung: {
+                              source: 'verwaltung',
+                              reason: 'unreachable' as const,
+                              message: 'Zeitüberschreitung',
+                              may_retry: true,
+                          },
+                      },
+                  }
+                : { tasks: [{ id: 3, title: 'Ticket beantworten' }], ok: ['verwaltung'] };
+        });
+
+        render(<PlannableSearch search={suche} source="verwaltung" onPick={() => {}} />);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Erneut versuchen' }));
+
+        // Die zweite Runde ist die Antwort auf den Klick.
+        expect(await screen.findByText('Ticket beantworten')).toBeTruthy();
+        expect(suche).toHaveBeenCalledTimes(2);
+
+        // Und die alte Meldung steht nicht mehr da — sie war die Auskunft von
+        // vorher.
+        expect(screen.queryByRole('status')).toBeNull();
+    });
+});
+
+/**
+ * `complete` sagt, ob die Liste vollstaendig ist (#9810).
+ *
+ * Drueben in `TaskHarvest::toArray()` steht es ausdruecklich und wird nicht dem
+ * Leser ueberlassen. Hier gilt dasselbe: Eine Ernte, die sich selbst als
+ * unvollstaendig meldet, darf nicht als „nichts offen" erscheinen — das waere
+ * die Auskunft, die niemand geben kann (Wiki #595).
+ */
+describe('die Vollstaendigkeit', () => {
+    it('sagt bei complete false kein „nichts offen"', async () => {
+        render(
+            <PlannableSearch
+                search={async () => ({ tasks: [], ok: ['verwaltung'], complete: false })}
+                source="verwaltung"
+                onPick={() => {}}
+                emptyText="Nichts offen."
+            />,
+        );
+
+        await waitFor(() =>
+            expect(document.querySelector('[data-slot="plannable-search"]')).toBeTruthy(),
+        );
+
+        expect(screen.queryByText('Nichts offen.')).toBeNull();
+    });
+
+    it('sagt es bei complete true', async () => {
+        render(
+            <PlannableSearch
+                search={async () => ({ tasks: [], ok: ['verwaltung'], complete: true })}
+                source="verwaltung"
+                onPick={() => {}}
+                emptyText="Nichts offen."
+            />,
+        );
+
+        expect(await screen.findByText('Nichts offen.')).toBeTruthy();
+    });
+});
+
+/**
+ * Die ALTE Array-Form bleibt (#9810).
+ *
+ * Mit `failed` ist ein Name aus der Ernte-Form verschwunden, und das ist
+ * Absicht: Wer ihn liest, soll einen Compilerfehler bekommen und kein stummes
+ * „[object Object]". Die Array-Form ist davon NICHT betroffen — sie sagte ueber
+ * die Systeme ohnehin nichts, und die Produkte geben heute genau sie herein.
+ * Dieser Test haelt fest, dass das so bleibt.
+ */
+describe('die alte Array-Form', () => {
+    it('nimmt einen nackten Treffer-Array an', async () => {
+        const suche: (begriff: string) => Promise<Plannable[]> = async () => offen;
+
+        render(<PlannableSearch search={suche} onPick={() => {}} />);
+
+        expect(await screen.findByText('Abgabe vorbereiten')).toBeTruthy();
+        expect(screen.getByText('Rechnung pruefen')).toBeTruthy();
+    });
+
+    /**
+     * Und sie behaelt die alte Lesart: Ein Array sagt ueber die Systeme nichts,
+     * also gilt weiter „eine Antwort ist eine Antwort" — sonst verlore ein
+     * Produkt, das nur Treffer schickt, ploetzlich seine Leermeldung.
+     */
+    it('sagt bei leerem Array weiter „nichts offen"', async () => {
+        render(
+            <PlannableSearch
+                search={async () => []}
+                source="verwaltung"
+                onPick={() => {}}
+                emptyText="Nichts offen."
+            />,
+        );
+
+        expect(await screen.findByText('Nichts offen.')).toBeTruthy();
+        expect(screen.queryByRole('status')).toBeNull();
     });
 });
