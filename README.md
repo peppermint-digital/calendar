@@ -829,19 +829,60 @@ to refuse.
 harvest, which is `TaskHarvest` from the task package passed straight through:
 
 ```ts
-{ tasks: Plannable[], ok?: string[], failed?: Record<string, string> }
+{
+    tasks: Plannable[],
+    ok?: string[],
+    failures?: Record<string, {
+        source: string,
+        reason: "not_offered" | "not_allowed" | "unreachable" | "tool_failed" | null,
+        message: string,
+        may_retry: boolean,
+    }>,
+    complete?: boolean,
+}
 ```
 
 | State | What the step says |
 | --- | --- |
 | `ok` contains the system, `tasks` empty | "nothing open" — that is an answer |
-| the system is in `failed` | the reason, in the words of the other end, and the empty sentence is *not* shown |
+| the system is in `failures` | the sentence for *that reason*, and the empty sentence is *not* shown |
+| `complete` is `false` | never "nothing open" — the harvest says so itself |
 | still in flight | neither of the two |
 
 A plain array cannot express the difference, and a system outage showing up as
 an empty list looks like an answer — which sends the next person looking in the
 wrong place. Tasks from systems that *did* answer stay listed above the notice;
 one outage never hides the rest.
+
+##### Four reasons, four next steps
+
+`failures` was `failed: Record<string, string>` until 11.11.2026 — one sentence
+per outage. The task package distinguishes four reasons, and they lead to four
+different places:
+
+| Reason | What it means | Overridable sentence |
+| --- | --- | --- |
+| `not_offered` | no error — that system does not offer tasks | `notOfferedText` |
+| `not_allowed` | retrying will not help | `notAllowedText` |
+| `unreachable` | retrying may help | `unreachableText` |
+| `tool_failed` | this one should be reported | `toolFailedText` |
+| `null` | nobody named one — the `message` is shown, because it is the only thing that says anything | `unknownText` |
+
+There is deliberately no fifth `"unknown"`: it would look like a reason, get a
+sentence in the table, and the sentence would say nothing. `null` forces the
+mask onto the `message` instead.
+
+`may_retry` decides whether a retry is offered, and it is **passed through, not
+recomputed** — the rule "waiting can help" belongs to the target system. The
+retry button re-asks through the same `search` function; there is no second
+route. Offering a reload for a missing permission is a false promise: it costs a
+second wait and says the same thing afterwards.
+
+The old key is **removed**, not deprecated. The value is an object now, and a
+consumer still reading `failed` would have rendered `[object Object]` where the
+reason belongs. A rename breaks at the compiler, at the one moment somebody is
+looking. The plain-array shape is untouched — `failed` only ever lived in the
+harvest.
 
 #### What a task carries
 

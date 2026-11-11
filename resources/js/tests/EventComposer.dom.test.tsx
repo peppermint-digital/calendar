@@ -1104,6 +1104,68 @@ describe('die Aufgaben-Stufen', () => {
         );
     });
 
+    /**
+     * Die drei Felder im Zeitraum haben Namen (#9808).
+     *
+     * Ueber ihnen steht nur „Wann", und das gilt fuer alle drei zusammen. In
+     * der Abnahme (#9799) sagte ein Vorleser hier „Textfeld, Auswahl, Auswahl,
+     * Auswahl, Auswahl" — welches Paar der Beginn und welches das Ende war,
+     * stand nirgends.
+     *
+     * Sichtbar bleibt die Zeile, wie sie war: Wer aus dem Raster kommt,
+     * bestaetigt einen vorbelegten Zeitraum und soll dafuer keine
+     * Formularspalte lesen.
+     */
+    it('benennt Datum, Beginn und Ende im Zeitraum', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                preset={{ date: '2026-03-12', start: '14:00', end: '15:30' }}
+                onSaveHere={vi.fn()}
+                plannable={{ sources: SYSTEME, search: suche([]), onSchedule: vi.fn() }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Verwaltung' }));
+        fireEvent.click(await screen.findByText('Ticket beantworten'));
+
+        // Genau „Datum" und nicht /Datum/: Der Knopf daneben heisst „Datum
+        // auswaehlen" und ist eine zweite Handlung mit eigenem Namen.
+        const datum = screen.getByLabelText('Datum');
+        expect((datum as HTMLInputElement).value).toBe('12.03.2026');
+
+        // Und die beiden Uhrzeiten sind auseinanderzuhalten — darum ging es.
+        expect(screen.getByLabelText(/Beginn/).textContent).toContain('14');
+        expect(screen.getByLabelText(/Ende/).textContent).toContain('15');
+
+        // Sichtbar steht ueber den drei Feldern weiter nur das eine Wort.
+        const stufe = document.querySelector('[data-slot="plannable-slot"]');
+        expect(stufe?.querySelectorAll('label')).toHaveLength(0);
+        expect(stufe?.textContent).toContain('Wann');
+    });
+
+    /** Die Woerter gehoeren dem Produkt, wie alle anderen der Maske. */
+    it('laesst die drei Namen ueberschreiben', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{ sources: SYSTEME, search: suche([]), onSchedule: vi.fn() }}
+                labels={{ plannableSlotStart: 'Von wann', plannableSlotEnd: 'Bis wann' }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Verwaltung' }));
+        fireEvent.click(await screen.findByText('Ticket beantworten'));
+
+        expect(screen.getByLabelText('Von wann')).toBeTruthy();
+        expect(screen.getByLabelText('Bis wann')).toBeTruthy();
+    });
+
     it('nennt im Kopf, welches System und welche Aufgabe gewaehlt sind', async () => {
         render(
             <EventComposer
@@ -1220,10 +1282,22 @@ describe('die Aufgaben-Stufen', () => {
                 onSaveHere={vi.fn()}
                 plannable={{
                     sources: SYSTEME,
+                    // Umgeschrieben am 11.11.2026 (#9810): Der Ausfall ist
+                    // ein Objekt mit typisiertem Grund (`failures`) statt eines
+                    // Satzes (`failed`). Festgehalten wird weiter dasselbe —
+                    // der Name kommt aus der LOKALEN Beschriftung, nicht aus
+                    // der Antwort der Gegenstelle.
                     search: async () => ({
                         tasks: [],
                         ok: [],
-                        failed: { verwaltung: 'Zeitüberschreitung nach 5s' },
+                        failures: {
+                            verwaltung: {
+                                source: 'verwaltung',
+                                reason: 'unreachable',
+                                message: 'Zeitüberschreitung nach 5s',
+                                may_retry: true,
+                            },
+                        },
                     }),
                     onSchedule: vi.fn(),
                 }}

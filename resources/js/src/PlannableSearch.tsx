@@ -61,14 +61,75 @@ export type Plannable = {
 };
 
 /**
+ * Warum ein System nicht geantwortet hat — als geschlossene Menge.
+ *
+ * Dieselben vier Namen wie `SourceFailure::REASONS` im Aufgabenpaket, und
+ * dieselbe Absicht: Es sind vier verschiedene Lagen mit vier verschiedenen
+ * nächsten Schritten. Ein einziger Satz wirft sie zusammen, und dann sagt die
+ * Oberfläche „etwas ist schiefgelaufen" — womit niemand etwas anfangen kann.
+ *
+ * | Grund | was es heißt |
+ * |---|---|
+ * | `not_offered` | kein Fehler — das System bietet Aufgaben nicht an |
+ * | `not_allowed` | Wiederholen hilft nicht |
+ * | `unreachable` | Wiederholen hilft vielleicht |
+ * | `tool_failed` | gehört gemeldet |
+ *
+ * **Kein „unknown":** Das wäre ein fünfter Grund, der wie ein Grund aussieht
+ * und keiner ist — er landet in der Tabelle, die Gründe auf Sätze abbildet,
+ * bekommt dort einen Satz, und der Satz sagt nichts. `null` zwingt die Maske
+ * stattdessen auf den {@link PlannableFailure.message}, der tatsächlich etwas
+ * sagt. Die Begründung steht genauso am PHP-Feld.
+ */
+export type PlannableFailureReason = 'not_offered' | 'not_allowed' | 'unreachable' | 'tool_failed';
+
+/**
+ * Ein System konnte nicht gefragt werden — Grund und Wortlaut getrennt.
+ *
+ * Die Namen sind die von `SourceFailure::toArray()`, bis auf den Unterstrich in
+ * `may_retry`: Das Produkt reicht die Ernte durch und übersetzt nichts. Wer hier
+ * `mayRetry` schriebe, hätte eine Übersetzungsschicht, die beim nächsten Umbau
+ * auseinanderläuft — dieselbe Begründung wie bei {@link Plannable.sourceKey}.
+ */
+export type PlannableFailure = {
+    /** Das System selbst — derselbe Schlüssel, unter dem der Ausfall steht. */
+    source: string;
+    /** Einer der vier Namen, oder `null`, wenn niemand einen genannt hat. */
+    reason: PlannableFailureReason | null;
+    /** Der Satz, den ein Mensch liest — im Wortlaut der Gegenstelle. */
+    message: string;
+    /**
+     * Hilft Warten?
+     *
+     * Wird DURCHGEREICHT und nicht nachgerechnet: Die Regel gehört dem
+     * Zielsystem (`SourceFailure::mightPassByItself()`). Eine Maske, die sie aus
+     * dem Grund nachbaut, muss ein zweites Mal korrigiert werden, sobald ein
+     * fünfter Grund dazukommt.
+     */
+    may_retry: boolean;
+};
+
+/**
  * Die Antwort auf eine Suche, wenn sie mehr sagt als „hier sind die Treffer".
  *
- * Deckungsgleich mit `TaskHarvest` im Aufgabenpaket (`tasks`, `ok`, `failed`),
- * damit das Produkt die Ernte durchreicht. Und sie ist der Grund, warum
- * {@link PlannableSearchProps.search} zwei Formen zurückgeben darf: Ein nackter
- * Treffer-Array kann den Unterschied zwischen „nichts offen" und „ich konnte
- * nicht nachsehen" nicht ausdrücken, und ein Systemausfall, der als leere Liste
- * erscheint, sieht aus wie eine Auskunft (Wiki #595).
+ * Deckungsgleich mit `TaskHarvest` im Aufgabenpaket (`tasks`, `ok`, `failures`,
+ * `complete`), damit das Produkt die Ernte durchreicht. Und sie ist der Grund,
+ * warum {@link PlannableSearchProps.search} zwei Formen zurückgeben darf: Ein
+ * nackter Treffer-Array kann den Unterschied zwischen „nichts offen" und „ich
+ * konnte nicht nachsehen" nicht ausdrücken, und ein Systemausfall, der als leere
+ * Liste erscheint, sieht aus wie eine Auskunft (Wiki #595).
+ *
+ * ## `failed` gibt es nicht mehr
+ *
+ * Bis zum 11.11.2026 hieß das Feld `failed` und trug `Schlüssel => Satz`. Jetzt
+ * heißt es {@link PlannableHarvest.failures} und trägt ein OBJEKT. Der alte
+ * Name ist ENTFERNT und nicht als veraltet behalten: Wer ihn weiter liest,
+ * bekommt einen Compilerfehler statt eines stummen „[object Object]" in seiner
+ * Maske. Die Form war seit v0.95.0 veröffentlicht — dann muss der Bruch laut
+ * sein, und zwar in dem Moment, in dem jemand hinsieht.
+ *
+ * Die ALTE Array-Form (`Plannable[]`) ist davon nicht betroffen und bleibt: Sie
+ * sagte über die Systeme ohnehin nichts, und `failed` lebte nur hier.
  */
 export type PlannableHarvest = {
     tasks: Plannable[];
@@ -80,8 +141,16 @@ export type PlannableHarvest = {
      * ist eine Antwort.
      */
     ok?: string[];
-    /** Schlüssel => Grund, im Wortlaut der Gegenstelle. */
-    failed?: Record<string, string>;
+    /** Schlüssel => warum dieses System still blieb. */
+    failures?: Record<string, PlannableFailure>;
+    /**
+     * Haben ALLE gefragten Systeme geantwortet?
+     *
+     * Ausdrücklich genannt und nicht dem Leser überlassen — genau wie drüben in
+     * `TaskHarvest::toArray()`. Eine verkürzte Liste muss als verkürzt
+     * erkennbar sein, und zwar ohne sie aus zwei Feldern neu herzuleiten.
+     */
+    complete?: boolean;
 };
 
 /**
@@ -164,8 +233,46 @@ export interface PlannableSearchProps {
     autoFocus?: boolean;
     /** Text, wenn nichts gefunden wurde. */
     emptyText?: string;
-    /** Eine Ausfallzeile. `{system}` und `{reason}` werden ersetzt. */
+    /**
+     * Die Ausfallzeile je Grund — vier Lagen, vier nächste Schritte.
+     *
+     * Bis zum 11.11.2026 gab es EINE Zeile für alle. Das war dieselbe
+     * Zusammenwerfung, die {@link PlannableFailureReason} auflöst: „Das System
+     * bietet Aufgaben nicht an" ist kein Fehler, „keine Berechtigung" wird
+     * durch Warten nicht besser, und „der Fremddienst hat einen Fehler
+     * gemeldet" gehört gemeldet. Eine Zeile für alle vier sagt „etwas ist
+     * schiefgelaufen" — und damit nichts.
+     *
+     * In jeder Vorlage werden `{system}` (der LOKALE Name) und `{message}`
+     * ersetzt. `{reason}` bleibt als Platzhalter für den Wortlaut gültig —
+     * unter diesem Namen stand er in der alten, einen Zeile, und ein Produkt,
+     * das sie überschreibt, soll seine Überschreibung behalten.
+     */
     unreachableText?: string;
+    /** Für `not_offered` — kein Fehler, nur eine Auskunft. Darum ohne Wortlaut. */
+    notOfferedText?: string;
+    /** Für `not_allowed` — Wiederholen hilft nicht. */
+    notAllowedText?: string;
+    /** Für `tool_failed` — das gehört gemeldet. */
+    toolFailedText?: string;
+    /**
+     * Für `reason: null` — niemand hat einen Grund genannt.
+     *
+     * Und deshalb steht hier der {@link PlannableFailure.message}: Er ist das
+     * Einzige, was in diesem Fall etwas sagt. „Konnte nicht gefragt werden" ist
+     * alles, was wir selbst wissen — eine Behauptung wie „nicht erreichbar"
+     * wäre schon mehr, als geprüft ist.
+     */
+    unknownText?: string;
+    /**
+     * Der Knopf, der es nochmal versucht.
+     *
+     * Er erscheint NUR, wo {@link PlannableFailure.may_retry} es sagt — und das
+     * sagt das Zielsystem, nicht diese Maske. Ein Wiederholen bei fehlender
+     * Berechtigung ist ein leeres Versprechen: Es kostet eine zweite Wartezeit
+     * und sagt danach dasselbe.
+     */
+    retryText?: string;
     /** Der Weg ins Heimatsystem, als Beschriftung für Hilfsmittel. `{title}` wird ersetzt. */
     openText?: string;
 }
@@ -179,6 +286,11 @@ export function PlannableSearch({
     autoFocus = false,
     emptyText = 'Nichts Offenes gefunden.',
     unreachableText = 'Nicht erreichbar: {system} — {reason}',
+    notOfferedText = '{system} bietet keine Aufgaben an.',
+    notAllowedText = 'Keine Berechtigung für {system} — {reason}',
+    toolFailedText = '{system} hat einen Fehler gemeldet — {reason}',
+    unknownText = 'Konnte nicht gefragt werden: {system} — {reason}',
+    retryText = 'Erneut versuchen',
     openText = 'Im System ansehen: {title}',
 }: PlannableSearchProps) {
     const [begriff, setBegriff] = useState('');
@@ -203,6 +315,16 @@ export function PlannableSearch({
      * noch unterwegs ist.
      */
     const [geantwortet, setGeantwortet] = useState(false);
+
+    /**
+     * Wie oft von Hand nachgefragt wurde.
+     *
+     * Der Wiederhol-Knopf braucht keinen neuen Weg: Er zaehlt hier hoch, und
+     * die Abfrage unten laeuft noch einmal ueber dieselbe `search`-Funktion,
+     * die das Produkt ohnehin gibt. Ein eigener Rueckruf daneben waere ein
+     * zweiter Weg zu derselben Stelle.
+     */
+    const [versuch, setVersuch] = useState(0);
 
     /**
      * Das System, zu dem die Treffer gehoeren, die gerade dastehen.
@@ -258,10 +380,39 @@ export function PlannableSearch({
         return () => {
             aktiv = false;
         };
-    }, [begriff, search, source]);
+    }, [begriff, search, source, versuch]);
 
-    /** Die Systeme, die nicht nachgesehen werden konnten — Name und Grund. */
-    const ausfaelle = Object.entries(ernte?.failed ?? {});
+    /** Die Systeme, die nicht nachgesehen werden konnten — mit Grund. */
+    const ausfaelle = Object.entries(ernte?.failures ?? {});
+
+    /**
+     * Grund => Vorlage.
+     *
+     * Absichtlich eine vollstaendige Tafel und keine Kette von Abfragen: Kaeme
+     * ein fuenfter Grund in die Union, meldet der Compiler HIER, dass ihm ein
+     * Satz fehlt. Genau dafuer ist die Menge geschlossen.
+     */
+    const vorlagen: Record<PlannableFailureReason, string> = {
+        not_offered: notOfferedText,
+        not_allowed: notAllowedText,
+        unreachable: unreachableText,
+        tool_failed: toolFailedText,
+    };
+
+    /** Was an dem einen System steht — der Satz zu seinem Grund. */
+    function ausfallZeile(schluessel: string, ausfall: PlannableFailure): string {
+        // Ohne genannten Grund der Satz, der auf den Wortlaut zurueckfaellt:
+        // Er ist das Einzige, was dann etwas sagt.
+        const vorlage = ausfall.reason === null ? unknownText : vorlagen[ausfall.reason];
+
+        return vorlage
+            .replace('{system}', sourceNames?.[schluessel] ?? schluessel)
+            // Beide Namen fuer denselben Wortlaut: `{reason}` hiess er in der
+            // alten, einen Zeile, und eine Ueberschreibung von damals soll
+            // weiter wirken.
+            .replace('{reason}', ausfall.message)
+            .replace('{message}', ausfall.message);
+    }
 
     /**
      * Heisst ein leeres Ergebnis hier wirklich „nichts offen"?
@@ -270,8 +421,9 @@ export function PlannableSearch({
      *
      * 1. Das System hat geantwortet und nichts gemeldet — das ist eine Antwort,
      *    und sie wird hingeschrieben.
-     * 2. Das System steht in `failed` — dann steht der Grund da, nicht die
-     *    Leermeldung. Ein Ausfall darf nicht als leere Liste erscheinen.
+     * 2. Das System steht in `failures` — dann steht der Satz zu seinem Grund
+     *    da, nicht die Leermeldung. Ein Ausfall darf nicht als leere Liste
+     *    erscheinen.
      * 3. Niemand hat geantwortet, ohne dass ein Ausfall gemeldet waere. Dann
      *    wissen wir nichts, und dann steht hier nichts. Eine Leermeldung waere
      *    eine Auskunft, die keiner geprueft hat.
@@ -281,11 +433,17 @@ export function PlannableSearch({
      * Treffer schickt, ploetzlich seine Leermeldung.
      */
     const wirklichNichtsOffen =
-        ernte?.ok === undefined
-            ? true
-            : source !== undefined && source !== ''
-              ? ernte.ok.includes(source)
-              : ernte.ok.length > 0;
+        // Sagt die Ernte selbst, dass sie unvollstaendig ist, ist die Frage
+        // beantwortet — und zwar mit nein. Das ist die Zusicherung, die
+        // `complete` drueben gibt; sie hier nachzurechnen waere der zweite Weg
+        // zu derselben Aussage.
+        ernte?.complete === false
+            ? false
+            : ernte?.ok === undefined
+              ? true
+              : source !== undefined && source !== ''
+                ? ernte.ok.includes(source)
+                : ernte.ok.length > 0;
 
     return (
         <div className="flex flex-col gap-2" data-slot="plannable-search" data-source={source ?? ''}>
@@ -366,16 +524,48 @@ export function PlannableSearch({
                 leer macht, sieht aus wie eine Auskunft.
             */}
             {ausfaelle.length > 0 && (
+                // `plannable-failed` heisst der Haken weiter, obwohl das Feld
+                // jetzt `failures` heisst: Am Typ muss der Bruch laut sein, hier
+                // waere er still — ein Produkt mit eigener Gestaltung an diesem
+                // Haken stuende ohne Meldung da, ohne dass es jemand merkt.
                 <div role="status" data-slot="plannable-failed" className="flex flex-col gap-1">
-                    {ausfaelle.map(([schluessel, grund]) => (
+                    {ausfaelle.map(([schluessel, ausfall]) => (
                         <p
                             key={schluessel}
                             data-source={schluessel}
-                            className="text-muted-foreground text-xs"
+                            // Der Grund steht auch am Element: Eine Maske, die
+                            // „nicht angeboten" anders zeichnen will als einen
+                            // Fehler, soll den Satz nicht lesen muessen.
+                            data-reason={ausfall.reason ?? ''}
+                            className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs"
                         >
-                            {unreachableText
-                                .replace('{system}', sourceNames?.[schluessel] ?? schluessel)
-                                .replace('{reason}', grund)}
+                            <span>{ausfallZeile(schluessel, ausfall)}</span>
+
+                            {/*
+                                Der Knopf nur, wo Warten laut Zielsystem helfen
+                                KANN. Bei fehlender Berechtigung waere er ein
+                                leeres Versprechen — es kostet eine zweite
+                                Wartezeit und sagt danach dasselbe.
+                            */}
+                            {ausfall.may_retry && (
+                                <button
+                                    type="button"
+                                    data-action="retry"
+                                    className="hover:text-foreground rounded-md border px-2 py-0.5 underline-offset-4 hover:underline"
+                                    onClick={() => {
+                                        // Die Meldung geht weg, BEVOR die neue
+                                        // Antwort da ist: Solange gefragt wird,
+                                        // wissen wir es nicht mehr. Die Treffer
+                                        // der uebrigen Systeme bleiben stehen —
+                                        // die waren richtig und sind es noch.
+                                        setErnte(null);
+                                        setGeantwortet(false);
+                                        setVersuch((bisher) => bisher + 1);
+                                    }}
+                                >
+                                    {retryText}
+                                </button>
+                            )}
                         </p>
                     ))}
                 </div>

@@ -32,7 +32,16 @@ export type {
 export type { AgendaListProps, AgendaRow } from './AgendaList';
 export { PlannableList, PLANNABLE_ATTRIBUTE, PLANNABLE_SOURCE_ATTRIBUTE } from './PlannableList';
 export { PlannableSearch } from './PlannableSearch';
-export type { Plannable, PlannableHarvest, PlannableSearchProps } from './PlannableSearch';
+export type {
+    Plannable,
+    // Der typisierte Ausfallgrund — deckungsgleich mit `SourceFailure` im
+    // Aufgabenpaket. Steht hier, weil ein Produkt seine Ernte damit typisiert,
+    // statt die Form abzuschreiben.
+    PlannableFailure,
+    PlannableFailureReason,
+    PlannableHarvest,
+    PlannableSearchProps,
+} from './PlannableSearch';
 export type { PlannableEntry, PlannableListProps } from './PlannableList';
 export { useRemoteTarget, remoteMoment } from './useRemoteTarget';
 export type { RemoteDraft, RemoteKind, RemoteSource, UseRemoteTargetOptions } from './useRemoteTarget';
