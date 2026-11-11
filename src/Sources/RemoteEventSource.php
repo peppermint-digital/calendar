@@ -30,14 +30,20 @@ use RuntimeException;
  * haette keine gute Antwort. Was zurueckkommt, ist ein {@see ExternalEvent} —
  * ohne Zeile in dieser Datenbank.
  *
- * ## Lesen schweigt, Schreiben schreit
+ * ## Die LISTE schweigt, das FORMULAR schreit
  *
- * Ein Ausfall beim Lesen wirft eine `RuntimeException`; die Registrierung
- * protokolliert sie und laesst die Quelle weg, der Rest des Kalenders bleibt
- * sichtbar. Ein Ausfall beim Schreiben wirft {@see ExternalSourceFailed} und
- * muss bis zur Oberflaeche durchschlagen: Zwischen „Seite geoeffnet" und
- * „Speichern gedrueckt" liegen Minuten, und ein Termin, den jemand angelegt zu
- * haben glaubt und den es nirgends gibt, ist schlimmer als eine Fehlermeldung.
+ * Ein Ausfall beim Lesen der Termine wirft eine `RuntimeException`; die
+ * Registrierung protokolliert sie und laesst die Quelle weg, der Rest des
+ * Kalenders bleibt sichtbar. Ein Ausfall beim Schreiben wirft
+ * {@see ExternalSourceFailed} und muss bis zur Oberflaeche durchschlagen:
+ * Zwischen „Seite geoeffnet" und „Speichern gedrueckt" liegen Minuten, und ein
+ * Termin, den jemand angelegt zu haben glaubt und den es nirgends gibt, ist
+ * schlimmer als eine Fehlermeldung.
+ *
+ * Die Grenze liegt also nicht zwischen Lesen und Schreiben, sondern zwischen
+ * Liste und Formular — darum wirft seit dem 11.11.2026 auch {@see kinds()},
+ * das liest (Bug #1416). Eine unvollstaendige Liste sieht man; eine leere
+ * Artenliste laesst den Benutzer handeln, als gaebe es die Art nicht.
  */
 class RemoteEventSource extends WritableEventSource
 {
@@ -113,7 +119,30 @@ class RemoteEventSource extends WritableEventSource
      * die schlechtere Antwort: Eine falsche Art legt den Termin in die falsche
      * Schublade, und das faellt erst drueben auf.
      *
+     * ## Warum ein Fehlschlag hier LAUT scheitert und beim Lesen nicht
+     *
+     * Bis zum 11.11.2026 wurde ein gescheiterter Aufruf hier zur leeren Liste —
+     * und damit nicht von „bietet keine Arten an" zu unterscheiden. Das ist
+     * dasselbe Uebel wie an der Ernte im Aufgabenpaket, nur eine Schicht
+     * tiefer: Ein Fehlschlag, der als Auskunft erscheint (Bug #1416).
+     *
+     * Beim Kalender ist das Schlucken RICHTIG — ein Kalender, der leer wird,
+     * weil ein fremdes System langsam ist, ist schlimmer als ein
+     * unvollstaendiger; die Unvollstaendigkeit sieht man, die leere Seite kann
+     * niemand erklaeren. Beim FORMULAR ist es falsch, weil eine leere
+     * Artenliste den Benutzer handeln laesst, als gaebe es die Art nicht.
+     * Deshalb bleibt {@see events()} unberuehrt und diese Stelle wirft.
+     *
+     * Was daran haengt: Die Maske kann ein nicht erreichbares Ziel nur
+     * benennen, wenn der Abruf seiner Arten scheitert — ueber die 502 des
+     * {@see \Peppermint\Calendar\Http\Controllers\EventSourceController}
+     * fuellt sie `unreachableSources` und zeigt „Nicht erreichbar: X. Die
+     * Terminarten dieser Systeme fehlen in der Liste". Mit der leeren Liste
+     * blieb dieser Hinweis unerreichbarer Code.
+     *
      * @return array<int, ExternalKind>
+     *
+     * @throws ExternalSourceFailed wenn das andere System nicht geantwortet hat
      */
     public function kinds(): array
     {
@@ -123,9 +152,9 @@ class RemoteEventSource extends WritableEventSource
 
         $ergebnis = $this->remote->call('calendar.kinds.list');
 
-        if (! $ergebnis->ok) {
-            return [];
-        }
+        // Und NICHT `return []`: siehe oben. „Konnte nicht fragen" ist keine
+        // Auskunft ueber die Arten des anderen Systems.
+        $this->durchgefallen($ergebnis, 'Terminarten holen');
 
         $arten = [];
 
@@ -273,7 +302,14 @@ class RemoteEventSource extends WritableEventSource
         return $this->remote->identify($userId) ?? throw ExternalSourceFailed::beim($vorgang, $this->key());
     }
 
-    /** Ein Fehlschlag beim Schreiben schlaegt durch, mit dem Grund der Gegenstelle. */
+    /**
+     * Ein Fehlschlag schlaegt durch, mit dem Grund der Gegenstelle.
+     *
+     * Fuer jeden Vorgang, dessen Ausgang ein Mensch gleich in der Maske sieht:
+     * die drei schreibenden, und seit dem 11.11.2026 auch das Holen der
+     * Terminarten ({@see kinds()}). Nicht fuer {@see events()} — dort waere
+     * eine leere Seite der schlechtere Ausgang.
+     */
     protected function durchgefallen(RemoteResult $ergebnis, string $vorgang): void
     {
         if ($ergebnis->ok) {

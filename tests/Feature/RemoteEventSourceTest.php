@@ -282,6 +282,40 @@ it('laesst Arten weg, die man drueben nicht von Hand anlegen darf', function () 
     expect($arten)->toBe(['verwaltung_termin', 'ohne_angabe']);
 });
 
+it('scheitert LAUT, wenn die Arten nicht abrufbar sind', function () {
+    // Bug #1416: Hier stand `return []`, und damit war „konnte nicht fragen"
+    // nicht von „bietet keine Arten an" zu unterscheiden. Eine leere
+    // Artenliste laesst den Benutzer handeln, als gaebe es die Art nicht —
+    // waehrend beim KALENDER das Schlucken richtig bleibt (siehe events()).
+    //
+    // Das ist der Test, der die alte Fassung faellt: Wer das `return []`
+    // zurueckdreht, bekommt hier ein leeres Array statt der Ausnahme.
+    $this->fremd->antworten['calendar.kinds.list'] = RemoteResult::failed('Zeitueberschreitung nach 5s', 'unreachable');
+
+    expect(fn () => $this->quelle->kinds())->toThrow(ExternalSourceFailed::class);
+});
+
+it('nennt in der Ausnahme das System und den Vorgang', function () {
+    // Damit die Oberflaeche sagen kann, WELCHES System bei WELCHEM Schritt
+    // nicht mitgespielt hat. „Etwas ist schiefgegangen" schickt den naechsten
+    // Menschen auf die falsche Suche.
+    $this->fremd->antworten['calendar.kinds.list'] = RemoteResult::failed('Host unbekannt', 'unreachable');
+
+    try {
+        $this->quelle->kinds();
+    } catch (ExternalSourceFailed $gescheitert) {
+        expect($gescheitert->sourceKey)->toBe('verwaltung')
+            ->and($gescheitert->vorgang)->toBe('Terminarten holen')
+            // Und der Wortlaut der Gegenstelle reist mit: Er ist das Einzige,
+            // was sagt, WAS nicht ging.
+            ->and($gescheitert->getMessage())->toContain('Host unbekannt');
+
+        return;
+    }
+
+    $this->fail('kinds() haette scheitern muessen.');
+});
+
 it('nennt keine Arten, wenn das andere System den Vorgang nicht anbietet', function () {
     // Raten waere die schlechtere Antwort: Eine falsche Art legt den Termin in
     // die falsche Schublade, und das faellt erst drueben auf.

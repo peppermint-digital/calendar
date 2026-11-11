@@ -1479,3 +1479,98 @@ describe('die Aufgaben-Stufen', () => {
         expect(hinaus.getAttribute('href')).toBe('/tasks/create?date=2026-03-12&start=14:00&end=15:30');
     });
 });
+
+/**
+ * Ein Ziel, das nicht antwortet (Bug #1416).
+ *
+ * Die andere Haelfte der Kette, deren PHP-Seite in `RemoteEventSourceTest` und
+ * `EventSourceControllerTest` liegt: Der Arten-Abruf eines unerreichbaren
+ * Zielsystems scheitert jetzt mit 502, statt mit 200 und einer leeren Liste zu
+ * antworten. Erst damit kann die Maske den Unterschied sagen, um den es geht —
+ * „niemand ist zustaendig" und „ich konnte nicht nachsehen" sind zwei Aussagen
+ * (Wiki #595).
+ *
+ * Bis zum 11.11.2026 war der Hinweis am KindPicker unerreichbarer Code: Der
+ * Prop war gebaut, der Text stand, der Test im Paket gruente — und in der
+ * Produktion kam nie ein Wert an.
+ */
+describe('ein Ziel, das nicht antwortet', () => {
+    /** Der Arten-Abruf scheitert, alles andere antwortet. */
+    function artenFallenAus() {
+        vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+            anfragen.push({ url, init });
+
+            return url.endsWith('/kinds')
+                ? antwortet({ message: 'Verwaltung nicht erreichbar' }, false, 502)
+                : antwortet({ id: 'verwaltung:7' });
+        });
+    }
+
+    it('nennt das System beim Namen, statt seine Arten einfach weglassen', async () => {
+        artenFallenAus();
+
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                targets={[{ key: 'verwaltung', label: 'Verwaltung', writable: true }]}
+                onSaveHere={vi.fn()}
+            />,
+        );
+
+        // Der LOKALE Name, nicht der Schluessel: Die Herkunft setzt der
+        // Fragende, nicht der Befragte (Wiki #595).
+        const hinweis = await screen.findByText(/Nicht erreichbar: Verwaltung/);
+        expect(hinweis.textContent).toContain('die übrigen sind vollständig');
+        expect(hinweis.textContent).not.toContain('verwaltung');
+    });
+
+    /**
+     * Ein Ausfall nimmt niemandem die Liste weg — dieselbe Regel wie an der
+     * Aufgabensuche. Wer seine eigene Art waehlen will, kann das weiter.
+     */
+    it('laesst die uebrigen Arten waehlbar', async () => {
+        artenFallenAus();
+
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                targets={[{ key: 'verwaltung', label: 'Verwaltung', writable: true }]}
+                onSaveHere={vi.fn()}
+            />,
+        );
+
+        await screen.findByText(/Nicht erreichbar: Verwaltung/);
+
+        expect(artenliste()).toContain('Termin');
+    });
+
+    /**
+     * Und die Gegenprobe, ohne die der Test nur „zeigt irgendwann irgendwas":
+     * Antwortet der Abruf mit 200 und einer leeren Liste — die Form, die vor
+     * Bug #1416 vom Server kam —, erscheint der Hinweis NICHT. Das war der
+     * Fehler, und es ist der Unterschied, den die PHP-Seite herstellt.
+     */
+    it('schweigt bei 200 mit leerer Artenliste — der alten Antwortform', async () => {
+        vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+            anfragen.push({ url, init });
+
+            return url.endsWith('/kinds') ? antwortet({ kinds: [] }) : antwortet({ id: 'verwaltung:7' });
+        });
+
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                targets={[{ key: 'verwaltung', label: 'Verwaltung', writable: true }]}
+                onSaveHere={vi.fn()}
+            />,
+        );
+
+        await screen.findByText('Was für ein Termin?');
+        await waitFor(() => expect(anfragen.some((a) => a.url.endsWith('/kinds'))).toBe(true));
+
+        expect(screen.queryByText(/Nicht erreichbar/)).toBeNull();
+    });
+});

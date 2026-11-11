@@ -56,15 +56,24 @@ class EventSourceController
      * Arten sind produkteigen, und sie zu holen ist ein Netzweg. Ihn bei jedem
      * Aufbau des Kalenders zu gehen hiesse, ihn fast immer umsonst zu gehen:
      * Gebraucht werden sie erst, wenn jemand ein Zielsystem auswaehlt.
+     *
+     * Und seit dem 11.11.2026 im 502-Weg wie die drei schreibenden Vorgaenge
+     * (Bug #1416). Vorher war er der einzige davon, der es nicht war — ein
+     * unerreichbares Zielsystem beantwortete den Abruf mit 200 und einer
+     * leeren Artenliste, und die Maske konnte „nicht erreichbar" deshalb nie
+     * sagen. Eine leere Liste ist hier keine Auskunft: Sie laesst den Benutzer
+     * handeln, als gaebe es die Art nicht.
      */
     public function kinds(string $source): JsonResponse
     {
-        return response()->json([
+        $ziel = $this->ziel($source);
+
+        return $this->fremderVorgang(fn () => response()->json([
             'kinds' => array_map(
                 fn ($kind) => $kind->toArray(),
-                $this->ziel($source)->kinds(),
+                $ziel->kinds(),
             ),
-        ]);
+        ]));
     }
 
     /**
@@ -193,6 +202,10 @@ class EventSourceController
      * mitgespielt. Und nicht stillschweigend ein Erfolg — beim Schreiben ist
      * das der schlimmste Ausgang, weil die Oberflaeche die Zeile dann schon
      * gezeichnet hat und es den Termin nirgends gibt.
+     *
+     * Beim Holen der Arten ist der schlimmste Ausgang ein anderer, aber kein
+     * kleinerer: eine Maske, die eine Art nicht anbietet, weil sie sie nicht
+     * erfragen konnte — und nichts davon sagt.
      */
     protected function fremderVorgang(callable $vorgang): JsonResponse
     {
