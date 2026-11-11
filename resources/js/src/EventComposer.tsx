@@ -3,7 +3,8 @@ import { ComposerSteps, type ComposerStep, type ComposerStepsLabels } from './Co
 import { DateField } from './DateField';
 import { EventForm, type EventFormErrors, type EventFormLabels } from './EventForm';
 import { KindPicker, type KindOption, type KindPickerLabels } from './KindPicker';
-import { PlannableSearch, type Plannable } from './PlannableSearch';
+import { PlannableSearch, type Plannable, type PlannableHarvest } from './PlannableSearch';
+import { TaskSourcePicker, type TaskSource } from './TaskSourcePicker';
 import { TimeField } from './TimeField';
 import { emptyDraft, type EventCategory, type EventDraft, type EventKind } from './types';
 import { useRemoteTarget, type RemoteSource } from './useRemoteTarget';
@@ -34,13 +35,36 @@ export type EventComposerLabels = {
     stepWhat: string;
     stepKind: string;
     stepFields: string;
+    /**
+     * Die Beschriftung der EINEN Stufe, die Aufgabe und Zeitraum zusammen
+     * abfragte.
+     *
+     * Seit dem 11.11.2026 sind es drei Stufen — Aufgabensystem, Aufgabe,
+     * Zeitraum —, weil die Aufgabenliste nach dem System gefiltert sein muss,
+     * um ueberhaupt lesbar zu sein (#9798). Die Beschriftung bleibt im Typ,
+     * damit ein Produkt, das sie noch uebergibt, nicht bricht.
+     *
+     * @deprecated Ohne Wirkung. Siehe {@link EventComposerLabels.stepSlot}.
+     */
     stepPlannable: string;
+    /** Die Stufe, auf der das Aufgabensystem gewaehlt wird. */
+    stepTaskSource: string;
+    /** Die Stufe, auf der die Aufgabe gewaehlt wird. */
+    stepTask: string;
+    /** Die Stufe, auf der der Zeitraum bestaetigt wird. */
+    stepSlot: string;
     /** Ueber dem Zeitraum im Aufgaben-Weg. */
     plannableSlot: string;
     /** Ueber der Suche. */
     plannablePick: string;
+    /** Der Knopf, der die Aufgabe wirklich einplant. */
+    plannableSchedule: string;
     /** Der Weg hinaus, wenn es die Aufgabe noch nicht gibt. */
     plannableNew: string;
+    /** Ueber der Liste der Aufgabensysteme. */
+    taskSourceHeading: string;
+    /** Wenn kein Aufgabensystem angesteckt ist. */
+    taskSourceEmpty: string;
 };
 
 const COMPOSER_DEFAULTS: EventComposerLabels = {
@@ -57,9 +81,15 @@ const COMPOSER_DEFAULTS: EventComposerLabels = {
     stepKind: 'Terminart',
     stepFields: 'Angaben',
     stepPlannable: 'Aufgabe und Zeitraum',
+    stepTaskSource: 'Aufgabensystem',
+    stepTask: 'Aufgabe',
+    stepSlot: 'Zeitraum',
     plannableSlot: 'Wann',
-    plannablePick: 'Was',
+    plannablePick: 'Welche Aufgabe?',
+    plannableSchedule: 'Einplanen',
     plannableNew: 'Neue Aufgabe anlegen',
+    taskSourceHeading: 'Aus welchem System?',
+    taskSourceEmpty: 'Hier ist kein Aufgabensystem angesteckt.',
 };
 
 export type EventComposerProps = {
@@ -162,9 +192,49 @@ export type EventComposerProps = {
      * NEUE Aufgabe anzulegen gehoert dem Aufgabensystem, nicht dem Kalender.
      */
     plannable?: {
-        search: (begriff: string) => Promise<Plannable[]>;
-        onSchedule: (id: number | string, slot: { date: string; start: string; end: string }) => void;
+        /**
+         * Die Aufgabensysteme, aus denen gewaehlt werden kann.
+         *
+         * Mit mehr als einem steht eine Stufe davor: erst das System, dann
+         * dessen Aufgaben. Bastian am 11.11.2026: „sonst kriege ich ja einfach
+         * eine unendlich lange Liste mit hunderten Aufgaben." Bei genau einem
+         * entfaellt die Stufe — und ohne Angabe gibt es sie gar nicht, dann
+         * fragt die Suche ohne Systembegriff, genau wie bisher.
+         *
+         * Die Liste ist LOKALE Angabe (im Aufgabenpaket
+         * `TaskSourceRegistry::available()`, das niemanden fragt) und steht
+         * deshalb schon beim Zeichnen da. Siehe {@link TaskSourcePicker} —
+         * daran haengen zwei Zusicherungen dieser Maske.
+         */
+        sources?: TaskSource[];
+        search: (begriff: string, source?: string) => Promise<Plannable[] | PlannableHarvest>;
+        /**
+         * Die Aufgabe wirklich einplanen.
+         *
+         * Der dritte Parameter sagt, WAS eingeplant wird und aus WELCHEM
+         * System: Die Kennung allein genuegt nicht, sobald es mehrere Systeme
+         * gibt — „7" im Manager und „7" in der Verwaltung sind zwei Aufgaben.
+         * `source` ist leer, wo es keine Systemstufe gab; das ist dieselbe
+         * Regel wie bei {@link KindOption} („leer = das eigene System").
+         *
+         * Additiv: Wer nur die ersten beiden Parameter nimmt, merkt nichts.
+         */
+        onSchedule: (
+            id: number | string,
+            slot: { date: string; start: string; end: string },
+            choice?: { source: string; task: Plannable },
+        ) => void;
         newHref?: string;
+        /**
+         * Laeuft das Einplanen gerade?
+         *
+         * Gelesen am Einplanen-Knopf, damit ein zweiter Klick nicht zwei
+         * Bloecke anlegt. Bis zum 11.11.2026 fuehrte dieser Typ die Angabe und
+         * NIEMAND las sie — ein Platz, den ein Produkt fuellen kann und den
+         * keiner abholt, ist dasselbe Uebel wie ein Platz, aus dem gelesen und
+         * den keiner fuellt (Wiki #595). Erst mit dem bestaetigenden Knopf gab
+         * es die Stelle, an die sie gehoert.
+         */
         busy?: boolean;
     };
 
@@ -212,6 +282,25 @@ export type EventComposerProps = {
  *    Felder sie trägt, sagt deren `requires`/`forbids`.
  * 2. Die Zusatzfelder verschwinden. Ein Deal-Feld beim Anlegen im Manager nähme
  *    eine Eingabe entgegen, die nirgends ankommt.
+ *
+ * ## Der Aufgaben-Weg: System, Aufgabe, Zeitraum
+ *
+ * Der zweite Weg fragt in drei Stufen: erst das Aufgabensystem, dann dessen
+ * Aufgaben, dann den Zeitraum. Das ist die UMKEHRUNG der Terminart darüber, und
+ * kein Widerspruch — dieselbe Regel bei anderer Größe. Zehn anlegbare
+ * Terminarten passen in eine Liste, da steht das System klein daneben. Aufgaben
+ * sind hunderte; Bastian am 11.11.2026: „sonst kriege ich ja einfach eine
+ * unendlich lange Liste mit hunderten Aufgaben."
+ *
+ * Bei genau einem System entfällt die Stufe und ist damit beantwortet — die
+ * Suche fragt dieses System. Ohne `plannable.sources` gibt es sie gar nicht, und
+ * die Suche fragt ohne Systembegriff; das ist der Aufruf, den die Produkte heute
+ * schon übergeben.
+ *
+ * Eingeplant wird erst durch den Knopf auf der letzten Stufe. Bis zum 11.11.2026
+ * legte der Klick auf einen Treffer sofort an — ein Fehlgriff in der
+ * Trefferliste erzeugte damit einen Eintrag, den niemand wollte, mit einem
+ * Zeitraum, den niemand gesehen hatte.
  *
  * ## Beispiel
  *
@@ -343,6 +432,94 @@ export function EventComposer({
 
     const aufgabenWeg = Boolean(plannable) && ! bearbeiten;
 
+    /** Die Aufgabensysteme, aus denen gewaehlt werden kann. */
+    const aufgabenSysteme = plannable?.sources ?? [];
+
+    /** Ist ueberhaupt etwas zu waehlen? */
+    const mehrereSysteme = aufgabenSysteme.length > 1;
+
+    /**
+     * Gibt es die Stufe „Aufgabensystem"?
+     *
+     * Nur bei mehr als einem System — eine Stufe mit einer Antwort wird nicht
+     * gestellt, sondern beantwortet, wie ueberall in diesem Assistenten.
+     *
+     * Und hier genuegt die Zahl, anders als bei der Terminart: Die Systemliste
+     * kommt NICHT ueber das Netz (im Aufgabenpaket `TaskSourceRegistry::available()`,
+     * das niemanden fragt), sie steht beim Zeichnen schon da. Also kann sie
+     * nicht nachtraeglich wachsen, und eine entfallene Stufe kann nicht
+     * nachtraeglich aufspringen. Die Zusicherung „nicht ueberspringen, solange
+     * die Antwort unterwegs ist" sitzt deshalb eine Stufe weiter, bei den
+     * Aufgaben — dort wird wirklich gefragt. Wer diese Liste eines Tages ueber
+     * das Netz holt, nimmt die Voraussetzung weg und muss die Regel hier
+     * nachbauen.
+     */
+    const systemSchritt = aufgabenWeg && weg === 'aufgabe' && mehrereSysteme;
+
+    const [eigenesSystem, setEigenesSystem] = useState('');
+
+    /**
+     * Das System, dessen Aufgaben gezeigt werden.
+     *
+     * Bei genau einem ist es dieses: Die Stufe entfaellt und ist damit
+     * BEANTWORTET, nicht nur weg. Das braucht hier keinen Effekt wie bei der
+     * Terminart — eine Systemwahl hat keine Nebenwirkung, sie wird nur
+     * weitergegeben, und dann genuegt es, sie abzuleiten.
+     */
+    const gewaehltesSystem =
+        aufgabenSysteme.length === 1 ? aufgabenSysteme[0]!.key : eigenesSystem;
+
+    /**
+     * Die gewaehlte Aufgabe.
+     *
+     * Sie steht hier und nicht im Entwurf: Ein Zeitblock traegt Titel, Ort und
+     * Beschreibung der Aufgabe, nicht die der Maske — eine Maske, die beide
+     * Saetze zeigt, fragt die Haelfte umsonst.
+     */
+    const [aufgabe, setAufgabe] = useState<Plannable | null>(null);
+
+    /**
+     * Schluessel => Name der Systeme, fuer die Ausfallmeldung an der Suche.
+     *
+     * Aus der LOKALEN Beschriftung, nie aus der Antwort des fremden Systems:
+     * Die Herkunft setzt der Fragende, nicht der Befragte (Wiki #595).
+     */
+    const systemNamen = useMemo(
+        () => Object.fromEntries(aufgabenSysteme.map((system) => [system.key, system.label])),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [plannable?.sources],
+    );
+
+    /** Ein System waehlen — und damit die Liste der naechsten Stufe bestimmen. */
+    const systemWaehlen = (system: TaskSource) => {
+        if (system.key !== gewaehltesSystem) {
+            // Die Aufgabe des vorigen Systems ist jetzt keine Wahl mehr. Blieb
+            // sie stehen, plante der Knopf auf der letzten Stufe etwas ein,
+            // was auf der Stufe davor nicht mehr sichtbar war.
+            setAufgabe(null);
+        }
+
+        setEigenesSystem(system.key);
+        setSchritt('aufgabe');
+    };
+
+    /** Eine Aufgabe waehlen. Erst danach ist der Zeitraum eine Frage. */
+    const aufgabeWaehlen = (kennung: number | string, eintrag?: Plannable) => {
+        // Der Eintrag ist am Typ optional, weil ein Aufrufer der Suche nur die
+        // Kennung melden darf. Von DIESER Suche kommt er immer mit.
+        setAufgabe(eintrag ?? { id: kennung, title: '' });
+        setSchritt('details');
+    };
+
+    /** Die gewaehlte Aufgabe in den gewaehlten Zeitraum legen. */
+    const einplanen = () => {
+        if (! aufgabe) {
+            return;
+        }
+
+        plannable?.onSchedule(aufgabe.id, zeitraum, { source: gewaehltesSystem, task: aufgabe });
+    };
+
 
     /**
      * Ein vorgewaehltes Ziel engt die LISTE ein, es nimmt keine Stufe weg.
@@ -410,10 +587,32 @@ export function EventComposer({
      * Beim Bearbeiten nie: Der Termin hat seine Art schon. Und im Aufgaben-Weg
      * nie — dort entsteht ein Zeitblock im System der Aufgabe.
      */
-    const artSchritt =
-        ! bearbeiten &&
-        weg === 'termin' &&
-        (artenwahl.length > 1 || fremd.loadingKinds || ausgefalleneZiele.length > 0);
+    const artWaehlbar =
+        ! bearbeiten && (artenwahl.length > 1 || fremd.loadingKinds || ausgefalleneZiele.length > 0);
+
+    const artSchritt = artWaehlbar && weg === 'termin';
+
+    /**
+     * Auf welche Stufe die Weiche fuehrt.
+     *
+     * Gefragt wird mit dem Weg, der gerade GEWAEHLT wurde, nicht mit dem, der
+     * noch offen ist. Das ist kein Feinschliff: `artSchritt` und `systemSchritt`
+     * lesen beide `weg`, und der steht im Augenblick des Klicks noch auf dem
+     * alten Wert. Mit dem gerechnet fuehrte „Termin" nach einem Abstecher in den
+     * Aufgaben-Weg an der Terminart VORBEI — direkt ins Formular, mit der Art,
+     * die zufaellig im Entwurf stand. Gefunden am 11.11.2026 beim Einbau der
+     * Aufgaben-Stufen, wo derselbe Fehler den Weg an der Systemwahl vorbeigefuehrt
+     * haette.
+     */
+    const stufeNach = (gewaehlterWeg: 'termin' | 'aufgabe'): string => {
+        if (gewaehlterWeg === 'termin') {
+            return artWaehlbar ? 'art' : 'details';
+        }
+
+        // Auf 'details' ginge es nie direkt: Dort steht der Zeitraum, und zu
+        // dem gehoert eine Aufgabe.
+        return mehrereSysteme ? 'aufgabensystem' : 'aufgabe';
+    };
 
     /** Die getroffene Wahl, in der Form, in der die Liste sie fuehrt. */
     const gewaehlt = {
@@ -581,22 +780,47 @@ export function EventComposer({
             liste.push({ key: 'art', label: beschriftung.stepKind, chosen: gewaehlterName });
         }
 
+        if (systemSchritt) {
+            liste.push({
+                key: 'aufgabensystem',
+                label: beschriftung.stepTaskSource,
+                chosen: systemNamen[gewaehltesSystem],
+            });
+        }
+
+        if (aufgabenWeg && weg === 'aufgabe') {
+            liste.push({
+                key: 'aufgabe',
+                label: beschriftung.stepTask,
+                // Der Titel bleibt im Kopf stehen, waehrend der Zeitraum
+                // bestaetigt wird: Sonst muesste man zurueckspringen, um
+                // nachzusehen, was man gerade einplant.
+                chosen: aufgabe?.title || undefined,
+            });
+        }
+
         liste.push({
             key: 'details',
-            label: weg === 'aufgabe' && aufgabenWeg ? beschriftung.stepPlannable : beschriftung.stepFields,
+            label: weg === 'aufgabe' && aufgabenWeg ? beschriftung.stepSlot : beschriftung.stepFields,
         });
 
         return liste;
     }, [
         artSchritt,
+        aufgabe?.title,
         aufgabenWeg,
         beschriftung.modeEvent,
         beschriftung.modePlannable,
         beschriftung.stepFields,
         beschriftung.stepKind,
-        beschriftung.stepPlannable,
+        beschriftung.stepSlot,
+        beschriftung.stepTask,
+        beschriftung.stepTaskSource,
         beschriftung.stepWhat,
         gewaehlterName,
+        gewaehltesSystem,
+        systemNamen,
+        systemSchritt,
         weg,
     ]);
 
@@ -668,7 +892,7 @@ export function EventComposer({
                                     // Aufgaben-Weg nie: Dort entsteht ein
                                     // Zeitblock im System der Aufgabe, und eine
                                     // Terminart hat er nicht.
-                                    setSchritt(eintrag === 'termin' && artSchritt ? 'art' : 'details');
+                                    setSchritt(stufeNach(eintrag));
                                 }}
                                 aria-pressed={weg === eintrag}
                                 // Der Name ist das WORT, die Erklaerung eine
@@ -719,12 +943,104 @@ export function EventComposer({
                 />,
             )}
 
+            {/*
+                Schritt „Aufgabensystem": erst das System, dann dessen Aufgaben.
+
+                Genau umgekehrt zur Terminart darueber — und das ist kein
+                Widerspruch, sondern dieselbe Regel bei anderer Groesse. Zehn
+                Terminarten passen in eine Liste, hunderte Aufgaben nicht.
+                Bastian am 11.11.2026: „Bei Aufgaben ist es wahrscheinlich
+                besser, wenn wir Aufgabesystem und dann Aufgabe machen."
+            */}
+            {schritt === 'aufgabensystem' && umhuellen(
+                <TaskSourcePicker
+                    options={aufgabenSysteme}
+                    value={gewaehltesSystem}
+                    onPick={systemWaehlen}
+                    // Einzeln zugewiesen und nicht als ganzer Beutel wie bei
+                    // KindPicker: Beide Bauteile haetten eine „heading" und
+                    // eine „empty", und in einem gemeinsamen Beutel waere das
+                    // EIN Wort fuer zwei Fragen.
+                    labels={{
+                        heading: beschriftung.taskSourceHeading,
+                        empty: beschriftung.taskSourceEmpty,
+                    }}
+                />,
+            )}
+
+            {/*
+                Schritt „Aufgabe": die Aufgaben des gewaehlten Systems.
+
+                Mit Suchfeld, denn nach dem System sind es noch viele — und ohne
+                jedes Feld fuer eine PERSON: Die angemeldete Person ist die
+                Person, und eine Maske, die nach fremden Aufgaben suchen laesst,
+                laedt zu einem Vorgang ein, den das Zielsystem ablehnen muss.
+            */}
+            {schritt === 'aufgabe' && umhuellen(
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium">{beschriftung.plannablePick}</p>
+                        <PlannableSearch
+                            search={plannable!.search}
+                            source={gewaehltesSystem}
+                            sourceNames={systemNamen}
+                            onPick={aufgabeWaehlen}
+                        />
+                    </div>
+
+                    {/*
+                        Eine NEUE Aufgabe anzulegen gehoert nicht hierher:
+                        Titel, Prioritaet und Projekt sind Begriffe des
+                        Aufgabensystems. Der Zeitraum reist in der Adresse
+                        mit, damit er beim Zurueckkommen nicht fehlt — er ist
+                        hier schon vorbelegt, auch wenn er erst auf der
+                        naechsten Stufe bestaetigt wird.
+                    */}
+                    {plannable!.newHref && (
+                        <a
+                            href={`${plannable!.newHref}${plannable!.newHref.includes('?') ? '&' : '?'}date=${zeitraum.date}&start=${zeitraum.start}&end=${zeitraum.end}`}
+                            className="inline-flex text-sm underline underline-offset-4"
+                        >
+                            {beschriftung.plannableNew}
+                        </a>
+                    )}
+                </div>,
+            )}
+
             {schritt !== 'details' ? null : aufgabenWeg && weg === 'aufgabe'
-                ? umhuellen(
-                      <div className="space-y-4">
+                ? /*
+                      Letzte Stufe im Aufgaben-Weg: der Zeitraum, und der Knopf,
+                      der wirklich einplant.
+
+                      Bis zum 11.11.2026 plante der Klick auf einen Treffer
+                      SOFORT ein. Das war nicht nur die falsche Reihenfolge,
+                      sondern ein Fehlklick-Risiko: Wer in einer Trefferliste
+                      danebengreift, hatte einen Termin erzeugt, den er nicht
+                      wollte. Jetzt bestaetigt ein Knopf.
+
+                      Der Zeitraum ist dabei meistens VORBELEGT — aus einem Klick
+                      ins Raster (`preset`) oder aus dem Entwurf des Produkts.
+                      Deshalb stehen die Felder mit ihrem Wert da und der Knopf
+                      daneben: Wer aus dem Raster kommt, soll einmal bestaetigen
+                      und nicht noch einmal eingeben.
+                  */
+                  umhuellen(
+                      <div className="space-y-4" data-slot="plannable-slot">
                           <div className="space-y-2">
                               <p className="text-sm font-medium">{beschriftung.plannableSlot}</p>
-                              <div className="flex flex-col gap-2 sm:flex-row">
+
+                              {/* Was hier eingeplant wird, steht neben dem
+                                  Knopf, nicht nur klein oben in der Kette. */}
+                              {aufgabe && (
+                                  <p
+                                      data-slot="plannable-chosen"
+                                      className="text-sm text-muted-foreground"
+                                  >
+                                      {aufgabe.title}
+                                  </p>
+                              )}
+
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                   <DateField
                                       value={zeitraum.date}
                                       onChange={(datum) => setZeitraum((bisher) => ({ ...bisher, date: datum }))}
@@ -738,31 +1054,23 @@ export function EventComposer({
                                       value={zeitraum.end}
                                       onChange={(zeit) => setZeitraum((bisher) => ({ ...bisher, end: zeit }))}
                                   />
+
+                                  <button
+                                      type="button"
+                                      data-action="schedule"
+                                      onClick={einplanen}
+                                      // Ohne gewaehlte Aufgabe gesperrt: Diese
+                                      // Stufe ist ueber die Kette nicht
+                                      // vorwaerts erreichbar, aber ein Knopf,
+                                      // der im Nichts anlegt, waere schlimmer
+                                      // als ein gesperrter.
+                                      disabled={! aufgabe || Boolean(plannable!.busy)}
+                                      className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+                                  >
+                                      {beschriftung.plannableSchedule}
+                                  </button>
                               </div>
                           </div>
-
-                          <div className="space-y-2">
-                              <p className="text-sm font-medium">{beschriftung.plannablePick}</p>
-                              <PlannableSearch
-                                  search={plannable!.search}
-                                  onPick={(kennung) => plannable!.onSchedule(kennung, zeitraum)}
-                              />
-                          </div>
-
-                          {/*
-                              Eine NEUE Aufgabe anzulegen gehoert nicht hierher:
-                              Titel, Prioritaet und Projekt sind Begriffe des
-                              Aufgabensystems. Der Zeitraum reist in der Adresse
-                              mit, damit er beim Zurueckkommen nicht fehlt.
-                          */}
-                          {plannable!.newHref && (
-                              <a
-                                  href={`${plannable!.newHref}${plannable!.newHref.includes('?') ? '&' : '?'}date=${zeitraum.date}&start=${zeitraum.start}&end=${zeitraum.end}`}
-                                  className="inline-flex text-sm underline underline-offset-4"
-                              >
-                                  {beschriftung.plannableNew}
-                              </a>
-                          )}
                       </div>,
                   )
                 : umhuellen(

@@ -738,8 +738,9 @@ Over Inertia you do not need it: the entries come back fresh anyway.
 
 ```tsx
 <PlannableSearch
-    search={(term) => fetch(`/api/calendar/plannable-tasks?q=${term}`).then((r) => r.json()).then((d) => d.tasks)}
-    onPick={(id) => scheduleIt(id)}
+    search={(term, source) => fetch(`/api/calendar/plannable-tasks?q=${term}&source=${source ?? ''}`)
+        .then((r) => r.json())}
+    onPick={(id, task) => scheduleIt(id, task)}
 />
 ```
 
@@ -760,6 +761,70 @@ path would have forced all of them to build the same endpoint.
 **Pass no `search` and the whole route disappears.** That is the modularity:
 with no task system plugged in there is nothing to plan, and the form does not
 ask.
+
+#### The task system is chosen first — the kind is not
+
+In the composer the task route asks in three steps: **system, then task, then
+time range**. That is the exact opposite of the kind step above, and the same
+rule at a different size: ten creatable kinds across all four systems fit in one
+list, so the system is just a label on the row. Open tasks are hundreds, so the
+system is picked *first* and the list that follows is the one of that system.
+
+```tsx
+<EventComposer
+    plannable={{
+        sources: taskSources,            // key, label, colour — straight from TaskSourceRegistry::available()
+        search: (term, source) => …,     // asked once the system is chosen
+        onSchedule: (id, slot, { source, task }) => …,
+        busy: scheduling,                // disables the confirming button
+    }}
+/>
+```
+
+With exactly one source the step disappears and is thereby *answered* — the
+search still asks that system. With no `sources` at all there is no step and the
+search is asked without a system, which is the call every product makes today.
+
+`onSchedule` carries the source because an id alone is ambiguous across systems:
+task 7 in the Manager and task 7 in the Verwaltung are two tasks. Empty means
+"there was no system step", the same convention `KindOption.source` uses.
+
+Nothing here takes a *person*. The signed-in user is the user; a field for
+searching someone else's tasks would invite an operation the target system has
+to refuse.
+
+#### Three states that are not the same thing
+
+`search` may resolve to a plain array — today's shape, unchanged — or to a
+harvest, which is `TaskHarvest` from the task package passed straight through:
+
+```ts
+{ tasks: Plannable[], ok?: string[], failed?: Record<string, string> }
+```
+
+| State | What the step says |
+| --- | --- |
+| `ok` contains the system, `tasks` empty | "nothing open" — that is an answer |
+| the system is in `failed` | the reason, in the words of the other end, and the empty sentence is *not* shown |
+| still in flight | neither of the two |
+
+A plain array cannot express the difference, and a system outage showing up as
+an empty list looks like an answer — which sends the next person looking in the
+wrong place. Tasks from systems that *did* answer stay listed above the notice;
+one outage never hides the rest.
+
+#### What a task carries
+
+Title, due date (formatted — `due` is a finished phrase, not a date, because
+this package has no locale), urgency, kind label, and `url` as the way into its
+home system. Not `description`, not `project_id`: those are vocabulary of the
+task system, and the way to them is the link, not a copy.
+
+`PlannableEntry` in the drag list grows the same `sourceKey`. It rides in the
+React key, in `data-plannable-source` on the card, and in the drop lookup —
+without it two systems with the same id would draw one card and drop the other
+one's title. Leave it out and nothing changes, which is why the products
+dragging from that list today need no edit.
 
 ### The stylesheet
 

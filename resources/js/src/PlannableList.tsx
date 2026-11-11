@@ -36,6 +36,19 @@ export interface PlannableEntry {
      * Sorte eindeutig.
      */
     subjectType?: string;
+    /**
+     * Aus welchem SYSTEM der Gegenstand kommt. Leer oder fehlend = dem eigenen.
+     *
+     * Dieselbe Art von Grenze wie `subjectType`, eine Ebene hoeher: „Aufgabe 7"
+     * im Manager und „Aufgabe 7" in der Verwaltung sind zwei Posten. Solange
+     * eine Liste nur das eigene System zeigt, aendert die Angabe nichts — und
+     * genau deshalb darf sie fehlen: Die Produkte, die heute aus dieser Liste
+     * ins Raster ziehen, ziehen ohne eine Zeile Aenderung weiter.
+     *
+     * Der Name ist der des Aufgabenpakets (`ForeignTask::$sourceKey`), damit das
+     * Produkt durchreicht und nichts uebersetzt.
+     */
+    sourceKey?: string;
     /** Was die Anwendung sonst noch an der Karte braucht. */
     meta?: Record<string, unknown>;
 }
@@ -57,6 +70,15 @@ export interface PlannableListProps {
 /** Das Attribut, an dem der Ablegevorgang eine Karte erkennt. */
 export const PLANNABLE_ATTRIBUTE = 'data-plannable-id';
 
+/**
+ * Das System der Karte, am DOM.
+ *
+ * Es steht neben der Kennung und nicht in ihr: Eine zusammengesetzte Kennung
+ * („manager:7") muesste beim Ablegen wieder zerlegt werden, und wer sie
+ * weiterreicht, schickt dem Zielsystem eine Kennung, die es nicht kennt.
+ */
+export const PLANNABLE_SOURCE_ATTRIBUTE = 'data-plannable-source';
+
 export function PlannableList({ items, renderItem, empty, className, eventData }: PlannableListProps) {
     const container = useRef<HTMLDivElement>(null);
 
@@ -74,7 +96,13 @@ export function PlannableList({ items, renderItem, empty, className, eventData }
             itemSelector: `[${PLANNABLE_ATTRIBUTE}]`,
             eventData(card: HTMLElement) {
                 const id = card.getAttribute(PLANNABLE_ATTRIBUTE) ?? '';
-                const item = items.find((entry) => String(entry.id) === id);
+                const source = card.getAttribute(PLANNABLE_SOURCE_ATTRIBUTE) ?? '';
+                // Kennung UND System: Zwei Systeme duerfen dieselbe Kennung
+                // fuehren, und dann traegt die abgelegte Karte sonst den Titel
+                // und die Dauer des falschen Postens.
+                const item = items.find(
+                    (entry) => String(entry.id) === id && (entry.sourceKey ?? '') === source,
+                );
 
                 return {
                     title: item?.title ?? card.dataset.plannableTitle ?? '',
@@ -93,8 +121,9 @@ export function PlannableList({ items, renderItem, empty, className, eventData }
                 ? empty
                 : items.map((item) => (
                       <div
-                          key={`${item.subjectType ?? ''}:${item.id}`}
+                          key={`${item.sourceKey ?? ''}:${item.subjectType ?? ''}:${item.id}`}
                           {...{ [PLANNABLE_ATTRIBUTE]: String(item.id) }}
+                          {...{ [PLANNABLE_SOURCE_ATTRIBUTE]: item.sourceKey ?? '' }}
                           data-plannable-title={item.title}
                           data-plannable-type={item.subjectType ?? ''}
                           data-duration-minutes={item.minutes ?? 60}

@@ -30,9 +30,9 @@ export type {
     SlotFinderSettings,
 } from './SlotFinderScreen';
 export type { AgendaListProps, AgendaRow } from './AgendaList';
-export { PlannableList, PLANNABLE_ATTRIBUTE } from './PlannableList';
+export { PlannableList, PLANNABLE_ATTRIBUTE, PLANNABLE_SOURCE_ATTRIBUTE } from './PlannableList';
 export { PlannableSearch } from './PlannableSearch';
-export type { Plannable, PlannableSearchProps } from './PlannableSearch';
+export type { Plannable, PlannableHarvest, PlannableSearchProps } from './PlannableSearch';
 export type { PlannableEntry, PlannableListProps } from './PlannableList';
 export { useRemoteTarget, remoteMoment } from './useRemoteTarget';
 export type { RemoteDraft, RemoteKind, RemoteSource, UseRemoteTargetOptions } from './useRemoteTarget';
@@ -52,6 +52,11 @@ export { EventComposer } from './EventComposer';
 // weil ein Produkt mit eigener Schrittfolge dieselbe Liste zeichnen soll.
 export { KindPicker, defaultKindPickerLabels } from './KindPicker';
 export type { KindOption, KindPickerLabels, KindPickerProps } from './KindPicker';
+// Die Wahl des Aufgabensystems — die Stufe VOR den Aufgaben. Steht hier aus
+// demselben Grund wie KindPicker: ein Produkt mit eigener Schrittfolge zeichnet
+// dieselbe Liste.
+export { TaskSourcePicker, defaultTaskSourcePickerLabels } from './TaskSourcePicker';
+export type { TaskSource, TaskSourcePickerLabels, TaskSourcePickerProps } from './TaskSourcePicker';
 // Der Kopf des Anlege-Assistenten. Steht hier, weil ein Produkt mit eigener
 // Schrittfolge dieselbe Kette zeichnen soll — nicht, weil der Composer sie
 // gereicht bekommen muesste; er baut sie selbst.

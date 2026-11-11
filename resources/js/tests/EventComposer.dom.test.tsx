@@ -557,6 +557,33 @@ describe('die drei Stufen zusammen', () => {
         expect(kette?.textContent).toContain('Meeting digital (Manager)');
     });
 
+    /**
+     * Gefunden am 11.11.2026 beim Einbau der Aufgaben-Stufen (#9798), vorhanden
+     * seit dem Assistenten (#9795): Die Weiche rechnete mit dem Weg, der noch
+     * OFFEN war, statt mit dem gerade gewaehlten. Wer in den Aufgaben-Weg sah
+     * und dann „Termin" nahm, kam an der Terminart vorbei — direkt ins
+     * Formular, mit der Art, die zufaellig im Entwurf stand. Eine uebersprungene
+     * Wahl, die niemand getroffen hat.
+     */
+    it('fuehrt auch nach einem Abstecher in den Aufgaben-Weg wieder auf die Terminart', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                targets={ZIELE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{ search: () => Promise.resolve(offen), onSchedule: vi.fn() }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Zurück zu: Was' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Termin' }));
+
+        await waitFor(() => expect(artenliste()).toHaveLength(3));
+        expect(screen.queryByLabelText('Titel')).toBeNull();
+    });
+
     it('fragt im Aufgaben-Weg nicht nach einer Terminart', async () => {
         render(
             <EventComposer
@@ -572,7 +599,15 @@ describe('die drei Stufen zusammen', () => {
 
         // Dort entsteht ein Zeitblock im System der Aufgabe. Eine Terminart
         // hat er nicht, und eine Liste dafuer waere eine Frage ohne Wirkung.
-        await waitFor(() => expect(screen.getByText('Wann')).toBeTruthy());
+        //
+        // Umgeschrieben am 11.11.2026 (#9798): Vorher stand hinter der Weiche
+        // SOFORT der Zeitraum („Wann") samt Suche auf einer Stufe. Jetzt
+        // kommt zuerst die Aufgabe und der Zeitraum danach — die Aussage des
+        // Tests ist unveraendert, nur das, was man als erstes sieht, ist die
+        // Aufgabensuche statt des Zeitraums.
+        await waitFor(() =>
+            expect(document.querySelector('[data-slot="plannable-search"]')).toBeTruthy(),
+        );
         expect(document.querySelector('[data-slot="kind-picker"]')).toBeNull();
     });
 
@@ -807,6 +842,16 @@ describe('der Aufgaben-Weg', () => {
         expect(screen.queryByRole('button', { name: 'Aufgabe einplanen' })).toBeNull();
     });
 
+    /**
+     * Umgeschrieben am 11.11.2026 (#9798), nicht geloescht: Der Gegenstand ist
+     * unveraendert — eingeplant wird mit Zeitraum, nicht nur die Aufgabe. Nur
+     * der Weg dorthin hat eine Stufe mehr, und am Ende steht ein Knopf.
+     *
+     * Dass er dort steht, ist nicht nur die Reihenfolge aus dem Auftrag: Vorher
+     * legte der Klick auf einen TREFFER sofort an. Wer in einer Trefferliste
+     * danebengreift, hatte damit einen Eintrag erzeugt, den er nicht wollte —
+     * und der Zeitraum, den er gar nicht gesehen hatte, stand schon drin.
+     */
     it('gibt den Zeitraum mit, nicht nur die Aufgabe', async () => {
         const eingeplant = vi.fn();
 
@@ -823,7 +868,19 @@ describe('der Aufgaben-Weg', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
         fireEvent.click(await screen.findByText('Abgabe vorbereiten'));
 
-        expect(eingeplant).toHaveBeenCalledWith(7, { date: '2026-03-12', start: '14:00', end: '15:30' });
+        // Die Wahl allein plant NICHT ein.
+        expect(eingeplant).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Einplanen' }));
+
+        expect(eingeplant).toHaveBeenCalledWith(
+            7,
+            { date: '2026-03-12', start: '14:00', end: '15:30' },
+            // Woraus eingeplant wird, reist mit: Die Kennung allein ist
+            // zweideutig, sobald es mehrere Aufgabensysteme gibt. Leer heisst
+            // „es gab keine Systemstufe", wie bei der Terminart.
+            { source: '', task: offen[0] },
+        );
     });
 
     /** Eine neue Aufgabe anzulegen gehört dem Aufgabensystem — mit dem Zeitraum. */
@@ -946,6 +1003,387 @@ it('nimmt den Zeitraum auch aus einem gesteuerten Entwurf', async () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
     fireEvent.click(await screen.findByText('Aus dem Entwurf'));
+    // Seit #9798 bestaetigt ein Knopf — der Zeitraum steht dort vorbelegt, und
+    // genau das ist der Punkt: einmal bestaetigen, nicht nochmal eingeben.
+    fireEvent.click(screen.getByRole('button', { name: 'Einplanen' }));
 
-    expect(eingeplant).toHaveBeenCalledWith(3, { date: '2026-04-01', start: '11:00', end: '12:00' });
+    expect(eingeplant).toHaveBeenCalledWith(
+        3,
+        { date: '2026-04-01', start: '11:00', end: '12:00' },
+        { source: '', task: { id: 3, title: 'Aus dem Entwurf' } },
+    );
+});
+
+/**
+ * Der Aufgaben-Weg in Stufen: System, Aufgabe, Zeitraum (#9798).
+ *
+ * Bastian am 11.11.2026, woertlich: „und in der liste zum planen einer aufgabe
+ * muss ich ja auch auswählen können aus welchem system und dann am besten pro
+ * system die entsprechenden aufgaben". Und die Begruendung, warum das hier
+ * anders laeuft als bei den Terminarten: „sonst kriege ich ja einfach eine
+ * unendlich lange Liste mit hunderten Aufgaben."
+ *
+ * Das ist der ganze Unterschied. Zehn Terminarten passen in eine Liste, dort
+ * steht das System klein daneben. Hunderte Aufgaben passen nicht, also wird das
+ * System vorher gewaehlt.
+ */
+describe('die Aufgaben-Stufen', () => {
+    const SYSTEME = [
+        { key: 'manager', label: 'Manager' },
+        { key: 'verwaltung', label: 'Verwaltung' },
+    ];
+
+    const PRO_SYSTEM: Record<string, Array<{ id: number; title: string }>> = {
+        manager: [{ id: 1, title: 'Angebot schreiben' }],
+        verwaltung: [{ id: 2, title: 'Ticket beantworten' }],
+    };
+
+    /** Merkt sich, wonach gefragt wurde — Begriff und System. */
+    function suche(gefragt: Array<unknown[]>) {
+        return (...argumente: unknown[]) => {
+            gefragt.push(argumente);
+
+            return Promise.resolve(PRO_SYSTEM[String(argumente[1] ?? '')] ?? []);
+        };
+    }
+
+    it('fuehrt von der Weiche ueber das System zur Aufgabe zum Zeitraum', async () => {
+        const eingeplant = vi.fn();
+        const gefragt: Array<unknown[]> = [];
+
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                preset={{ date: '2026-03-12', start: '14:00', end: '15:30' }}
+                onSaveHere={vi.fn()}
+                plannable={{ sources: SYSTEME, search: suche(gefragt), onSchedule: eingeplant }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+
+        // Stufe: das System — und noch keine Aufgaben. Sie zu laden, bevor das
+        // System gewaehlt ist, waere genau die unendliche Liste.
+        expect(document.querySelector('[data-slot="task-source-picker"]')).toBeTruthy();
+        expect(document.querySelector('[data-slot="plannable-search"]')).toBeNull();
+        expect(gefragt).toHaveLength(0);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Verwaltung' }));
+
+        // Stufe: die Aufgaben DIESES Systems, und noch kein Zeitraum.
+        expect(await screen.findByText('Ticket beantworten')).toBeTruthy();
+        expect(gefragt[0]).toEqual(['', 'verwaltung']);
+        expect(screen.queryByText('Angebot schreiben')).toBeNull();
+        expect(document.querySelector('[data-slot="plannable-slot"]')).toBeNull();
+
+        fireEvent.click(screen.getByText('Ticket beantworten'));
+
+        // Stufe: der Zeitraum, vorbelegt, mit dem Knopf daneben.
+        expect(document.querySelector('[data-slot="plannable-slot"]')).toBeTruthy();
+
+        // Vorbelegt, nicht leer: Wer aus dem Raster kommt, soll einmal
+        // bestaetigen und nicht nochmal eingeben. Das Datumsfeld zeigt deutsch
+        // und meldet ISO nach aussen (siehe DateField).
+        const felder = Array.from(
+            document.querySelectorAll('[data-slot="plannable-slot"] input'),
+        ) as HTMLInputElement[];
+        expect(felder.map((feld) => feld.value)).toContain('12.03.2026');
+
+        // Und die gewaehlte Aufgabe steht beim Knopf, nicht nur klein im Kopf.
+        expect(
+            document.querySelector('[data-slot="plannable-chosen"]')?.textContent,
+        ).toBe('Ticket beantworten');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Einplanen' }));
+
+        expect(eingeplant).toHaveBeenCalledWith(
+            2,
+            { date: '2026-03-12', start: '14:00', end: '15:30' },
+            { source: 'verwaltung', task: PRO_SYSTEM.verwaltung![0] },
+        );
+    });
+
+    it('nennt im Kopf, welches System und welche Aufgabe gewaehlt sind', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{ sources: SYSTEME, search: suche([]), onSchedule: vi.fn() }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
+        fireEvent.click(await screen.findByText('Angebot schreiben'));
+
+        // Die getroffene Wahl bleibt sichtbar, waehrend die naechste getroffen
+        // wird — sonst muesste man zuruecksprigen, um nachzusehen, was man
+        // gerade einplant.
+        const kette = document.querySelector('[data-slot="composer-steps"]');
+        expect(kette?.textContent).toContain('Manager');
+        expect(kette?.textContent).toContain('Angebot schreiben');
+    });
+
+    /**
+     * Eine Stufe mit einer einzigen Antwort wird nicht gestellt — sie wird
+     * beantwortet. Und „beantwortet" heisst hier: Die Suche fragt dieses System,
+     * nicht keines.
+     */
+    it('entfaellt bei einem einzigen System — und fragt es trotzdem', async () => {
+        const gefragt: Array<unknown[]> = [];
+        const eingeplant = vi.fn();
+
+        const { container } = render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                preset={{ date: '2026-03-12', start: '09:00', end: '10:00' }}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    sources: [{ key: 'verwaltung', label: 'Verwaltung' }],
+                    search: suche(gefragt),
+                    onSchedule: eingeplant,
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+
+        expect(container.querySelector('[data-slot="task-source-picker"]')).toBeNull();
+        expect(await screen.findByText('Ticket beantworten')).toBeTruthy();
+        expect(gefragt[0]).toEqual(['', 'verwaltung']);
+
+        fireEvent.click(screen.getByText('Ticket beantworten'));
+        fireEvent.click(screen.getByRole('button', { name: 'Einplanen' }));
+
+        // Das System reist mit, obwohl es niemand angeklickt hat.
+        expect(eingeplant.mock.calls[0][2]).toEqual({
+            source: 'verwaltung',
+            task: PRO_SYSTEM.verwaltung![0],
+        });
+    });
+
+    /**
+     * Ohne Systemangabe gibt es die Stufe gar nicht, und die Suche fragt ohne
+     * Systembegriff — das ist der Aufruf, den CRM, Verwaltung und Brain heute
+     * uebergeben. Keine Zeile Aenderung dort.
+     */
+    it('fehlt ganz, wo das Produkt keine Systeme nennt', async () => {
+        const gefragt: Array<unknown[]> = [];
+        const eingeplant = vi.fn();
+
+        const { container } = render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                preset={{ date: '2026-03-12', start: '09:00', end: '10:00' }}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    search: (begriff: string) => {
+                        gefragt.push([begriff]);
+
+                        return Promise.resolve([{ id: 5, title: 'Ohne System' }]);
+                    },
+                    onSchedule: eingeplant,
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+
+        expect(container.querySelector('[data-slot="task-source-picker"]')).toBeNull();
+        expect(await screen.findByText('Ohne System')).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Ohne System'));
+        fireEvent.click(screen.getByRole('button', { name: 'Einplanen' }));
+
+        // Leer heisst „es gab keine Systemstufe" — dieselbe Regel wie bei der
+        // Terminart, wo leer „der eigene Kalender" heisst.
+        expect(eingeplant.mock.calls[0][2]).toEqual({
+            source: '',
+            task: { id: 5, title: 'Ohne System' },
+        });
+    });
+
+    /**
+     * Die drei Zustaende, durch den Composer hindurch (Wiki #595). Entscheidend
+     * ist der Name: Er kommt aus der LOKALEN Beschriftung des Systems, nicht
+     * aus der Antwort der Gegenstelle.
+     */
+    it('zeigt den Grund mit Namen, wenn das gewaehlte System nicht antwortet', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    sources: SYSTEME,
+                    search: async () => ({
+                        tasks: [],
+                        ok: [],
+                        failed: { verwaltung: 'Zeitüberschreitung nach 5s' },
+                    }),
+                    onSchedule: vi.fn(),
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Verwaltung' }));
+
+        const hinweis = await screen.findByRole('status');
+        expect(hinweis.textContent).toContain('Verwaltung');
+        expect(hinweis.textContent).toContain('Zeitüberschreitung nach 5s');
+
+        // „Nichts offen" waere hier eine Auskunft, die niemand geben kann.
+        expect(screen.queryByTestId('plannable-empty')).toBeNull();
+    });
+
+    it('sagt „nichts offen" nur, wenn das System geantwortet hat', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    sources: SYSTEME,
+                    search: async () => ({ tasks: [], ok: ['manager'] }),
+                    onSchedule: vi.fn(),
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
+
+        expect(await screen.findByTestId('plannable-empty')).toBeTruthy();
+        expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    /**
+     * Nicht ueberspringen und nicht weiterschieben, solange die Antwort noch
+     * unterwegs ist — der Fang der Terminart-Biene, hier an der Stelle, an die
+     * er gehoert: Die Systemliste ist lokale Angabe und kann nicht nachtraeglich
+     * wachsen; gefragt wird erst hier.
+     */
+    it('schiebt niemanden weiter, solange die Ernte laeuft', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    sources: SYSTEME,
+                    search: () => new Promise(() => {}),
+                    onSchedule: vi.fn(),
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
+
+        // Die Stufe steht, der Zeitraum steht NICHT — und es steht weder eine
+        // Leermeldung noch ein Ausfall da. Beides waere eine Aussage ueber
+        // etwas, das noch laeuft.
+        expect(document.querySelector('[data-slot="plannable-search"]')).toBeTruthy();
+        expect(document.querySelector('[data-slot="plannable-slot"]')).toBeNull();
+        expect(screen.queryByTestId('plannable-empty')).toBeNull();
+        expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    /**
+     * Ueber die Kette zurueck und ein anderes System gewaehlt: Die Aufgabe des
+     * vorigen ist dann keine Wahl mehr. Blieb sie stehen, plante der Knopf auf
+     * der letzten Stufe etwas ein, was auf der Stufe davor nicht mehr sichtbar
+     * war.
+     */
+    it('wirft die gewaehlte Aufgabe weg, wenn das System gewechselt wird', async () => {
+        const eingeplant = vi.fn();
+
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{ sources: SYSTEME, search: suche([]), onSchedule: eingeplant }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
+        fireEvent.click(await screen.findByText('Angebot schreiben'));
+
+        expect(document.querySelector('[data-slot="plannable-slot"]')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Zurück zu: Aufgabensystem' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Verwaltung' }));
+
+        // Die Aufgaben des neuen Systems stehen da, die alte Wahl ist weg —
+        // auch im Kopf.
+        expect(await screen.findByText('Ticket beantworten')).toBeTruthy();
+        const kette = document.querySelector('[data-slot="composer-steps"]');
+        expect(kette?.textContent).not.toContain('Angebot schreiben');
+        expect(eingeplant).not.toHaveBeenCalled();
+    });
+
+    /**
+     * `busy` fuehrte dieser Typ seit dem 16.10.2026, und NIEMAND las es. Ein
+     * Platz, den ein Produkt fuellen kann und den keiner abholt, ist dasselbe
+     * Uebel wie ein Platz, aus dem gelesen und den keiner fuellt (Wiki #595).
+     * Erst mit dem bestaetigenden Knopf gab es die Stelle, an die es gehoert.
+     */
+    it('sperrt den Einplanen-Knopf, solange das Einplanen laeuft', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    sources: SYSTEME,
+                    search: suche([]),
+                    onSchedule: vi.fn(),
+                    busy: true,
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
+        fireEvent.click(await screen.findByText('Angebot schreiben'));
+
+        // Sonst legen zwei Klicks zwei Bloecke an.
+        expect((screen.getByRole('button', { name: 'Einplanen' }) as HTMLButtonElement).disabled).toBe(
+            true,
+        );
+    });
+
+    /** Eine neue Aufgabe anzulegen gehoert dem Aufgabensystem — mit dem Zeitraum. */
+    it('fuehrt den Weg hinaus an der Aufgaben-Stufe, wo die Aufgabe fehlt', async () => {
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                preset={{ date: '2026-03-12', start: '14:00', end: '15:30' }}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    sources: SYSTEME,
+                    search: async () => ({ tasks: [], ok: ['manager'] }),
+                    onSchedule: vi.fn(),
+                    newHref: '/tasks/create',
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
+
+        // Dort, wo man merkt, dass es die Aufgabe nicht gibt — und der
+        // vorbelegte Zeitraum reist schon mit, obwohl er erst eine Stufe
+        // spaeter bestaetigt wird.
+        const hinaus = (await screen.findByText('Neue Aufgabe anlegen')) as HTMLAnchorElement;
+        expect(hinaus.getAttribute('href')).toBe('/tasks/create?date=2026-03-12&start=14:00&end=15:30');
+    });
 });
