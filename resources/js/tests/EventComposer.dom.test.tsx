@@ -84,6 +84,65 @@ describe('die Terminart-Stufe', () => {
         );
     });
 
+    /*
+     * Bug #1417: Ein unerreichbares Ziel meldet sich, statt zu verschwinden.
+     *
+     * Der private Kalender der Nabe verschwand LAUTLOS aus dieser Maske, wenn
+     * die Nabe nicht erreichbar war: `isWritable()` war `false`, und damit war
+     * die Quelle aus `beschreibbareZiele()` heraus, BEVOR die Maske sie sah.
+     * Sie konnte nie in `targets` und nie in `unreachableSources` landen — der
+     * `unreachable`-Zweig des KindPickers war in keinem Produkt erreichbar.
+     *
+     * Seit dem 12.11.2026 markiert `EventSourceRegistry::ziele()` sie:
+     * `writable: false` (sie ist NICHT beschreibbar, und ein Knopf, der
+     * drueben scheitert, ist schlechter als kein Knopf) und zusaetzlich
+     * `unreachable: true`.
+     *
+     * Dieser Test ist der Durchstich: ein Zieleintrag, wie das Paket ihn bei
+     * unerreichbarer Nabe herausgibt — und der Hinweis muss feuern.
+     */
+    it('meldet ein ausgefallenes Ziel, statt es verschwinden zu lassen', async () => {
+        const MIT_AUSFALL: RemoteSource[] = [
+            { key: 'manager', label: 'Manager', writable: true },
+            // Genau die Form, die `ziele()` bei unerreichbarer Nabe liefert.
+            { key: 'brain-privat', label: 'AI Brain', writable: false, unreachable: true },
+        ];
+
+        render(<EventComposer kinds={EIGENE} targets={MIT_AUSFALL} onSaveHere={vi.fn()} />);
+
+        const hinweis = await screen.findByRole('status');
+
+        // MIT NAMEN, nicht mit dem Schluessel: Der Name kommt aus der lokalen
+        // Beschriftung der Quelle (Wiki #595).
+        expect(hinweis.textContent).toContain('AI Brain');
+        expect(hinweis.textContent).not.toContain('brain-privat');
+
+        // Und die uebrigen Arten bleiben waehlbar — ein Ausfall nimmt die
+        // Maske nicht mit.
+        await waitFor(() => expect(artenliste()).toContain('Geschäftlich(Manager)'));
+    });
+
+    it('macht ein ausgefallenes Ziel NICHT waehlbar', async () => {
+        // Die zweite Haelfte, und die wichtigere: Waere es waehlbar, scheiterte
+        // das Anlegen erst beim Speichern — schlechter als der Zustand vor der
+        // Behebung, in dem es nur lautlos verschwand.
+        const MIT_AUSFALL: RemoteSource[] = [
+            { key: 'manager', label: 'Manager', writable: true },
+            { key: 'brain-privat', label: 'AI Brain', writable: false, unreachable: true },
+        ];
+
+        render(<EventComposer kinds={EIGENE} targets={MIT_AUSFALL} onSaveHere={vi.fn()} />);
+
+        await waitFor(() => expect(artenliste()).toHaveLength(3));
+
+        // Keine Zeile traegt den Namen des ausgefallenen Systems.
+        expect(artenliste().some((zeile) => zeile.includes('AI Brain'))).toBe(false);
+
+        // Und es wurde auch nicht nach seinen Arten gefragt: Ein Ziel, das
+        // nicht beschreibbar ist, wird nicht vorgeladen.
+        expect(anfragen.some((anfrage) => anfrage.url.includes('brain-privat'))).toBe(false);
+    });
+
     it('schreibt den Systemnamen nur an die FREMDEN Zeilen', async () => {
         render(<EventComposer kinds={EIGENE} targets={ZIELE} onSaveHere={vi.fn()} />);
 

@@ -24,6 +24,18 @@ export interface RemoteSource {
     colour?: string | null;
     /** Ob dieses System Termine von aussen annimmt. Sagt das Zielsystem, nicht wir. */
     writable?: boolean;
+    /**
+     * Das System hat auf die Frage nicht geantwortet.
+     *
+     * Getrennt von `writable: false` gefuehrt, und das ist der ganze Zweck:
+     * „Niemand ist zustaendig" und „ich konnte nicht nachsehen" sind zwei
+     * Aussagen (Wiki #595). Ein ausgefallenes Ziel bleibt `writable: false` —
+     * es ist nicht beschreibbar, und ein Knopf, der drueben scheitert, ist
+     * schlechter als kein Knopf.
+     *
+     * Gesetzt vom Paket, nicht vom Produkt: `EventSourceRegistry::ziele()`.
+     */
+    unreachable?: boolean;
 }
 
 /** Eine Terminart des ZIELSYSTEMS. Was sie bedeutet, weiss nur das Zielsystem. */
@@ -148,14 +160,20 @@ export function useRemoteTarget({
     const [kindsBySource, setKindsBySource] = useState<Record<string, RemoteKind[]>>({});
 
     /**
-     * Ziele, die nicht geantwortet haben.
+     * Ziele, deren ARTENABRUF fehlgeschlagen ist.
      *
      * Getrennt von „hat keine Arten" gefuehrt, und das ist der ganze Zweck:
      * „Niemand ist zuständig" und „ich konnte nicht nachsehen" sind zwei
      * Aussagen (Wiki #595). Ein Systemausfall, der als leere Liste erscheint,
      * sieht aus wie eine Antwort.
+     *
+     * Das ist nur die eine HAELFTE der Ausfaelle: Hier landet, wer in der
+     * Liste stand und beim Abruf wegblieb. Die andere Haelfte meldet sich
+     * schon in der Liste (`unreachable` am Zieleintrag) und kommt gar nicht
+     * bis zum Abruf — ein Ziel, das nicht `writable` ist, wird nie
+     * vorgeladen. `unreachableSources` unten fuegt beide zusammen.
      */
-    const [unreachableSources, setUnreachableSources] = useState<string[]>([]);
+    const [fehlgeschlageneZiele, setFehlgeschlageneZiele] = useState<string[]>([]);
 
     /**
      * Schon von der ERSTEN Zeichnung an wahr, wenn vorgeladen wird.
@@ -248,7 +266,7 @@ export function useRemoteTarget({
 
             if ('fehler' in ergebnis) {
                 melden(ergebnis.fehler);
-                setUnreachableSources((bisher) => (bisher.includes(key) ? bisher : [...bisher, key]));
+                setFehlgeschlageneZiele((bisher) => (bisher.includes(key) ? bisher : [...bisher, key]));
 
                 return;
             }
@@ -310,7 +328,7 @@ export function useRemoteTarget({
             // hat — es ist ein Hinweis an der Liste: Diese Arten fehlen, die
             // uebrigen gelten. Eine rote Meldung ueber der Maske waere eine
             // Fehlermeldung fuer etwas, das noch niemand versucht hat.
-            setUnreachableSources(ausgefallen);
+            setFehlgeschlageneZiele(ausgefallen);
             setLoadingKinds(false);
         })();
     }, [artenHolen, preloadKinds, zielsatz]);
@@ -449,6 +467,25 @@ export function useRemoteTarget({
         }
     }
 
+    /**
+     * Alle ausgefallenen Ziele — gemeldete und beim Abruf weggebliebene.
+     *
+     * Zwei Wege, ein Ergebnis, und die Oberflaeche soll den Unterschied nicht
+     * kennen muessen: Fuer den Menschen davor ist „das System hat auf die
+     * Freigabefrage nicht geantwortet" und „das System hat auf den Artenabruf
+     * nicht geantwortet" dieselbe Aussage — seine Arten fehlen in der Liste.
+     *
+     * Die Reihenfolge ist die der Zielliste und nicht die des Eintreffens:
+     * Ein Hinweis, dessen Systeme bei jedem Rendern die Plaetze tauschen,
+     * liest sich wie eine Aenderung.
+     */
+    const unreachableSources = [
+        ...sources.filter((quelle) => quelle.unreachable === true).map((quelle) => quelle.key),
+        ...fehlgeschlageneZiele.filter(
+            (key) => sources.find((quelle) => quelle.key === key)?.unreachable !== true,
+        ),
+    ];
+
     return {
         /** Leer = der eigene Kalender, sonst der Schluessel des Zielsystems. */
         target,
@@ -466,7 +503,7 @@ export function useRemoteTarget({
         writableSources,
         /** Die Arten je Ziel, soweit geholt. Nur mit `preloadKinds` vollstaendig. */
         kindsBySource,
-        /** Die Schluessel der Ziele, die nicht geantwortet haben. */
+        /** Die Schluessel ALLER Ziele, die nicht geantwortet haben — gemeldete und beim Abruf weggebliebene. */
         unreachableSources,
         /** Laeuft das Vorladen der Arten noch? */
         loadingKinds,
