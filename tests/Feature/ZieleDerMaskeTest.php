@@ -62,6 +62,10 @@ it('nennt eine beschreibbare Quelle als Ziel', function () {
         'label' => 'Writable demo system',
         'writable' => true,
         'unreachable' => false,
+        // Seit #9882 fuehrt der Eintrag die Absage als EIGENES Merkmal, statt
+        // sie in `unreachable` mitzumeinen. Eine beschreibbare Quelle ist
+        // weder ausgefallen noch abgelehnt.
+        'not_allowed' => false,
     ]]);
 });
 
@@ -97,6 +101,9 @@ it('MARKIERT ein ausgefallenes Ziel, statt es wegzulassen', function () {
         // (Wiki #595) — und damit schlechter als der Zustand vor der Behebung.
         'writable' => false,
         'unreachable' => true,
+        // Ausgefallen ist NICHT abgelehnt — das ist der ganze Zweck des
+        // zweiten Merkmals (#9882).
+        'not_allowed' => false,
     ]]);
 });
 
@@ -153,6 +160,7 @@ it('zaehlt eine beschreibbare Quelle NICHT als ausgefallen, auch wenn sie es mel
         'label' => 'AI Brain',
         'writable' => true,
         'unreachable' => false,
+        'not_allowed' => false,
     ]]);
 });
 

@@ -611,6 +611,18 @@ export function EventComposer({
         .map((schluessel) => targets.find((ziel) => ziel.key === schluessel)?.label ?? schluessel);
 
     /**
+     * Abgelehnte Ziele — mit Namen, nicht mit Schluessel.
+     *
+     * Zeichengleich zu den ausgefallenen daneben, und das ist Absicht: Die
+     * Namen kommen aus der LOKALEN Beschriftung der Quelle, nie aus der
+     * Antwort des fremden Systems. Die Herkunft setzt der Fragende, nicht der
+     * Befragte (Wiki #595).
+     */
+    const abgelehnteZiele = fremd.notAllowedSources
+        .filter((schluessel) => ! nurEinZiel || schluessel === initialTarget)
+        .map((schluessel) => targets.find((ziel) => ziel.key === schluessel)?.label ?? schluessel);
+
+    /**
      * Gibt es die Stufe „Terminart" ueberhaupt?
      *
      * Drei Gruende, sie zu zeigen, und der dritte ist der wichtige:
@@ -978,6 +990,7 @@ export function EventComposer({
                     value={gewaehlt}
                     onPick={artWaehlen}
                     unreachable={ausgefalleneZiele}
+                    notAllowed={abgelehnteZiele}
                     loading={fremd.loadingKinds}
                     labels={labels}
                 />,

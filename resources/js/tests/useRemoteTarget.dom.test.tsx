@@ -228,6 +228,40 @@ describe('die Arten vorladen', () => {
         expect(gemeldet).toEqual([]);
     });
 
+    it('fuehrt eine ABSAGE getrennt von einem Ausfall (#9882)', async () => {
+        // Am Komm-Layer sind `not_allowed` und `unreachable` zwei der vier
+        // Fehlerarten. Bastian las am 12.11.2026 „Nicht erreichbar: AI Brain
+        // (privat)" ueber ein System, das geantwortet und mit HTTP 401
+        // abgelehnt hatte.
+        const { result } = renderHook(() =>
+            useRemoteTarget({
+                sources: [
+                    { key: 'manager', label: 'Manager', writable: true },
+                    // Genau die Form, die `ziele()` bei einer Absage liefert.
+                    { key: 'brain-privat', label: 'AI Brain', writable: false, not_allowed: true },
+                ],
+            }),
+        );
+
+        expect(result.current.notAllowedSources).toEqual(['brain-privat']);
+
+        // Der eigentliche Befund: NICHT in der Ausfall-Liste. Stuende es dort,
+        // waere die Luege nur umgezogen.
+        expect(result.current.unreachableSources).toEqual([]);
+    });
+
+    it('zaehlt einen Ausfall NICHT als Absage', async () => {
+        // Die Gegenrichtung, ohne die die Zusicherung oben nichts belegt.
+        const { result } = renderHook(() =>
+            useRemoteTarget({
+                sources: [{ key: 'brain-privat', label: 'AI Brain', writable: false, unreachable: true }],
+            }),
+        );
+
+        expect(result.current.unreachableSources).toEqual(['brain-privat']);
+        expect(result.current.notAllowedSources).toEqual([]);
+    });
+
     it('geht beim Auswaehlen nicht ein zweites Mal ins Netz', async () => {
         vi.stubGlobal('fetch', (url: string) => {
             anfragen.push({ url });

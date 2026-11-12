@@ -95,7 +95,28 @@ class EventSourceRegistry
      * Bug #1417 ausdruecklich so gewollt: Behoben wird, dass ein AUSFALL
      * aussieht wie ein Nein, nicht dass ein Nein verschwindet.
      *
-     * @return array<int, array{key: string, label: string, writable: bool, unreachable: bool}>
+     * ## Die Absage ist ein EIGENES Merkmal, nicht ein zweites `unreachable`
+     *
+     * Seit dem 12.11.2026 (Aufgabe #9882) kann eine Quelle auch melden, dass
+     * die Gegenstelle GEANTWORTET und abgelehnt hat ({@see MeldetAbsage}). Das
+     * kommt als `not_allowed: true` heraus und ausdruecklich nicht als
+     * `unreachable: true`.
+     *
+     * Der Grund ist derselbe, aus dem ein ausgefallenes Ziel oben nicht
+     * `writable: true` bekommt: **Ein Anzeiger mit zwei Bedeutungen ist
+     * schlimmer als zwei Anzeiger.** Haette `unreachable` auch die Absage
+     * getragen, waere die Maske genau da, wo Bastian sie am 12.11.2026
+     * gefunden hat — bei „Nicht erreichbar: AI Brain (privat)" ueber ein
+     * erreichbares System. Die Luege waere nur umgezogen, von der
+     * Fehlerbehandlung in den Zieleintrag.
+     *
+     * Der Name ist der des Komm-Layers (`not_allowed`) und nicht eine eigene
+     * Erfindung — dieselbe geschlossene Menge, die `PlannableSearch` im
+     * Frontend schon fuehrt (`not_offered`, `not_allowed`, `unreachable`,
+     * `tool_failed`). Wer hier ein neues Wort einfuehrte, haette zwei
+     * Vokabulare fuer dieselben vier Lagen.
+     *
+     * @return array<int, array{key: string, label: string, writable: bool, unreachable: bool, not_allowed: bool}>
      */
     public function ziele(): array
     {
@@ -112,6 +133,25 @@ class EventSourceRegistry
                     'label' => $source->label(),
                     'writable' => true,
                     'unreachable' => false,
+                    'not_allowed' => false,
+                ];
+
+                continue;
+            }
+
+            // Die Absage ZUERST, und die Reihenfolge ist eine Aussage: Wer
+            // abgelehnt wurde, ist nicht ausgefallen. Eine Quelle, die beides
+            // bejahte, wuerde sonst als Ausfall erscheinen und ihre genauere
+            // Auskunft verlieren. Dass beides nicht zugleich zutreffen kann,
+            // haelt ein Test fest — hier wird es trotzdem nicht
+            // vorausgesetzt, weil den Vertrag fremde Quellen umsetzen duerfen.
+            if ($source instanceof MeldetAbsage && $source->istAbgelehnt()) {
+                $ziele[] = [
+                    'key' => $key,
+                    'label' => $source->label(),
+                    'writable' => false,
+                    'unreachable' => false,
+                    'not_allowed' => true,
                 ];
 
                 continue;
@@ -126,6 +166,7 @@ class EventSourceRegistry
                     'label' => $source->label(),
                     'writable' => false,
                     'unreachable' => true,
+                    'not_allowed' => false,
                 ];
             }
         }

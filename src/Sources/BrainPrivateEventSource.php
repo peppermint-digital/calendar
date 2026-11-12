@@ -49,7 +49,7 @@ use Throwable;
  * und `events()` weist einen fremden `$userId` ausdrücklich ab, damit auch ein
  * Administrator beim Kalender-Umschalten keinen fremden Privatkalender öffnet.
  */
-class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbwesenheit, MeldetAusfall
+class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbwesenheit, MeldetAbsage, MeldetAusfall
 {
     /**
      * Die Wache steckt in der Freigabe-Prüfung, nicht hier.
@@ -154,18 +154,56 @@ class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbw
         // in Bug #1417 geht, nur an einer zweiten Stelle.
         if ($zustand === Freigabezustand::NichtErreichbar) {
             return [
-                'titel' => 'AI Brain antwortet nicht',
-                'text' => 'Deine privaten Termine aus AI Brain werden hier gerade nicht angezeigt, '
+                'titel' => (string) config(
+                    'calendar.brain_private_events.hinweise.nicht_erreichbar.titel',
+                    'AI Brain antwortet nicht',
+                ),
+                'text' => (string) config(
+                    'calendar.brain_private_events.hinweise.nicht_erreichbar.text',
+                    'Deine privaten Termine aus AI Brain werden hier gerade nicht angezeigt, '
                     .'weil AI Brain nicht erreichbar ist. Die übrigen Termine sind vollständig. '
                     .'Versuche es später noch einmal.',
+                ),
+            ];
+        }
+
+        // Die Nabe hat GEANTWORTET und abgelehnt. Eigener Satz, und er ist der
+        // Anlass der ganzen Aenderung (Aufgabe #9882): Vorher stand hier der
+        // Ausfall-Satz, und der behauptet „nicht erreichbar" ueber ein System,
+        // das sehr wohl erreichbar ist.
+        //
+        // Und er schickt die Person ausdruecklich NICHT zur Administration des
+        // eigenen Kontos: Bei 401/403 ist nicht die persoenliche
+        // Freischaltung das Problem, sondern der Zugang dieses PRODUKTS zur
+        // Nabe. Wer hier „lass dich freischalten" sagt, baut dieselbe
+        // Fehlleitung wie der alte Satz, nur eine Tuer weiter.
+        if ($zustand === Freigabezustand::NichtErlaubt) {
+            return [
+                'titel' => (string) config(
+                    'calendar.brain_private_events.hinweise.nicht_erlaubt.titel',
+                    'Zugriff auf AI Brain nicht freigegeben',
+                ),
+                'text' => (string) config(
+                    'calendar.brain_private_events.hinweise.nicht_erlaubt.text',
+                    'Deine privaten Termine aus AI Brain werden hier nicht angezeigt, '
+                    .'weil AI Brain den Zugriff dieser Anwendung abgelehnt hat. Die übrigen '
+                    .'Termine sind vollständig. Das lässt sich nicht an deinem Konto beheben — '
+                    .'bitte melde es, wenn es bleibt.',
+                ),
             ];
         }
 
         return [
-            'titel' => 'AI-Brain-Kalender nicht verbunden',
-            'text' => 'Deine privaten Termine aus AI Brain werden hier nicht angezeigt, '
+            'titel' => (string) config(
+                'calendar.brain_private_events.hinweise.nicht_freigeschaltet.titel',
+                'AI-Brain-Kalender nicht verbunden',
+            ),
+            'text' => (string) config(
+                'calendar.brain_private_events.hinweise.nicht_freigeschaltet.text',
+                'Deine privaten Termine aus AI Brain werden hier nicht angezeigt, '
                 .'weil der Kalender für dein Konto dort nicht freigeschaltet ist. '
                 .'Eine Administratorin oder ein Administrator kann das in AI Brain erledigen.',
+            ),
         ];
     }
 
@@ -194,6 +232,39 @@ class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbw
         }
 
         return $this->freigabe->zustand() === Freigabezustand::NichtErreichbar;
+    }
+
+    /**
+     * Hat die Nabe geantwortet und den Zugang abgelehnt?
+     *
+     * Dieselbe Bauform wie {@see istAusgefallen()} daneben, und dieselben zwei
+     * Vorpruefungen aus demselben Grund: Beide kosten keinen Netzweg, und
+     * keine von beiden ist eine Absage. Ohne die Reihenfolge wuerde in der
+     * Testreihe dieses Pakets — in der die Bruecke nicht installiert ist
+     * (Regel 7) — eine fehlende Bruecke als Absage der Nabe gemeldet.
+     *
+     * Und genau EIN Zustand, nicht „alles, was nicht frei ist": Eine fehlende
+     * Freischaltung ist keine Absage, sondern eine Auskunft, und die soll
+     * verschwinden.
+     *
+     * Die beiden Methoden koennen nie zugleich `true` sein, weil
+     * {@see Freigabezustand} ein Enum ist und `zustand()` genau einen Wert
+     * liefert. Ein Test haelt das fest — nicht weil es hier zweifelhaft waere,
+     * sondern weil der Zieleintrag in {@see EventSourceRegistry::ziele()}
+     * sonst zwei Markierungen zugleich tragen koennte, und das waere wieder
+     * ein Anzeiger mit zwei Bedeutungen.
+     */
+    public function istAbgelehnt(): bool
+    {
+        if (config('calendar.brain_private_events.enabled', true) !== true) {
+            return false;
+        }
+
+        if (! $this->brueckeVorhanden()) {
+            return false;
+        }
+
+        return $this->freigabe->zustand() === Freigabezustand::NichtErlaubt;
     }
 
     /**

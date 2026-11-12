@@ -119,6 +119,75 @@ describe('ein Ziel, das nicht geantwortet hat', () => {
     });
 });
 
+/*
+ * Aufgabe #9882. Bastian las am 12.11.2026 in der Anlege-Maske des Managers:
+ *
+ *   „Nicht erreichbar: AI Brain (privat)."
+ *
+ * Die Nabe war erreichbar. Sie hatte mit HTTP 401 geantwortet und abgelehnt.
+ * Am Komm-Layer sind `unreachable` und `not_allowed` zwei der vier
+ * Fehlerarten, mit zwei verschiedenen naechsten Schritten — und genau diese
+ * Trennung muss bis in den Satz durchkommen, sonst ist sie nur im Code wahr.
+ */
+describe('ein Ziel, das GEANTWORTET und abgelehnt hat', () => {
+    it('sagt „nicht freigegeben" und NICHT „nicht erreichbar"', () => {
+        render(<KindPicker options={AUSWAHL} notAllowed={['AI Brain (privat)']} onPick={vi.fn()} />);
+
+        const hinweis = screen.getByRole('status');
+
+        expect(hinweis.textContent).toContain('Nicht freigegeben');
+        expect(hinweis.textContent).toContain('AI Brain (privat)');
+
+        // Das Entscheidende ist, was NICHT dasteht — das war der Fehler.
+        expect(hinweis.textContent).not.toContain('Nicht erreichbar');
+
+        // Und kein leeres Versprechen: Wiederholen hilft bei einer Absage nicht.
+        expect(hinweis.textContent).not.toContain('noch einmal');
+
+        // Der Rest bleibt waehlbar, wie beim Ausfall.
+        expect(zeilen()).toHaveLength(4);
+    });
+
+    it('fuehrt Absage und Ausfall als ZWEI Zeilen, nicht als eine', () => {
+        // Eine Zeile fuer beide sagt „irgendwas war" und damit nichts.
+        render(
+            <KindPicker
+                options={AUSWAHL}
+                unreachable={['Verwaltung']}
+                notAllowed={['AI Brain (privat)']}
+                onPick={vi.fn()}
+            />,
+        );
+
+        const zeilenHinweis = screen.getAllByRole('status');
+        expect(zeilenHinweis).toHaveLength(2);
+
+        // Und jedes System steht in SEINER Zeile, nicht in beiden.
+        const ausfall = document.querySelector('[data-slot="kind-picker-unreachable"]');
+        const absage = document.querySelector('[data-slot="kind-picker-not-allowed"]');
+
+        expect(ausfall?.textContent).toContain('Verwaltung');
+        expect(ausfall?.textContent).not.toContain('AI Brain');
+        expect(absage?.textContent).toContain('AI Brain (privat)');
+        expect(absage?.textContent).not.toContain('Verwaltung');
+    });
+
+    it('schweigt, wenn niemand abgelehnt hat', () => {
+        // Die Gegenprobe: Ohne sie koennte die Zeile immer dastehen und der
+        // Test oben waere trotzdem gruen.
+        render(<KindPicker options={AUSWAHL} unreachable={['Verwaltung']} onPick={vi.fn()} />);
+
+        expect(document.querySelector('[data-slot="kind-picker-not-allowed"]')).toBeNull();
+        expect(screen.getAllByRole('status')).toHaveLength(1);
+    });
+
+    it('sagt es auch, wenn ueberhaupt keine Art uebrig ist', () => {
+        render(<KindPicker options={[]} notAllowed={['AI Brain (privat)']} onPick={vi.fn()} />);
+
+        expect(screen.getByRole('status').textContent).toContain('Nicht freigegeben');
+    });
+});
+
 describe('solange geladen wird', () => {
     it('sagt, dass noch etwas unterwegs ist', () => {
         render(<KindPicker options={AUSWAHL} loading onPick={vi.fn()} />);
@@ -154,5 +223,18 @@ describe('die Woerter', () => {
 
         expect(screen.getByText('Welche Art?')).toBeTruthy();
         expect(screen.getByRole('status').textContent).toBe('Ohne Antwort: Manager');
+    });
+
+    it('auch den Satz zur Absage — ein Paket, das Saetze ausliefert, liefert eine Sprache aus', () => {
+        render(
+            <KindPicker
+                options={AUSWAHL}
+                notAllowed={['AI Brain']}
+                onPick={vi.fn()}
+                labels={{ notAllowed: 'Kein Zugriff: {systems}' }}
+            />,
+        );
+
+        expect(screen.getByRole('status').textContent).toBe('Kein Zugriff: AI Brain');
     });
 });

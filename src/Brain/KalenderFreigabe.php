@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Peppermint\Calendar\Enums\Freigabezustand;
 use Peppermint\Calendar\Exceptions\BrainBridgeMissing;
+use Peppermint\Calendar\Exceptions\NabeLehntAb;
 use Throwable;
 
 /**
@@ -72,6 +73,7 @@ class KalenderFreigabe
 
     /** Wie lange die Antwort je Person gilt. */
     public const SEKUNDEN = 60;
+
 
     public function __construct(private readonly ?string $guard = null) {}
 
@@ -172,9 +174,27 @@ class KalenderFreigabe
             // Deshalb DARF das gemerkt werden: Sonst klopft jeder
             // Seitenaufruf an eine Tür, die es nicht gibt.
             return Freigabezustand::BrueckeFehlt;
+        } catch (NabeLehntAb) {
+            // Die Nabe hat GEANTWORTET und abgelehnt (HTTP 401/403).
+            //
+            // Dieser Zweig steht VOR dem `Throwable` darunter, und die
+            // Reihenfolge ist die eigentliche Behebung: Bis zum 12.11.2026
+            // gab es ihn nicht, also fiel eine Absage in den Ausfall-Zweig
+            // und die Maske sagte „Nicht erreichbar: AI Brain (privat)" —
+            // ueber ein System, das sehr wohl erreichbar war. Siehe
+            // {@see \Peppermint\Calendar\Enums\Freigabezustand::NichtErlaubt}.
+            return Freigabezustand::NichtErlaubt;
         } catch (Throwable) {
-            // Aussetzer der Nabe. Der eine Fall, der sich melden muss — und
-            // der NICHT gemerkt wird, siehe Klassenkopf.
+            // Aussetzer der Nabe. Meldet sich, und wird NICHT gemerkt, siehe
+            // Klassenkopf.
+            //
+            // Hier landet seit dem 12.11.2026 ausdruecklich AUCH der
+            // `tool_failed`-Fall (die Nabe antwortet, aber mit 5xx oder einem
+            // JSON-RPC-Fehler). Das ist Absicht und kein vergessener Zweig:
+            // Fuer die Person ist es dieselbe Lage wie ein Ausfall — sie kann
+            // nichts tun, es ist ein Fehlzustand, und er darf deshalb genauso
+            // NICHT gemerkt werden. Ein eigener Zustand haette einen eigenen
+            // Satz gebraucht, der nichts anderes sagen koennte.
             return Freigabezustand::NichtErreichbar;
         }
     }
@@ -192,10 +212,97 @@ class KalenderFreigabe
             throw BrainBridgeMissing::forPrivateEvents();
         }
 
+        try {
+            $werkzeuge = $bruecke::brain()->listTools();
+        } catch (Throwable $fehler) {
+            throw $this->uebersetzt($fehler);
+        }
+
         return array_values(array_filter(array_map(
             static fn ($werkzeug) => is_array($werkzeug) ? ($werkzeug['name'] ?? null) : null,
-            $bruecke::brain()->listTools(),
+            $werkzeuge,
         ), 'is_string'));
+    }
+
+    /**
+     * Eine Ausnahme der Bruecke in die Sprache dieses Pakets bringen.
+     *
+     * ## Warum die Pruefung ueber einen NAMEN laeuft und nicht ueber `catch`
+     *
+     * Die Bruecke steht in `suggest`, nicht in `require` (Regel 7). Ein
+     * `catch (McpAufrufGescheitert)` verlangte ein `use` auf eine Klasse, die
+     * in einer eigenstaendigen Installation nicht existiert — und das ist
+     * nicht bloss unsauber, sondern STILL: PHP betritt einen `catch` auf einen
+     * fehlenden Typ einfach nie, und kein Test wird dabei rot. Dieselbe
+     * Begruendung, aus der schon die Fassade oben als Zeichenkette geprueft
+     * wird.
+     *
+     * `is_a()` mit einem Klassennamen als Zeichenkette ist dafuer das richtige
+     * Werkzeug: Es gibt bei einer unbekannten Klasse `false` zurueck, statt zu
+     * werfen. Fehlt die Bruecke, ist die Antwort also „keine Absage" — und das
+     * ist die Wahrheit, denn ohne Bruecke kam man gar nicht bis hierher.
+     *
+     * ## Die Abbildung steht HIER und nicht in der Bruecke
+     *
+     * Die Bruecke traegt die Tatsache (den Status), nicht ihre Deutung. Dass
+     * 401 und 403 fuer eine Oberflaeche dasselbe heissen, ist eine Aussage
+     * ueber DIESE Oberflaeche — sie fragt `istAbsage()` und nicht nach Zahlen,
+     * damit die Grenze zwischen den beiden an einer Stelle liegt und nicht
+     * hier noch einmal.
+     *
+     * Alles andere reist UNVERAENDERT weiter. Das ist Absicht: Ein Ausfall
+     * soll seinen eigenen Typ behalten, damit {@see erfragen()} ihn am
+     * `Throwable` erkennt, und ein Fehler, den wir nicht deuten koennen, soll
+     * nicht als etwas Gedeutetes erscheinen.
+     */
+    private function uebersetzt(Throwable $fehler): Throwable
+    {
+        if (! is_a($fehler, $this->brueckenFehlerKlasse())) {
+            return $fehler;
+        }
+
+        // Nur lesen, wenn die Klasse das Versprechen auch haelt. Eine
+        // Bruecke, die aelter ist als der 12.11.2026, wirft noch die
+        // Oberklasse ohne `istAbsage()` — dann bleibt es ein Ausfall, also der
+        // Stand von vorher. Das ist die vorsichtige Richtung: Eine Absage, die
+        // als Ausfall erscheint, ist der bekannte Fehler; ein Ausfall, der als
+        // Absage erscheint, waere ein neuer.
+        if (! method_exists($fehler, 'istAbsage') || ! $fehler->istAbsage()) {
+            return $fehler;
+        }
+
+        return new NabeLehntAb(
+            is_int($fehler->httpStatus ?? null) ? $fehler->httpStatus : null,
+            $fehler->getMessage(),
+        );
+    }
+
+    /**
+     * Die Ausnahme der Bruecke, die einen HTTP-Status typisiert traegt.
+     *
+     * Als Zeichenkette und nicht als `use`, weil die Bruecke in `suggest`
+     * steht — die vollstaendige Begruendung steht an {@see uebersetzt()}.
+     * `McpAufrufGescheitert` erbt von `AiBrainBridgeException`; beide Namen
+     * stehen hier, damit eine Suche nach einem von ihnen diese Stelle findet.
+     *
+     * Eine ueberschreibbare METHODE und keine Konstante, aus demselben Grund
+     * wie bei {@see \Peppermint\Calendar\Sources\BrainPrivateEventSource::brueckeVorhanden()}:
+     * In der Testreihe dieses Pakets ist die Bruecke nicht installiert, und
+     * ohne eine ueberschreibbare Stelle waere die Uebersetzung nur in ihrer
+     * NEGATIVEN Richtung pruefbar — `is_a()` gegen eine fehlende Klasse ist
+     * immer `false`, der Zweig also nie betreten. Ein Verhalten, das kein
+     * Test je betritt, ist kein gepruefte Verhalten.
+     *
+     * Dass der Prueflings-Ersatz von der echten Klasse abweichen koennte, ist
+     * die bekannte Gefahr dabei. Sie ist hier klein gehalten, weil der Test
+     * nur den NAMEN ersetzt und das Versprechen selbst — `istAbsage()` und
+     * `httpStatus` — in der Bruecke eigene Tests hat (`McpFehlerartTest`).
+     * Und die Leseseite hier haelt sich ausdruecklich zurueck: Ohne
+     * `istAbsage()` bleibt es ein Ausfall, also der Stand von vorher.
+     */
+    protected function brueckenFehlerKlasse(): string
+    {
+        return '\\Peppermint\\AiBrainBridge\\Exceptions\\McpAufrufGescheitert';
     }
 
     /**

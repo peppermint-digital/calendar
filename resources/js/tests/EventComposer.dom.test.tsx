@@ -122,6 +122,53 @@ describe('die Terminart-Stufe', () => {
         await waitFor(() => expect(artenliste()).toContain('Geschäftlich(Manager)'));
     });
 
+    /**
+     * Aufgabe #9882 — der Durchstich fuer die ABSAGE.
+     *
+     * Zeichengleich zum Ausfall-Durchstich darueber, und genau das ist die
+     * Aussage: Dieselbe Kette, ein anderer Satz. Bastian las am 12.11.2026
+     * „Nicht erreichbar: AI Brain (privat)" ueber ein System, das erreichbar
+     * war und mit HTTP 401 abgelehnt hatte.
+     */
+    it('meldet eine ABSAGE mit ihrem eigenen Satz, nicht als Ausfall', async () => {
+        const MIT_ABSAGE: RemoteSource[] = [
+            { key: 'manager', label: 'Manager', writable: true },
+            // Genau die Form, die `ziele()` bei einer Absage der Nabe liefert.
+            { key: 'brain-privat', label: 'AI Brain (privat)', writable: false, not_allowed: true },
+        ];
+
+        render(<EventComposer kinds={EIGENE} targets={MIT_ABSAGE} onSaveHere={vi.fn()} />);
+
+        const hinweis = await screen.findByRole('status');
+
+        expect(hinweis.textContent).toContain('Nicht freigegeben');
+        expect(hinweis.textContent).toContain('AI Brain (privat)');
+
+        // Der Satz, der NICHT mehr dastehen darf — das war Bastians Befund.
+        expect(hinweis.textContent).not.toContain('Nicht erreichbar');
+
+        // Mit NAMEN, nicht mit dem Schluessel (Wiki #595).
+        expect(hinweis.textContent).not.toContain('brain-privat');
+
+        // Und die uebrigen Arten bleiben waehlbar.
+        await waitFor(() => expect(artenliste()).toContain('Geschäftlich(Manager)'));
+    });
+
+    it('macht ein abgelehntes Ziel NICHT waehlbar', async () => {
+        // Dieselbe Begruendung wie beim Ausfall: Waere es waehlbar, scheiterte
+        // das Anlegen erst beim Speichern.
+        const MIT_ABSAGE: RemoteSource[] = [
+            { key: 'manager', label: 'Manager', writable: true },
+            { key: 'brain-privat', label: 'AI Brain (privat)', writable: false, not_allowed: true },
+        ];
+
+        render(<EventComposer kinds={EIGENE} targets={MIT_ABSAGE} onSaveHere={vi.fn()} />);
+
+        await waitFor(() => expect(artenliste()).toHaveLength(3));
+
+        expect(artenliste().some((zeile) => zeile.includes('AI Brain'))).toBe(false);
+    });
+
     it('macht ein ausgefallenes Ziel NICHT waehlbar', async () => {
         // Die zweite Haelfte, und die wichtigere: Waere es waehlbar, scheiterte
         // das Anlegen erst beim Speichern — schlechter als der Zustand vor der

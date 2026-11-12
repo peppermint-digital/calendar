@@ -33,6 +33,8 @@ export type KindPickerLabels = {
     loading: string;
     /** Welche Systeme nicht geantwortet haben. `{systems}` wird ersetzt. */
     unreachable: string;
+    /** Welche Systeme den Zugriff ABGELEHNT haben. `{systems}` wird ersetzt. */
+    notAllowed: string;
     /** Wenn es nichts zu waehlen gibt. */
     empty: string;
 };
@@ -42,6 +44,22 @@ export const defaultKindPickerLabels: KindPickerLabels = {
     loading: 'Weitere Terminarten werden geladen …',
     unreachable:
         'Nicht erreichbar: {systems}. Die Terminarten dieser Systeme fehlen in der Liste — ' +
+        'die übrigen sind vollständig.',
+    /*
+     * Der Satz, um den es in Aufgabe #9882 geht. Drei Dinge daran sind
+     * Absicht:
+     *
+     * 1. „Nicht freigegeben" und nicht „nicht erreichbar" — das System hat
+     *    geantwortet. Bastian las am 12.11.2026 den falschen Satz.
+     * 2. Kein „Versuche es später noch einmal". Wiederholen hilft bei einer
+     *    Absage nicht, und ein leeres Versprechen kostet eine zweite
+     *    Wartezeit und sagt danach dasselbe.
+     * 3. Derselbe zweite Halbsatz wie oben („die übrigen sind vollständig").
+     *    Er ist die eigentliche Auskunft: Was fehlt, ist benannt, und was
+     *    dasteht, ist verlässlich.
+     */
+    notAllowed:
+        'Nicht freigegeben: {systems}. Die Terminarten dieser Systeme fehlen in der Liste — ' +
         'die übrigen sind vollständig.',
     empty: 'Hier lässt sich gerade keine Terminart anlegen.',
 };
@@ -63,6 +81,15 @@ export type KindPickerProps = {
      * Schluessel.
      */
     unreachable?: string[];
+    /**
+     * Systeme, die GEANTWORTET und den Zugriff abgelehnt haben — mit ihrem
+     * Namen, nicht ihrem Schluessel.
+     *
+     * Eigener Prop und nicht Teil von {@link unreachable}, weil es eine
+     * eigene Aussage ist. Dieselbe Begruendung, aus der `writable` und
+     * `unreachable` am Zieleintrag getrennt sind.
+     */
+    notAllowed?: string[];
     /** Laufen noch Abfragen? */
     loading?: boolean;
     labels?: Partial<KindPickerLabels>;
@@ -116,6 +143,7 @@ export function KindPicker({
     value,
     onPick,
     unreachable = [],
+    notAllowed = [],
     loading = false,
     labels,
     className = '',
@@ -178,8 +206,22 @@ export function KindPicker({
                 erscheint, sieht aus wie eine Auskunft.
             */}
             {unreachable.length > 0 && (
-                <p role="status" className="text-xs text-muted-foreground">
+                <p role="status" data-slot="kind-picker-unreachable" className="text-xs text-muted-foreground">
                     {beschriftung.unreachable.replace('{systems}', unreachable.join(', '))}
+                </p>
+            )}
+
+            {/*
+                Und die Absage als EIGENE Zeile, nicht als zweiter Eintrag in
+                der Liste oben. „Hat nicht geantwortet" und „hat abgelehnt"
+                sind zwei Aussagen mit zwei verschiedenen naechsten Schritten
+                — eine Zeile fuer beide sagt „irgendwas war" und damit nichts.
+                Dasselbe Argument, mit dem `PlannableSearch` seine vier
+                Gruende auf vier Saetze abbildet statt auf einen.
+            */}
+            {notAllowed.length > 0 && (
+                <p role="status" data-slot="kind-picker-not-allowed" className="text-xs text-muted-foreground">
+                    {beschriftung.notAllowed.replace('{systems}', notAllowed.join(', '))}
                 </p>
             )}
         </div>

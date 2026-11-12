@@ -36,6 +36,27 @@ export interface RemoteSource {
      * Gesetzt vom Paket, nicht vom Produkt: `EventSourceRegistry::ziele()`.
      */
     unreachable?: boolean;
+    /**
+     * Das System hat GEANTWORTET und den Zugriff abgelehnt.
+     *
+     * Getrennt von `unreachable` gefuehrt, und das ist der ganze Zweck
+     * (Aufgabe #9882): Am Komm-Layer sind `not_allowed` und `unreachable`
+     * zwei der vier Fehlerarten, mit zwei verschiedenen naechsten Schritten.
+     * Ein Ausfall geht vorueber, eine Absage behebt ein Mensch.
+     *
+     * Bastian las am 12.11.2026 „Nicht erreichbar: AI Brain (privat)" ueber
+     * ein System, das erreichbar war und mit HTTP 401 abgelehnt hatte. Wer
+     * die Absage in `unreachable` mitmeinte, haette dieselbe Luege nur
+     * umgezogen — ein Anzeiger mit zwei Bedeutungen ist schlimmer als zwei
+     * Anzeiger.
+     *
+     * Der Name ist der des Komm-Layers und bleibt in seiner Schreibweise:
+     * Das Produkt reicht die Ernte durch und uebersetzt nichts — dieselbe
+     * Begruendung wie bei `may_retry` in {@link PlannableFailure}.
+     *
+     * Gesetzt vom Paket, nicht vom Produkt: `EventSourceRegistry::ziele()`.
+     */
+    not_allowed?: boolean;
 }
 
 /** Eine Terminart des ZIELSYSTEMS. Was sie bedeutet, weiss nur das Zielsystem. */
@@ -486,6 +507,25 @@ export function useRemoteTarget({
         ),
     ];
 
+    /**
+     * Die Ziele, die GEANTWORTET und abgelehnt haben.
+     *
+     * Eine eigene Liste und nicht Teil von {@link unreachableSources} — siehe
+     * `not_allowed` am {@link RemoteSource}. Fuer den Menschen davor sind es
+     * zwei verschiedene Saetze: „niemand hat geantwortet" laedt zum
+     * Wiederholen ein, „der Zugriff wurde abgelehnt" nicht.
+     *
+     * Nur der GEMELDETE Weg, anders als oben: Ein abgelehntes Ziel ist nicht
+     * `writable` und wird deshalb nie vorgeladen — es kann also gar nicht aus
+     * einem fehlgeschlagenen Artenabruf kommen. Ein Ausfall BEIM Abruf heisst
+     * „hat nicht geantwortet" und gehoert nach oben; ihn hier
+     * hereinzurechnen waere eine Behauptung ueber einen Grund, den wir nicht
+     * kennen.
+     */
+    const notAllowedSources = sources
+        .filter((quelle) => quelle.not_allowed === true)
+        .map((quelle) => quelle.key);
+
     return {
         /** Leer = der eigene Kalender, sonst der Schluessel des Zielsystems. */
         target,
@@ -505,6 +545,8 @@ export function useRemoteTarget({
         kindsBySource,
         /** Die Schluessel ALLER Ziele, die nicht geantwortet haben — gemeldete und beim Abruf weggebliebene. */
         unreachableSources,
+        /** Die Schluessel der Ziele, die geantwortet und den Zugriff ABGELEHNT haben. */
+        notAllowedSources,
         /** Laeuft das Vorladen der Arten noch? */
         loadingKinds,
     };
