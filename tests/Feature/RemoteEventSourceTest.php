@@ -236,6 +236,40 @@ it('bestaetigt das Loeschen ausdruecklich', function () {
     ]);
 });
 
+it('haelt einen Probelauf nicht fuer ein Loeschen', function () {
+    // Der gefaehrlichste Zustand dieser Antwort: Er sieht aus wie Erfolg.
+    // `ok` ist true, `durchgefallen()` laesst ihn durch, kein Fehler entsteht
+    // — und die Oberflaeche hat die Zeile schon entfernt. Ein Termin, von dem
+    // jemand glaubt, er sei geloescht, und der drueben weiter steht, ist
+    // genau die Haelfte des Vertrags, die `delete()` zusichert (Bug #1432).
+    $this->fremd->antworten['calendar.events.delete'] = RemoteResult::ok(['status' => 'confirmation_required']);
+
+    expect(fn () => $this->quelle->delete(7, '4711'))
+        ->toThrow(ExternalSourceFailed::class, 'Probelauf');
+});
+
+it('laesst ein wirkliches Loeschen durch', function () {
+    // Die Gegenprobe: Ohne sie koennte die Pruefung oben auch jedes Loeschen
+    // abweisen, und der Test waere trotzdem gruen.
+    $this->fremd->antworten['calendar.events.delete'] = RemoteResult::ok(['status' => 'deleted']);
+
+    $this->quelle->delete(7, '4711');
+
+    expect($this->fremd->letzterAufruf('calendar.events.delete')['confirm'])->toBeTrue();
+});
+
+it('laesst eine Antwort ohne status durch', function () {
+    // Ein Erfueller, der gar kein `status` fuehrt, hat damit nichts gesagt —
+    // und „nichts gesagt" ist kein Probelauf. Wer das als Fehlschlag liest,
+    // bricht jeden Erfueller, der die Nutzlast leer laesst, obwohl `ok` und
+    // der Vorgang selbst in Ordnung sind.
+    $this->fremd->antworten['calendar.events.delete'] = RemoteResult::ok();
+
+    $this->quelle->delete(7, '4711');
+
+    expect($this->fremd->letzterAufruf('calendar.events.delete')['confirm'])->toBeTrue();
+});
+
 it('ist nicht beschreibbar, wenn eine der drei Faehigkeiten fehlt', function () {
     // Drei und nicht eine: Ein System, das nur anlegen laesst, waere
     // beschreibbar fuer einen Knopf und nicht fuer die anderen zwei.

@@ -379,6 +379,26 @@ class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbw
         return $this->ausAntwort($geaendert, 'verschieben', $zone);
     }
 
+    /**
+     * Loescht den Termin in der Nabe.
+     *
+     * `confirm => true` geht mit, damit ein loeschendes Werkzeug den Aufruf
+     * nicht als Vorschau behandelt und Erfolg meldet, ohne etwas zu tun —
+     * dieselbe Vorkehrung wie bei {@see RemoteEventSource::delete()}.
+     *
+     * ## Hier steht KEINE Pruefung auf `status`, und das ist Absicht
+     *
+     * Der `status`-Vertrag aus Bug #1432 gilt fuer `calendar.events.delete`
+     * der drei Produkte — er ist dort definiert, weil er dort am 12.11.2026
+     * in allen drei gleich gemacht wurde. Dieser Weg geht nicht dorthin,
+     * sondern an `delete-calendar-tool` der Nabe, und dessen Antwortform ist
+     * nicht gemessen.
+     *
+     * Eine Pruefung auf einen Schluessel, von dem man nicht weiss, ob ihn
+     * jemand setzt, ist schlimmer als keine: Sie sieht wie eine Zusicherung
+     * aus und kann nie greifen. Wer sie hier haben will, messe zuerst, was
+     * `delete-calendar-tool` zurueckgibt.
+     */
     public function delete(int $userId, string $eventId): void
     {
         $this->schreib('loeschen', 'delete-calendar-tool', [

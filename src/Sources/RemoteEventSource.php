@@ -276,6 +276,54 @@ class RemoteEventSource extends WritableEventSource
             );
     }
 
+    /**
+     * Loescht drueben — und prueft, dass wirklich geloescht wurde.
+     *
+     * ## `confirm` ist Teil des Vertrags, nicht eine Eigenart eines Produkts
+     *
+     * Gemessen am 11.11.2026 (Bug #1432) hiess dieselbe Angabe in drei
+     * Produkten drei verschiedene Dinge: Der Manager verlangte sie und machte
+     * ohne sie einen Probelauf, Verwaltung und CRM ignorierten sie und
+     * loeschten sofort. Seit dem 12.11.2026 verlangen alle drei sie, mit
+     * EINER Bedeutung — der Schutz haengt damit nicht mehr am Zielsystem.
+     *
+     * Das ist der Grund, warum diese Methode `confirm` mitgeben darf, ohne zu
+     * wissen, wer antwortet: Sie nennt eine FAEHIGKEIT, und die Bedeutung
+     * eines Arguments darf nicht am Erfueller haengen.
+     *
+     * ## Der Vertrag, soweit er hier gilt
+     *
+     * Ein Werkzeug, das `calendar.events.delete` erfuellt, antwortet mit einer
+     * Nutzlast, die `status` fuehrt:
+     *
+     * | `status`                 | Bedeutung                                |
+     * |--------------------------|------------------------------------------|
+     * | `deleted`                | geloescht                                |
+     * | `confirmation_required`  | PROBELAUF, es wurde NICHTS geloescht     |
+     *
+     * `status` steht ausdruecklich in der NUTZLAST und nicht nur im
+     * `structuredContent`: `RemoteResult` liest `data`, und was nur im
+     * `structuredContent` steht, erreicht diesen Aufrufer nicht.
+     *
+     * Dieser Vertrag gilt fuer den LOESCHWEG. Er ist keine allgemeine Regel
+     * fuer andere Vorgaenge — die Antwortform am Komm-Layer ist nicht
+     * entschieden (AI Brain #1424), und dort gibt es keinen einheitlichen
+     * inneren Erfolgsanzeiger.
+     *
+     * ## Warum der Probelauf trotz `confirm => true` geprueft wird
+     *
+     * Weil er der gefaehrlichste Zustand ist, den diese Antwort haben kann:
+     * Er sieht aus wie Erfolg. `ok` ist `true`, `durchgefallen()` laesst ihn
+     * durch, kein Fehler entsteht — und die Oberflaeche hat die Zeile schon
+     * entfernt. Ein Termin, von dem jemand glaubt, er sei geloescht, und der
+     * drueben weiter steht, ist genau die Haelfte des Vertrags, die
+     * `WritableEventSource::delete()` zusichert.
+     *
+     * Heute soll das nie eintreten, denn `confirm => true` geht mit. Die
+     * Pruefung ist fuer den Tag, an dem ein Erfueller das Argument anders
+     * nennt oder vergisst — dann wird daraus eine Fehlermeldung und keine
+     * falsche Zusage.
+     */
     public function delete(int $userId, string $eventId): void
     {
         $this->person($userId, 'loeschen');
@@ -288,6 +336,15 @@ class RemoteEventSource extends WritableEventSource
         ]);
 
         $this->durchgefallen($ergebnis, 'loeschen');
+
+        if (($ergebnis->data['status'] ?? null) === 'confirmation_required') {
+            throw new ExternalSourceFailed(
+                $this->label().' hat nur einen Probelauf gemacht und nichts geloescht — '
+                .'die Bestaetigung ist nicht angekommen.',
+                $this->key(),
+                'loeschen',
+            );
+        }
     }
 
     /**
