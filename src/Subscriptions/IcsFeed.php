@@ -63,10 +63,52 @@ use Throwable;
  * den Komm-Layer, und zwar nicht aus Bequemlichkeit, sondern weil es dort
  * keinen Weg zu ihr gibt.
  *
- * Dieselbe Entscheidung, aus demselben Grund, an zwei weiteren Stellen:
- * `peppermint/mailbox` `src/Jmap/JmapClient.php` (ein Mailserver) und
- * `peppermint/notifications` `src/Push/PushKeys.php` (Push-Schluessel).
- * Gemessen und festgehalten am 12.11.2026, Aufgabe #9882.
+ * ## Dass die NABE kein Gateway-Ziel ist, steht woertlich im Postfach-Paket
+ *
+ * Und zwar besser, als es hier noch einmal stuende — deshalb der Verweis statt
+ * einer zweiten Fassung. `peppermint/mailbox`
+ * `src/MailboxServiceProvider.php`, Methode `mitteRufen()`, Abschnitt
+ * „`call()` und ausdruecklich NICHT der Gateway":
+ *
+ * > „Der Gateway leitet an ein angebundenes PRODUKT weiter. AI Brain ist
+ * > keines — es ist die Nabe und steht in keinem Faehigkeits-Register.
+ * > `gateway(..., 'ai-brain')` haette also nie ein Ziel gefunden, und der
+ * > Ausfall waere als ‚Mitte nicht erreichbar' durchgegangen: Jede
+ * > Zustaendigkeit haette gefehlt, ohne dass etwas bricht."
+ *
+ * Umgesetzt wird es in `peppermint/mailbox`
+ * `src/Werkzeuge/BridgeWerkzeugquelle.php` als Verzweigung: Nabe → `call()`,
+ * Produkt → `gateway()`. Die Pakete `inbox` und `notifications` machen es
+ * gleich.
+ *
+ * **Warum das HIER steht, obwohl es die Aussenwelt betrifft:** Weil es die
+ * zweite Haelfte derselben Frage ist. „Nicht ueber den Gateway" hat zwei
+ * verschiedene Gruende — die Gegenstelle ist draussen (hier), oder sie ist die
+ * Mitte selbst (dort). Wer nur den einen kennt, stellt beim naechsten Mal den
+ * anderen falsch um. Gemessen am 12.11.2026: Von den drei Stellen, die ein
+ * Auftrag als „Aussenwelt" fuehrte, waren ZWEI in Wahrheit die Nabe.
+ *
+ * ## Die drei Schwesterstellen — und KEINE zwei davon aus demselben Grund
+ *
+ * Das ist der Teil, den man leicht falsch zusammenfasst. Jede der drei
+ * umgeht den Komm-Layer, und jede aus einem ANDEREN Grund. Eine gemeinsame
+ * Regel waere an zwei von drei Stellen falsch:
+ *
+ * | Stelle | Gegenstelle | warum nicht ueber den Komm-Layer | Prueffrage |
+ * |---|---|---|---|
+ * | **hier** | fremder ICS-Anbieter | Aussenwelt, steht in keinem Register | steht sie in der `capability_map`? |
+ * | `mailbox` `src/Jmap/JmapClient.php` | fremder Mailserver | dasselbe | dieselbe |
+ * | `mailbox` `src/Schreiben/BrueckenDiktat.php` | **die NABE** (`/api/v1/transcribe`) | eine Audiodatei reist als `multipart`; MCP nimmt JSON | traegt der Vorgang eine DATEI? |
+ * | `notifications` `src/Push/PushKeys.php` | **die NABE** (`push.hub_url`) | der Schluessel wird gebraucht, BEVOR eine Anmeldung steht | braucht man den Wert vor der Anmeldung? |
+ *
+ * Nur die ersten zwei sind die Aussenwelt. Die anderen zwei reden mit der
+ * Mitte und bleiben trotzdem draussen — begruendete Ausnahmen von Regel 2,
+ * keine Reste.
+ *
+ * Gemessen und festgehalten am 12.11.2026, Aufgabe #9882. Ein Auftrag fuehrte
+ * alle vier als „Aussenwelt"; bei zwei war das falsch. Der Fehler dahinter ist
+ * uebertragbar und lohnt die Zeile: **aus der FORM (ein direkter Aufruf) wurde
+ * auf den GEGENSTAND (ein Fremddienst) geschlossen.**
  */
 class IcsFeed
 {
