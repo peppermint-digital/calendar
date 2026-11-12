@@ -31,6 +31,42 @@ use Throwable;
  * Klasse LAUT ab, statt eine leere Liste zu liefern — eine leere Liste saehe
  * aus wie „der Feed hat keine Termine", und der Abgleich wuerde daraufhin alles
  * wegraeumen.
+ *
+ * ## Das `Http::` hier ist RICHTIG und bleibt — es ist die Aussenwelt
+ *
+ * Wer den Komm-Layer aufraeumt, kommt an dieser Zeile vorbei und sieht einen
+ * direkten Netzaufruf, also scheinbar einen Rest aus der Zeit vor dem
+ * Verbund. Der Satz steht deshalb hier und nicht nur im Wiki: Der Leser kommt
+ * am Code vorbei, nicht am Artikel.
+ *
+ * **Die Grenze ist nicht „direkter Aufruf gegen Vorgang", sondern WER am
+ * anderen Ende sitzt:**
+ *
+ * | Gegenstelle | Weg |
+ * |---|---|
+ * | ein anderes Peppermint-PRODUKT | `AiBrain::gateway('<vorgang>', …, $slug)` |
+ * | die NABE selbst (AI Brain) | `AiBrain::call('<werkzeug>')` — der Nabe-Zweig |
+ * | **die Aussenwelt** (hier) | **direkt, wie hier** |
+ *
+ * Diese Klasse holt den ICS-Feed eines FREMDEN Anbieters — Google, Outlook,
+ * ein Vereinskalender. Der Komm-Layer ist der Weg zwischen UNSEREN Systemen
+ * (Produkt-Vertrag, Regel 2). Google steht in keinem Faehigkeits-Register,
+ * kennt keinen Vorgangsnamen und hat keine Freigabe in
+ * `comm_layer.gateway_grants`. Ein Umbau haette hier kein Ziel: Der Gateway
+ * loest jedes Ziel ueber ein `ConnectedProduct` mit `mcp_url` auf, und ein
+ * fremder Anbieter ist keines. Der Aufruf fiele mit `not_offered` aus — und
+ * ein Abo, das deshalb leer zurueckkommt, laesst den Abgleich den ganzen
+ * Kalender wegraeumen (siehe `holen()`).
+ *
+ * **Die Prueffrage, wenn der naechste hier steht:** Steht die Gegenstelle in
+ * `config('ai-brain.comm_layer.capability_map')`? Nein → sie gehoert nicht in
+ * den Komm-Layer, und zwar nicht aus Bequemlichkeit, sondern weil es dort
+ * keinen Weg zu ihr gibt.
+ *
+ * Dieselbe Entscheidung, aus demselben Grund, an zwei weiteren Stellen:
+ * `peppermint/mailbox` `src/Jmap/JmapClient.php` (ein Mailserver) und
+ * `peppermint/notifications` `src/Push/PushKeys.php` (Push-Schluessel).
+ * Gemessen und festgehalten am 12.11.2026, Aufgabe #9882.
  */
 class IcsFeed
 {
