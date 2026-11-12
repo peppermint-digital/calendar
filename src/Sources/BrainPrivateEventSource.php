@@ -5,6 +5,7 @@ namespace Peppermint\Calendar\Sources;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Peppermint\Calendar\Brain\KalenderFreigabe;
+use Peppermint\Calendar\Enums\Freigabezustand;
 use Peppermint\Calendar\Exceptions\BrainBridgeMissing;
 use Peppermint\Calendar\Exceptions\ExternalSourceFailed;
 use Throwable;
@@ -48,7 +49,7 @@ use Throwable;
  * und `events()` weist einen fremden `$userId` ausdrücklich ab, damit auch ein
  * Administrator beim Kalender-Umschalten keinen fremden Privatkalender öffnet.
  */
-class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbwesenheit
+class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbwesenheit, MeldetAusfall
 {
     /**
      * Die Wache steckt in der Freigabe-Prüfung, nicht hier.
@@ -139,8 +140,25 @@ class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbw
             return null;
         }
 
-        if ($this->freigabe->fuerAngemeldetePerson()) {
+        $zustand = $this->freigabe->zustand();
+
+        if ($zustand->istFrei()) {
             return null;
+        }
+
+        // Bis zum 12.11.2026 stand hier nur der Satz unten, fuer JEDES `false`
+        // — auch fuer eine nicht erreichbare Nabe. Dann behauptete der Hinweis
+        // „nicht freigeschaltet", obwohl die Freischaltung gar nicht erfragt
+        // werden konnte, und schickte die Person zu einer Administratorin, die
+        // nichts zu tun hat. Das ist dieselbe Luege ueber den Grund, um die es
+        // in Bug #1417 geht, nur an einer zweiten Stelle.
+        if ($zustand === Freigabezustand::NichtErreichbar) {
+            return [
+                'titel' => 'AI Brain antwortet nicht',
+                'text' => 'Deine privaten Termine aus AI Brain werden hier gerade nicht angezeigt, '
+                    .'weil AI Brain nicht erreichbar ist. Die übrigen Termine sind vollständig. '
+                    .'Versuche es später noch einmal.',
+            ];
         }
 
         return [
@@ -149,6 +167,33 @@ class BrainPrivateEventSource extends WritableEventSource implements ErklaertAbw
                 .'weil der Kalender für dein Konto dort nicht freigeschaltet ist. '
                 .'Eine Administratorin oder ein Administrator kann das in AI Brain erledigen.',
         ];
+    }
+
+    /**
+     * Hat die Nabe auf die Frage nach der Freigabe nicht geantwortet?
+     *
+     * Nur dieser EINE Zustand, und bewusst nicht „alles, was nicht frei ist":
+     * Eine Person ohne Freischaltung ist keine unerreichbare Nabe, und eine
+     * fehlende Bruecke auch nicht. Wer das zusammenfasst, meldet einen Ausfall,
+     * wo eine Auskunft vorliegt — genau verkehrt zu Bug #1417.
+     *
+     * Vom Produkt abgeschaltet und Bruecke fehlt werden zuerst geprueft: Beides
+     * kostet keinen Netzweg, und beides ist kein Ausfall. Ohne diese
+     * Reihenfolge wuerde in der Testreihe dieses Pakets — in der die Bruecke
+     * nicht installiert ist (Regel 7) — jede fehlende Bruecke als Ausfall der
+     * Nabe gemeldet.
+     */
+    public function istAusgefallen(): bool
+    {
+        if (config('calendar.brain_private_events.enabled', true) !== true) {
+            return false;
+        }
+
+        if (! $this->brueckeVorhanden()) {
+            return false;
+        }
+
+        return $this->freigabe->zustand() === Freigabezustand::NichtErreichbar;
     }
 
     /**

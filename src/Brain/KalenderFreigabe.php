@@ -4,6 +4,7 @@ namespace Peppermint\Calendar\Brain;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Peppermint\Calendar\Enums\Freigabezustand;
 use Peppermint\Calendar\Exceptions\BrainBridgeMissing;
 use Throwable;
 
@@ -74,7 +75,57 @@ class KalenderFreigabe
 
     public function __construct(private readonly ?string $guard = null) {}
 
+    /**
+     * Der Riegel: Darf diese Person hier gerade?
+     *
+     * Bleibt ein `bool`, weil ein Riegel nur zwei Antworten braucht. Wer den
+     * GRUND braucht — eine Oberflaeche, die einen Ausfall melden soll —, fragt
+     * {@see zustand()}.
+     */
     public function fuerAngemeldetePerson(): bool
+    {
+        return $this->zustand()->istFrei();
+    }
+
+    /**
+     * Warum ist die Quelle da oder nicht da?
+     *
+     * ## Warum es diese Methode gibt
+     *
+     * Hier gab es bis zum 12.11.2026 nur `fuerAngemeldetePerson(): bool`, und
+     * vier verschiedene Lagen endeten in demselben `false`. Fuer den Riegel
+     * genuegte das; fuer die Maske nicht, und daran hing Bug #1417: Der
+     * private Kalender der Nabe verschwand LAUTLOS aus der Anlege-Maske, wenn
+     * die Nabe nicht erreichbar war — ununterscheidbar von „diese Person hat
+     * ihren Kalender nicht freigeschaltet".
+     *
+     * Die Unterscheidung war an dieser Stelle VORHANDEN und wurde weggeworfen:
+     * Der `Throwable` wurde abgefangen und gab dasselbe `false` wie eine
+     * fehlende Freigabe. Weggeworfene Information wiederzubeschaffen ist
+     * unmoeglich — deshalb steht die Behebung hier und nicht weiter oben.
+     *
+     * ## Der Zwischenspeicher merkt den Ausfall NICHT
+     *
+     * Das war vorher so und bleibt so, und es ist der Grund, warum der
+     * Ausfall-Fall ueberhaupt gesondert gefuehrt wird: Ein einmaliger
+     * Aussetzer darf nicht fuer die Dauer eines Caches zur Dauerantwort
+     * werden. Die Quelle bliebe sonst noch eine Minute verborgen, obwohl sie
+     * wieder da ist. Welche Antwort gemerkt werden darf, entscheidet der
+     * Zustand selbst ({@see Freigabezustand::merkbar()}) und nicht ein
+     * `if` an jeder Rueckgabestelle.
+     *
+     * ## Gelesen wird STRENG
+     *
+     * Im Speicher steht jetzt der Name des Zustands und nicht mehr ein Bool.
+     * Gelesen wird er ueber `tryFrom()`, und was dabei nicht aufgeht, gilt als
+     * NICHT gemerkt — dann wird neu gefragt. Der lose Weg waere
+     * `(bool) $gemerkt`, und der liest ausgerechnet
+     * `'nicht_freigeschaltet'` als `true`: Ein Wert aus einem aelteren Stand
+     * im noch warmen Speicher wuerde die Quelle fuer jeden oeffnen. Dieselbe
+     * Falle, vor der {@see \Peppermint\Calendar\Sources\RemoteResult} warnt.
+     * Der Preis ist ein Netzweg, hoechstens einmal je Minute und Person.
+     */
+    public function zustand(): Freigabezustand
     {
         $person = $this->personId();
 
@@ -82,34 +133,50 @@ class KalenderFreigabe
         // Hintergrundlauf soll diese Quelle nicht im Namen irgendwessen
         // öffnen — und die Nabe wiese den Vorgang ohnehin ab.
         if ($person === null) {
-            return false;
+            return Freigabezustand::KeinePerson;
         }
 
         $schluessel = 'calendar.brain_freigabe:'.$person;
-        $gemerkt = Cache::get($schluessel);
+        $gemerkt = Freigabezustand::tryFrom((string) Cache::get($schluessel));
 
         if ($gemerkt !== null) {
-            return (bool) $gemerkt;
+            return $gemerkt;
         }
 
+        $zustand = $this->erfragen();
+
+        if ($zustand->merkbar()) {
+            Cache::put($schluessel, $zustand->value, self::SEKUNDEN);
+        }
+
+        return $zustand;
+    }
+
+    /**
+     * Die Nabe wirklich fragen — ohne Speicher, ohne Riegel.
+     *
+     * Getrennt von {@see zustand()}, damit der Speicher an EINER Stelle
+     * entschieden wird. Vorher stand neben jedem `return` ein eigenes
+     * `Cache::put` oder keines, und ob eines fehlte, war nur durch Zaehlen zu
+     * sehen.
+     */
+    private function erfragen(): Freigabezustand
+    {
         try {
-            $frei = in_array(self::WERKZEUG, $this->werkzeugnamen(), true);
-        } catch (BrainBridgeMissing $fehlt) {
+            return in_array(self::WERKZEUG, $this->werkzeugnamen(), true)
+                ? Freigabezustand::Frei
+                : Freigabezustand::NichtFreigeschaltet;
+        } catch (BrainBridgeMissing) {
             // Die Brücke fehlt im Produkt. Das ist keine Frage der Person und
             // auch kein Aussetzer — es bleibt so, bis jemand sie installiert.
-            // Deshalb WIRD das gemerkt: Sonst klopft jeder Seitenaufruf an
-            // eine Tür, die es nicht gibt.
-            Cache::put($schluessel, false, self::SEKUNDEN);
-
-            return false;
+            // Deshalb DARF das gemerkt werden: Sonst klopft jeder
+            // Seitenaufruf an eine Tür, die es nicht gibt.
+            return Freigabezustand::BrueckeFehlt;
         } catch (Throwable) {
-            // Aussetzer der Nabe — nicht merken, siehe Klassenkopf.
-            return false;
+            // Aussetzer der Nabe. Der eine Fall, der sich melden muss — und
+            // der NICHT gemerkt wird, siehe Klassenkopf.
+            return Freigabezustand::NichtErreichbar;
         }
-
-        Cache::put($schluessel, $frei, self::SEKUNDEN);
-
-        return $frei;
     }
 
     /**

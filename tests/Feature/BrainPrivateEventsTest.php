@@ -5,7 +5,9 @@ use Illuminate\Support\Facades\Cache;
 use Peppermint\Calendar\Brain\KalenderFreigabe;
 use Peppermint\Calendar\Exceptions\BrainBridgeMissing;
 use Peppermint\Calendar\Sources\BrainPrivateEventSource;
+use Peppermint\Calendar\Enums\Freigabezustand;
 use Peppermint\Calendar\Sources\ErklaertAbwesenheit;
+use Peppermint\Calendar\Sources\MeldetAusfall;
 
 /**
  * Die privaten Termine aus der Nabe — angeboten nur, wer sie freigeschaltet hat.
@@ -153,6 +155,131 @@ it('merkt eine fehlende Bruecke sehr wohl — die kommt nicht von selbst zurueck
     expect($quelle->isAvailable())->toBeFalse()
         ->and($quelle->isAvailable())->toBeFalse()
         ->and($freigabe->abrufe)->toBe(1, 'Eine fehlende Bruecke wird gemerkt.');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Bug #1417: „nicht freigeschaltet" und „nicht erreichbar" sind zwei Dinge
+|--------------------------------------------------------------------------
+|
+| `fuerAngemeldetePerson()` beantwortete VIER Lagen mit demselben `false`.
+| Fuer den Riegel genuegte das; fuer die Maske nicht — der private Kalender
+| der Nabe verschwand lautlos, wenn die Nabe nicht erreichbar war.
+|
+| Die Unterscheidung war an der Stelle VORHANDEN und wurde weggeworfen: Der
+| `Throwable` gab dasselbe `false` wie eine fehlende Freigabe.
+*/
+
+it('unterscheidet eine fehlende Freischaltung von einem Ausfall der Nabe', function () {
+    // Beide Haelften, denn genau ihre Gleichheit war der Fehler.
+    $nichtFrei = freigabeMitWerkzeugen(['list-tasks-tool']);
+
+    expect($nichtFrei->zustand())->toBe(Freigabezustand::NichtFreigeschaltet);
+
+    // Geleert, und das ist nicht Hygiene, sondern der Gegenstand: Der
+    // Speicherschluessel haengt an der PERSON, und beide Doppel dieser Suite
+    // geben dieselbe Person aus. Ohne das Leeren laese die zweite Haelfte die
+    // gemerkte Antwort der ersten — und der Test waere gruen, ohne den
+    // Ausfall-Weg je betreten zu haben.
+    Cache::flush();
+
+    $ausgefallen = freigabeMitWerkzeugen([], new RuntimeException('Nabe weg'));
+
+    expect($ausgefallen->zustand())->toBe(Freigabezustand::NichtErreichbar);
+
+    // Und der Riegel sagt zu beiden weiter dasselbe — er darf es auch.
+    expect($ausgefallen->fuerAngemeldetePerson())->toBeFalse();
+
+    Cache::flush();
+
+    expect(freigabeMitWerkzeugen(['list-tasks-tool'])->fuerAngemeldetePerson())->toBeFalse();
+});
+
+it('unterscheidet auch die beiden stillen Faelle', function () {
+    // Sie verhalten sich heute gleich und sind trotzdem getrennt: Eine
+    // fehlende Bruecke bleibt, bis jemand sie installiert — eine fehlende
+    // Freischaltung kann die Person selbst erteilen lassen.
+    expect(freigabeMitWerkzeugen([], BrainBridgeMissing::forPrivateEvents())->zustand())
+        ->toBe(Freigabezustand::BrueckeFehlt);
+
+    Cache::flush();
+
+    expect(freigabeMitWerkzeugen([KalenderFreigabe::WERKZEUG])->zustand())
+        ->toBe(Freigabezustand::Frei);
+});
+
+it('merkt den Ausfall-Zustand NICHT, die anderen sehr wohl', function () {
+    // Die Auflage zu dieser Aenderung: Der Ausfall bleibt ungecacht. Ein
+    // Aussetzer, der fuer die Dauer eines Caches zur Dauerantwort wird, haelt
+    // die Quelle verborgen, obwohl sie wieder da ist.
+    $ausgefallen = freigabeMitWerkzeugen([], new RuntimeException('Nabe weg'));
+
+    $ausgefallen->zustand();
+    $ausgefallen->zustand();
+
+    expect($ausgefallen->abrufe)->toBe(2, 'Ein Ausfall wird erneut versucht.');
+
+    Cache::flush();
+
+    $nichtFrei = freigabeMitWerkzeugen(['list-tasks-tool']);
+
+    $nichtFrei->zustand();
+    $nichtFrei->zustand();
+
+    expect($nichtFrei->abrufe)->toBe(1, 'Eine Auskunft wird gemerkt.');
+});
+
+it('liest einen unbrauchbaren Speicherwert als NICHT gemerkt', function () {
+    // Der lose Weg waere `(bool) $gemerkt`, und der liest ausgerechnet
+    // 'nicht_freigeschaltet' als `true` — ein Wert aus einem aelteren Stand im
+    // noch warmen Speicher wuerde die Quelle fuer jeden oeffnen. Dieselbe
+    // Falle, vor der RemoteResult warnt.
+    $freigabe = freigabeMitWerkzeugen(['list-tasks-tool']);
+
+    Cache::put('calendar.brain_freigabe:'.$freigabe->personId(), true, 60);
+
+    expect($freigabe->zustand())->toBe(Freigabezustand::NichtFreigeschaltet)
+        ->and($freigabe->abrufe)->toBe(1, 'Der unbrauchbare Wert fuehrt zu einer neuen Frage.');
+});
+
+it('meldet den Ausfall als Ausfall — und sonst nichts als Ausfall', function () {
+    $ausgefallen = quelleMitFreigabe(freigabeMitWerkzeugen([], new RuntimeException('Nabe weg')));
+
+    expect($ausgefallen)->toBeInstanceOf(MeldetAusfall::class)
+        ->and($ausgefallen->istAusgefallen())->toBeTrue();
+
+    // Die Gegenproben, und sie sind der eigentliche Inhalt: Wer jedes `false`
+    // als Ausfall meldet, baut den Fehler verkehrt herum wieder ein.
+    Cache::flush();
+    expect(quelleMitFreigabe(freigabeMitWerkzeugen(['list-tasks-tool']))->istAusgefallen())
+        ->toBeFalse('eine fehlende Freischaltung ist kein Ausfall');
+
+    Cache::flush();
+    expect(quelleMitFreigabe(freigabeMitWerkzeugen([KalenderFreigabe::WERKZEUG]))->istAusgefallen())
+        ->toBeFalse('eine freigeschaltete Quelle schon gar nicht');
+});
+
+it('meldet keinen Ausfall, wenn die Bruecke gar nicht da ist', function () {
+    // Ohne diese Reihenfolge wuerde in DIESER Suite — in der die Bruecke
+    // wirklich fehlt (Regel 7) — jede fehlende Bruecke als Ausfall der Nabe
+    // gemeldet. Gegenprobe zur Probe:
+    expect(class_exists('\\Peppermint\\AiBrainBridge\\Facades\\AiBrain'))->toBeFalse();
+
+    expect((new BrainPrivateEventSource(new KalenderFreigabe))->istAusgefallen())->toBeFalse();
+});
+
+it('sagt bei einem Ausfall NICHT, der Kalender sei nicht freigeschaltet', function () {
+    // Bis zum 12.11.2026 stand hier derselbe Satz wie bei einer fehlenden
+    // Freischaltung — und schickte die Person zu einer Administratorin, die
+    // nichts zu tun hat. Dieselbe Luege ueber den Grund, nur an einer zweiten
+    // Stelle.
+    $hinweis = quelleMitFreigabe(freigabeMitWerkzeugen([], new RuntimeException('Nabe weg')))
+        ->abwesenheitsHinweis();
+
+    expect($hinweis)->toBeArray()
+        ->and($hinweis['titel'])->toBe('AI Brain antwortet nicht')
+        ->and($hinweis['text'])->not->toContain('freigeschaltet')
+        ->and($hinweis['text'])->not->toContain('Administrator');
 });
 
 it('erklaert der Oberflaeche, warum die Quelle fehlt', function () {
