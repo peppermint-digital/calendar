@@ -135,3 +135,113 @@ describe('kein Lade- und kein Ausfallzustand', () => {
         expect(zeilen()).toHaveLength(3);
     });
 });
+
+/**
+ * „Aus diesem System geht gerade nichts" — die Absage VOR den vier Schritten
+ * (#9901).
+ *
+ * In der Maske erscheinen vier Aufgabensysteme, einplanen laesst sich aber nur
+ * aus dem eigenen: Eine fremde Aufgabe hat im Manager kein lokales Modell. Ohne
+ * Kennzeichnung geht man vier Stufen und bekommt am Ende eine Absage — und eine
+ * Maske, die hingehen laesst und dann absagt, ist schlechter als eine, die es
+ * vorher sagt.
+ *
+ * Der Satz ist eine LOKALE Angabe des Aufrufers, keine Abfrage: Er steht beim
+ * Zeichnen schon da, wie die Liste selbst.
+ */
+describe('„hier laesst sich nichts einplanen"', () => {
+    const MIT_GRUND: TaskSource[] = [
+        { key: 'manager', label: 'Manager' },
+        {
+            key: 'verwaltung',
+            label: 'Verwaltung',
+            notPlannableReason: 'Aus der Verwaltung laesst sich hier noch nichts einplanen.',
+        },
+    ];
+
+    function gruende(): string[] {
+        return Array.from(
+            document.querySelectorAll('[data-slot="task-source-not-plannable"]'),
+        ).map((zeile) => (zeile.textContent ?? '').trim());
+    }
+
+    it('zeigt den Grund als zweite Zeile unter dem Namen', () => {
+        const { container } = render(<TaskSourcePicker options={MIT_GRUND} onPick={vi.fn()} />);
+
+        expect(gruende()).toEqual(['Aus der Verwaltung laesst sich hier noch nichts einplanen.']);
+
+        // Unter dem Namen und INNERHALB der Zeile, zu der er gehoert — nicht
+        // als eigener Hinweis am Fuss der Liste, der zu nichts zeigt.
+        const zeile = container.querySelector('[data-source="verwaltung"]');
+        expect(zeile?.querySelector('[data-slot="task-source-not-plannable"]')).toBeTruthy();
+    });
+
+    it('laesst ein System ohne Grund aussehen wie heute', () => {
+        const { container } = render(<TaskSourcePicker options={SYSTEME} onPick={vi.fn()} />);
+
+        // Keines der drei traegt einen Grund — also keine zweite Zeile
+        // irgendwo, und die Zeilen sagen weiter genau ihren Namen.
+        expect(container.querySelectorAll('[data-slot="task-source-not-plannable"]')).toHaveLength(
+            0,
+        );
+        expect(zeilen()).toEqual(['Manager', 'Verwaltung', 'AI Brain']);
+    });
+
+    it('nimmt `null` wie „kein Grund"', () => {
+        const { container } = render(
+            <TaskSourcePicker
+                options={[{ key: 'manager', label: 'Manager', notPlannableReason: null }]}
+                onPick={vi.fn()}
+            />,
+        );
+
+        expect(container.querySelectorAll('[data-slot="task-source-not-plannable"]')).toHaveLength(
+            0,
+        );
+    });
+
+    /**
+     * Die Zeile bleibt anklickbar. Suchen funktioniert, und das ist der Wert
+     * der Foederation — ihn wegzunehmen waere schlimmer als die Absage am Ende.
+     */
+    it('bleibt waehlbar — kein disabled, kein aria-disabled', () => {
+        const gewaehlt = vi.fn();
+        const { container } = render(<TaskSourcePicker options={MIT_GRUND} onPick={gewaehlt} />);
+
+        const zeile = container.querySelector<HTMLButtonElement>('[data-source="verwaltung"]')!;
+
+        expect(zeile.disabled).toBe(false);
+        expect(zeile.getAttribute('aria-disabled')).toBeNull();
+
+        fireEvent.click(zeile);
+
+        expect(gewaehlt).toHaveBeenCalledWith(MIT_GRUND[1]);
+    });
+
+    /**
+     * Kein Tooltip: Was nur beim Daraufzeigen erscheint, gibt es auf dem Handy
+     * nicht. Der Satz steht da, bevor jemand irgendwohin zeigt.
+     */
+    it('sagt es ohne Daraufzeigen', () => {
+        const { container } = render(<TaskSourcePicker options={MIT_GRUND} onPick={vi.fn()} />);
+
+        const zeile = container.querySelector('[data-source="verwaltung"]')!;
+
+        expect(zeile.getAttribute('title')).toBeNull();
+        expect(zeile.querySelector('[data-slot="task-source-not-plannable"]')?.textContent).toBe(
+            'Aus der Verwaltung laesst sich hier noch nichts einplanen.',
+        );
+    });
+
+    /**
+     * Und er wird mit vorgelesen: Eine Absage, die nur zu sehen ist, waere fuer
+     * Hilfsmittel wieder der Weg ueber vier Stufen ins Leere.
+     */
+    it('steht im Namen, den Hilfsmittel lesen', () => {
+        render(<TaskSourcePicker options={MIT_GRUND} onPick={vi.fn()} />);
+
+        expect(
+            screen.getByRole('button', { name: /Aus der Verwaltung laesst sich hier noch nichts/ }),
+        ).toBeTruthy();
+    });
+});

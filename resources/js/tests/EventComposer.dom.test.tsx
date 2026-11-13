@@ -1439,6 +1439,74 @@ describe('die Aufgaben-Stufen', () => {
         expect(screen.queryByTestId('plannable-empty')).toBeNull();
     });
 
+    /**
+     * Der Waechter gegen die Zusammenfuehrung (#9901).
+     *
+     * „Aus diesem System laesst sich nichts einplanen" steht in einem EIGENEN
+     * Feld (`notPlannableReason`) und NICHT im `label`. Der Grund ist genau
+     * diese Stelle: Aus denselben Eintraegen baut der Composer die
+     * Namenstabelle fuer die Ausfallzeile der Suche (`sourceNames`, aus
+     * `system.label`). Stuende der Satz im Namen, hiesse die Ausfallzeile
+     * „Verwaltung (nicht einplanbar) konnte nicht gefragt werden".
+     *
+     * Ein Feld zweckentfremden heisst, es an seiner zweiten Lesestelle
+     * kaputtzumachen — und die zweite Lesestelle sieht man beim Bauen nicht.
+     * Dieser Test ist sie.
+     */
+    it('haelt den Grund aus der Namenstabelle der Ausfallzeile heraus', async () => {
+        const GRUND = 'Aus der Verwaltung laesst sich hier noch nichts einplanen.';
+
+        render(
+            <EventComposer
+                kinds={EIGENE}
+                value={null}
+                onSaveHere={vi.fn()}
+                plannable={{
+                    sources: [
+                        { key: 'manager', label: 'Manager' },
+                        { key: 'verwaltung', label: 'Verwaltung', notPlannableReason: GRUND },
+                    ],
+                    search: async () => ({
+                        tasks: [],
+                        ok: [],
+                        failures: {
+                            verwaltung: {
+                                source: 'verwaltung',
+                                reason: 'unreachable',
+                                message: 'Zeitüberschreitung nach 5s',
+                                may_retry: true,
+                            },
+                        },
+                    }),
+                    onSchedule: vi.fn(),
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Aufgabe einplanen' }));
+
+        // Auf der Stufe davor steht der Satz — dafuer ist er da.
+        const zeile = document.querySelector('[data-source="verwaltung"]')!;
+        expect(zeile.querySelector('[data-slot="task-source-not-plannable"]')?.textContent).toBe(
+            GRUND,
+        );
+
+        // Ueber den Griff angeklickt, nicht ueber den Namen: Der Name des
+        // Knopfes traegt den Satz jetzt mit, und genau das ist der Punkt.
+        fireEvent.click(zeile);
+
+        const hinweis = await screen.findByRole('status');
+
+        // Der Name in der Ausfallzeile ist der blanke `label` — ohne den Satz
+        // und ohne eine Spur davon.
+        expect(hinweis.textContent).toContain('Verwaltung');
+        expect(hinweis.textContent).toContain('Zeitüberschreitung nach 5s');
+        expect(hinweis.textContent).not.toContain(GRUND);
+        // Der Wortstamm, nicht das ganze Wort: „(nicht einplanbar)" im Namen
+        // ist genau die Zusammenfuehrung, die dieser Test abfangen soll.
+        expect(hinweis.textContent).not.toContain('einplan');
+    });
+
     it('sagt „nichts offen" nur, wenn das System geantwortet hat', async () => {
         render(
             <EventComposer

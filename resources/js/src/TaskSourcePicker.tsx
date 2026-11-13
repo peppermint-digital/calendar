@@ -8,12 +8,48 @@
  *
  * Mehr steht hier nicht, insbesondere keine Aufgaben: Die kommen erst, wenn das
  * System gewaehlt IST — das ist der ganze Grund fuer diese Stufe.
+ *
+ * Die Ausnahme ist `notPlannableReason`: Das ist keine vierte Frage an die
+ * Registry, sondern eine Angabe des Aufrufers UEBER dieses System — was er mit
+ * einer Aufgabe von dort anfangen kann. Deshalb steht sie hier und nicht
+ * drueben.
  */
 export type TaskSource = {
     key: string;
     label: string;
     /** Die Farbe, unter der das System seine Posten fuehrt. */
     colour?: string | null;
+    /**
+     * Warum aus diesem System gerade nichts eingeplant werden kann. Fehlt oder
+     * `null` = es geht.
+     *
+     * Der Satz steht als zweite, gedaempfte Zeile unter dem Namen. Die Zeile
+     * bleibt dabei anklickbar und ohne `disabled`: Suchen geht weiterhin, und
+     * das ist der Wert der Foederation — ihn wegzunehmen waere schlimmer als die
+     * Absage am Ende.
+     *
+     * ## Warum das ein EIGENES Feld ist und nicht in `label` gehoert
+     *
+     * „Verwaltung (nicht einplanbar)" im `label` waere die naheliegende
+     * Loesung und ist nachweisbar falsch: {@link EventComposer} baut aus
+     * DENSELBEN Eintraegen die Namenstabelle fuer die Ausfallzeile der Suche
+     * (`sourceNames`, aus `system.label`), und {@link PlannableSearch} liest
+     * daraus `sourceNames?.[schluessel] ?? schluessel`. Die Ausfallzeile hiesse
+     * dann „Verwaltung (nicht einplanbar) konnte nicht gefragt werden".
+     *
+     * Ein Feld zweckentfremden heisst, es an seiner zweiten Lesestelle
+     * kaputtzumachen — und die zweite Lesestelle sieht man beim Bauen nicht.
+     * Deshalb bleiben die beiden Felder getrennt, auch wenn sie einmal
+     * nebeneinander wie dasselbe aussehen.
+     *
+     * Und es heisst nicht `unavailableReason`: Das System IST verfuegbar, es
+     * laesst sich durchsuchen und seine Aufgaben erscheinen. Nur einplanen geht
+     * nicht.
+     *
+     * Es ist ein Wert, den der Aufrufer mitgibt — keine Abfrage. Der Satz steht
+     * beim Zeichnen schon da, wie die Liste selbst (siehe unten).
+     */
+    notPlannableReason?: string | null;
 };
 
 export type TaskSourcePickerLabels = {
@@ -111,23 +147,51 @@ export function TaskSourcePicker({
                                     onClick={() => onPick(system)}
                                     aria-pressed={gewaehlt}
                                     className={
-                                        'flex w-full items-center gap-2 rounded-md border p-3 text-left hover:bg-muted ' +
+                                        'w-full rounded-md border p-3 text-left hover:bg-muted ' +
                                         (gewaehlt ? 'border-primary' : '')
                                     }
                                 >
-                                    {/* Die Farbe ist das Wiedererkennungszeichen des
-                                        Systems aus dem Raster — und nur das. Vor
-                                        Hilfsmitteln verborgen: Vorgelesen waere sie
-                                        ein Punkt ohne Aussage, und die Beschriftung
-                                        daneben sagt dasselbe in Worten. */}
-                                    {system.colour && (
+                                    <span className="flex items-center gap-2">
+                                        {/* Die Farbe ist das Wiedererkennungszeichen des
+                                            Systems aus dem Raster — und nur das. Vor
+                                            Hilfsmitteln verborgen: Vorgelesen waere sie
+                                            ein Punkt ohne Aussage, und die Beschriftung
+                                            daneben sagt dasselbe in Worten. */}
+                                        {system.colour && (
+                                            <span
+                                                aria-hidden="true"
+                                                className="size-2.5 shrink-0 rounded-full"
+                                                style={{ backgroundColor: system.colour }}
+                                            />
+                                        )}
+                                        <span className="text-sm font-medium">{system.label}</span>
+                                    </span>
+
+                                    {/*
+                                        Warum aus diesem System gerade nichts
+                                        eingeplant werden kann — als zweite Zeile
+                                        unter dem Namen und NICHT als Zusatz im
+                                        Namen selbst (siehe {@link TaskSource}).
+
+                                        Kein Tooltip: Was nur beim Daraufzeigen
+                                        erscheint, gibt es auf dem Handy nicht.
+                                        Und kein `disabled`/`aria-disabled`: Die
+                                        Zeile bleibt waehlbar, weil Suchen
+                                        weiterhin geht.
+
+                                        Innerhalb des Knopfes, damit Hilfsmittel
+                                        den Satz mit vorlesen — eine Absage, die
+                                        nur zu sehen ist, waere fuer sie wieder
+                                        der Weg ueber vier Stufen ins Leere.
+                                    */}
+                                    {system.notPlannableReason && (
                                         <span
-                                            aria-hidden="true"
-                                            className="size-2.5 shrink-0 rounded-full"
-                                            style={{ backgroundColor: system.colour }}
-                                        />
+                                            data-slot="task-source-not-plannable"
+                                            className="mt-1 block text-xs text-muted-foreground"
+                                        >
+                                            {system.notPlannableReason}
+                                        </span>
                                     )}
-                                    <span className="text-sm font-medium">{system.label}</span>
                                 </button>
                             </li>
                         );
