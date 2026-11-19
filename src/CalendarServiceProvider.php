@@ -23,8 +23,16 @@ class CalendarServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/calendar.php', 'calendar');
 
+        // `singleton` mit Absicht (Bug #1522): Die Person kommt als ARGUMENT
+        // (`forUser($id)`, `forKind($art, $id)`), nie aus der Wache. Gemerkt
+        // wird nur, ob die Zuordnungstabelle existiert — eine Schema-Frage.
         $this->app->singleton(CategoryRegistry::class);
 
+        // `singleton` mit Absicht (Bug #1522): Die Arten kommen aus
+        // `calendar.kinds`, nicht aus der Wache. Gemessen am 19.11.2026: In
+        // Manager, CRM, Verwaltung und im Kalender-Plugin von ai-brain hat
+        // keine Art einen Konstruktor oder fragt Auth. Wer das aendert, holt
+        // dieses Register zu `scoped` (siehe EventSourceRegistry unten).
         $this->app->singleton(EventKindRegistry::class, function ($app): EventKindRegistry {
             $registry = new EventKindRegistry;
 
@@ -79,7 +87,45 @@ class CalendarServiceProvider extends ServiceProvider
             $app->make(KalenderFreigabe::class),
         ));
 
-        $this->app->singleton(EventSourceRegistry::class, function ($app): EventSourceRegistry {
+        /*
+        | Das Quellen-Register ist `scoped`, nicht `singleton` (Bug #1522).
+        |
+        | Sein INHALT haengt an der angemeldeten Person: Manager, CRM und
+        | Verwaltung haengen per `extend()` die Kalender der anderen Systeme
+        | hinein (`BrainCalendarSources::build()`), und das fragt BEIM BAUEN
+        | die Wache — ohne Person meldet es null Quellen, mit Person die, fuer
+        | die DIESE Person freigeschaltet ist. Ein `singleton` frore diese
+        | Antwort fuer die Lebenszeit des Behaelters ein. Unter FPM ist das eine
+        | Anfrage und folgenlos; unter Octane und im Warteschlangen-Arbeiter
+        | lebt der Behaelter Stunden, und dann gilt:
+        |
+        |   erst ohne Anmeldung, dann mit  → die Liste bleibt LEER
+        |   erst Person A, dann Person B   → B sieht die Liste von A
+        |
+        | Beides lautlos. Dieselbe Fehlerform wie #1479 im Aufgaben-Paket, und
+        | dieselbe Behebung: `scoped` lebt eine Anfrage bzw. eine Aufgabe,
+        | weil Octane und der Arbeiter dazwischen `forgetScopedInstances()`
+        | rufen. Innerhalb einer Anfrage bleibt es EIN Register — die Quellen
+        | werden nicht je Aufloesung neu gebaut.
+        |
+        | Die uebrigen Bindungen dieser Datei bleiben `singleton`, und zwar
+        | jede aus einem benennbaren Grund — nicht „alle", sondern „was an der
+        | Person haengt":
+        |
+        |   EventKindRegistry   Arten aus `calendar.kinds`, keine Wache
+        |   CategoryRegistry    zustandslos bis auf die Schema-Frage; die
+        |                       Person kommt als Argument (`forUser($id)`)
+        |   KalenderFreigabe    haelt nur den NAMEN der Wache und fragt die
+        |                       Person bei jedem Aufruf neu; gemerkt wird
+        |                       im Cache unter der Personen-ID
+        |   BrainPrivate-/BrainSubscribedEventSource
+        |                       halten nur die KalenderFreigabe und fragen
+        |                       ebenso zur Aufrufzeit
+        |
+        | Wer eine davon kuenftig beim BAUEN nach der Person fragen laesst,
+        | muss sie hierher holen.
+        */
+        $this->app->scoped(EventSourceRegistry::class, function ($app): EventSourceRegistry {
             $registry = new EventSourceRegistry;
 
             foreach ((array) $app['config']->get('calendar.sources', []) as $class) {
