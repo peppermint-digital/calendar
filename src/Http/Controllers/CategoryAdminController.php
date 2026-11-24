@@ -101,11 +101,15 @@ class CategoryAdminController
         $kategorie = CalendarCategory::query()->create(CalendarCategory::onlyExistingColumns([
             CalendarCategory::column('slug') => $slug,
             CalendarCategory::column('label') => $daten['label'],
-            CalendarCategory::column('colour') => $daten['colour'] ?? null,
             CalendarCategory::column('sort_order') => $daten['sort_order'] ?? 0,
             CalendarCategory::column('is_active') => $daten['is_active'] ?? true,
             CalendarCategory::column('kind') => $daten['kind'] ?? null,
             CalendarCategory::column('owner_id') => null,
+            // Ohne Farbe bleibt die Spalte AUS dem Einfuegen, statt NULL zu
+            // bekommen: Im Peppermint Manager heisst sie `color` und ist
+            // NOT NULL mit Vorgabe — ein ausdrueckliches NULL endete dort in
+            // einer 500 (#10195). Dieselbe Regel wie in `CategorySync::farbe()`.
+            ...(filled($daten['colour'] ?? null) ? [CalendarCategory::column('colour') => $daten['colour']] : []),
         ]));
 
         return response()->json(['category' => $this->alsZeile($kategorie)], 201);

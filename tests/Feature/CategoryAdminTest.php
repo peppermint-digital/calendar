@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Peppermint\Calendar\Categories\EventCategories;
@@ -153,4 +154,35 @@ it('does not ask when no ability is configured', function () {
     config()->set('calendar.categories.manage_ability', null);
 
     $this->getJson('/api/calendar/categories')->assertOk();
+});
+
+/**
+ * Without a colour the insert must leave the column out, not write NULL.
+ *
+ * Found on 24.11.2026 (#10195) when the Peppermint Manager switched to this
+ * screen: there the column is `color`, NOT NULL with a default. An explicit
+ * NULL failed the request with a 500 — the same trap `CategorySync::farbe()`
+ * already avoids (#4620). "No colour given" means "use the default", not
+ * "the colour is nothing".
+ */
+it('leaves the colour to the column default when none is given', function () {
+    $einfuegen = [];
+    DB::listen(function ($abfrage) use (&$einfuegen): void {
+        if (str_starts_with(strtolower($abfrage->sql), 'insert')) {
+            $einfuegen[] = $abfrage->sql;
+        }
+    });
+
+    $this->postJson('/api/calendar/categories', ['label' => 'Ohne Farbe'])->assertCreated();
+
+    expect($einfuegen)->toHaveCount(1)
+        ->and($einfuegen[0])->not->toContain(CalendarCategory::column('colour'));
+});
+
+it('does not clear the colour when an update sends none', function () {
+    $kategorie = pflegeKategorie(['slug' => 'rot', 'label' => 'Rot', 'colour' => '#ff0000']);
+
+    $this->patchJson("/api/calendar/categories/{$kategorie->id}", ['label' => 'Rot bleibt', 'colour' => null])->assertOk();
+
+    expect($kategorie->refresh()->field('colour'))->toBe('#ff0000');
 });
